@@ -1,0 +1,12 @@
+name: edwindayot-landing
+services:
+  landing:
+    build: .
+    image: edwindayot-portfolio:latest
+    container_name: edwindayot-landing
+    restart: unless-stopped
+    networks:
+      - traefik-public
+networks:
+  traefik-public:
+    external: true
