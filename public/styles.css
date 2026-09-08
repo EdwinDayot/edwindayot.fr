@@ -13,6 +13,10 @@ a{color:inherit;text-decoration:none}a:focus-visible,summary:focus-visible{outli
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.reveal{opacity:1;transform:none;transition:none}.button,.phone-row img{transition:none}.phone-row img:hover{transform:none}.hero-art img{min-height:0}.reading-progress{animation:none;transform:scaleX(1)}}
 @media print{body{background:#fff;color:#111}.site-header nav,.hero-art,.reading-progress,.hero-actions,.project-nav,.phone-gallery,.api-section,.site-footer{display:none}.project,.project-outline{break-inside:avoid;border:1px solid #ddd;background:#fff;color:#111}.reveal{opacity:1;transform:none}.detail-grid{display:grid}}
 
+/* Hero reel: a small index of the product worlds inside the opening frame. */
+.hero-art-wrap{min-width:0}.hero-reel{display:flex;gap:18px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:13px;margin-top:12px}.hero-reel button{padding:0;border:0;border-bottom:1px solid transparent;background:none;color:var(--muted);font:700 .68rem/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:color .2s ease,border-color .2s ease}.hero-reel button:hover,.hero-reel button:focus-visible,.hero-reel button[aria-selected=true]{color:var(--accent);border-color:var(--accent)}.hero-art img{transition:opacity .24s ease}.hero-art.is-changing .hero-reel-image{opacity:.35}
+@media(max-width:600px){.hero-reel{gap:12px}.hero-reel button{font-size:.64rem}}
+
 /* Signature interaction: project chapters stay available while the reader explores. */
 .project-nav{position:sticky;top:76px;z-index:4;background:rgba(12,13,13,.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
 .project-nav a{transition:color .25s ease,transform .25s ease}.project-nav a:hover{color:var(--ink);transform:translateY(-2px)}.project-nav a[aria-current=location]{color:var(--accent);text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:7px}

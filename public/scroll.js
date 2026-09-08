@@ -4,6 +4,9 @@
   const projectLinks = [...document.querySelectorAll('.project-nav a')];
   const projects = projectLinks.map(link => document.querySelector(link.hash)).filter(Boolean);
   const heroArt = document.querySelector('.hero-art');
+  const heroImage = document.querySelector('.hero-reel-image');
+  const heroCaption = document.querySelector('.hero-caption');
+  const reelButtons = [...document.querySelectorAll('.hero-reel button')];
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   if (progress) progress.value = 100;
@@ -33,6 +36,28 @@
       heroArt.style.setProperty('--art-x', '0px');
       heroArt.style.setProperty('--art-y', '0px');
     });
+  }
+
+  if (heroImage && heroCaption && reelButtons.length) {
+    let switchTimer;
+    const switchReel = button => {
+      const image = button.dataset.image;
+      if (!image) return;
+      reelButtons.forEach(item => item.setAttribute('aria-selected', item === button ? 'true' : 'false'));
+      heroCaption.textContent = button.dataset.caption || '';
+      heroImage.alt = button.dataset.alt || '';
+      window.clearTimeout(switchTimer);
+      if (reducedMotion) {
+        heroImage.src = image;
+        return;
+      }
+      heroArt?.classList.add('is-changing');
+      switchTimer = window.setTimeout(() => {
+        heroImage.src = image;
+        heroArt?.classList.remove('is-changing');
+      }, 140);
+    };
+    reelButtons.forEach(button => button.addEventListener('click', () => switchReel(button)));
   }
 
   if ('IntersectionObserver' in window && projectLinks.length) {
