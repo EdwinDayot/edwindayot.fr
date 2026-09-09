@@ -122,6 +122,168 @@
     renderQuest();
     showQuestToast('Parcours réinitialisé.');
   });
+
+  const gameCanvas = document.querySelector('#shipping-game');
+  const gameStart = document.querySelector('#game-start');
+  const gameStartPanel = document.querySelector('.game-start');
+  const gameStartLabel = gameStartPanel?.querySelector('span');
+  const gameScore = document.querySelector('#game-score');
+  const gameTime = document.querySelector('#game-time');
+  const gameStatus = document.querySelector('#game-status');
+  const gameControls = [...document.querySelectorAll('[data-game-control]')];
+
+  if (gameCanvas && gameStart) {
+    const context = gameCanvas.getContext('2d');
+    const gameWidth = gameCanvas.width;
+    const gameHeight = gameCanvas.height;
+    const player = { x: gameWidth / 2 - 42, y: gameHeight - 62, width: 84, height: 28, speed: 440 };
+    const pressed = new Set();
+    let fallingItems = [];
+    let gameScoreValue = 0;
+    let gameSeconds = 30;
+    let spawnClock = 0;
+    let running = false;
+    let lastFrame = 0;
+    let animationFrame;
+
+    const drawText = (text, x, y, color, size = 12) => {
+      context.fillStyle = color;
+      context.font = `700 ${size}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+      context.fillText(text, x, y);
+    };
+
+    const drawGame = () => {
+      context.clearRect(0, 0, gameWidth, gameHeight);
+      context.fillStyle = '#111515';
+      context.fillRect(0, 0, gameWidth, gameHeight);
+      context.strokeStyle = 'rgba(201,244,90,.12)';
+      context.lineWidth = 1;
+      for (let x = 0; x <= gameWidth; x += 48) {
+        context.beginPath();
+        context.moveTo(x, 0);
+        context.lineTo(x, gameHeight);
+        context.stroke();
+      }
+      for (let y = 0; y <= gameHeight; y += 48) {
+        context.beginPath();
+        context.moveTo(0, y);
+        context.lineTo(gameWidth, y);
+        context.stroke();
+      }
+      fallingItems.forEach(item => {
+        context.fillStyle = item.type === 'bug' ? '#ff7666' : item.type === 'ship' ? '#8ed8ff' : '#c9f45a';
+        context.beginPath();
+        context.arc(item.x, item.y, 18, 0, Math.PI * 2);
+        context.fill();
+        drawText(item.label, item.x - 9, item.y + 4, '#11150d', 10);
+      });
+      context.fillStyle = '#f0f1ea';
+      context.beginPath();
+      context.roundRect(player.x, player.y, player.width, player.height, 7);
+      context.fill();
+      context.fillStyle = '#c9f45a';
+      context.beginPath();
+      context.moveTo(player.x + 30, player.y);
+      context.lineTo(player.x + 42, player.y - 18);
+      context.lineTo(player.x + 54, player.y);
+      context.fill();
+      drawText('SHIP', player.x + 24, player.y + 18, '#11150d', 10);
+      if (!running) drawText(gameScoreValue >= 12 ? 'BUILD LIVRÉ' : 'READY', 22, 34, '#c9f45a', 13);
+    };
+
+    const updateHud = () => {
+      if (gameScore) gameScore.textContent = String(gameScoreValue);
+      if (gameTime) gameTime.textContent = String(Math.max(0, Math.ceil(gameSeconds)));
+    };
+
+    const endGame = won => {
+      running = false;
+      window.cancelAnimationFrame(animationFrame);
+      if (won) {
+        completeQuest('game', 'Étape 05 débloquée. Produit livré.');
+        if (gameStatus) gameStatus.textContent = 'Build livré. Tu peux rejouer pour battre ton score.';
+        if (gameStartLabel) gameStartLabel.textContent = 'Le produit est en production.';
+      } else {
+        if (gameStatus) gameStatus.textContent = 'Le délai est passé. Rejoue et sécurise le build.';
+        if (gameStartLabel) gameStartLabel.textContent = 'Le build a besoin d’un autre passage.';
+      }
+      gameStart.textContent = won ? 'Rejouer' : 'Réessayer';
+      gameStartPanel?.classList.remove('is-hidden');
+      drawGame();
+    };
+
+    const spawnItem = () => {
+      const bug = Math.random() < 0.24;
+      const ship = !bug && Math.random() < 0.12;
+      fallingItems.push({
+        x: 26 + Math.random() * (gameWidth - 52),
+        y: -22,
+        speed: 150 + Math.random() * 110,
+        type: bug ? 'bug' : ship ? 'ship' : 'signal',
+        label: bug ? '!' : ship ? '+' : '○'
+      });
+    };
+
+    const frame = time => {
+      if (!running) return;
+      const delta = Math.min((time - lastFrame) / 1000, 0.05);
+      lastFrame = time;
+      gameSeconds -= delta;
+      spawnClock += delta;
+      if (spawnClock > 0.52) {
+        spawnClock = 0;
+        spawnItem();
+      }
+      if (pressed.has('ArrowLeft') || pressed.has('a')) player.x -= player.speed * delta;
+      if (pressed.has('ArrowRight') || pressed.has('d')) player.x += player.speed * delta;
+      player.x = Math.max(0, Math.min(gameWidth - player.width, player.x));
+      fallingItems = fallingItems.filter(item => {
+        item.y += item.speed * delta;
+        const hit = item.x > player.x - 10 && item.x < player.x + player.width + 10 && item.y > player.y - 18 && item.y < player.y + player.height + 18;
+        if (hit) {
+          gameScoreValue += item.type === 'bug' ? -2 : item.type === 'ship' ? 2 : 1;
+          gameScoreValue = Math.max(0, gameScoreValue);
+          return false;
+        }
+        return item.y < gameHeight + 24;
+      });
+      updateHud();
+      drawGame();
+      if (gameScoreValue >= 12) return endGame(true);
+      if (gameSeconds <= 0) return endGame(false);
+      animationFrame = window.requestAnimationFrame(frame);
+    };
+
+    const startGame = () => {
+      fallingItems = [];
+      gameScoreValue = 0;
+      gameSeconds = 30;
+      spawnClock = 0;
+      player.x = gameWidth / 2 - 42;
+      running = true;
+      lastFrame = performance.now();
+      gameStartPanel?.classList.add('is-hidden');
+      if (gameStatus) gameStatus.textContent = 'Collecte les signaux verts. Évite les bugs rouges.';
+      updateHud();
+      animationFrame = window.requestAnimationFrame(frame);
+    };
+
+    gameStart.addEventListener('click', startGame);
+    gameControls.forEach(control => {
+      const direction = control.dataset.gameControl === 'left' ? 'ArrowLeft' : 'ArrowRight';
+      control.addEventListener('pointerdown', () => pressed.add(direction));
+      ['pointerup', 'pointercancel', 'pointerleave'].forEach(eventName => control.addEventListener(eventName, () => pressed.delete(direction)));
+    });
+    window.addEventListener('keydown', event => {
+      if (['ArrowLeft', 'ArrowRight', 'a', 'd'].includes(event.key)) {
+        pressed.add(event.key);
+        if (running) event.preventDefault();
+      }
+    });
+    window.addEventListener('keyup', event => pressed.delete(event.key));
+    drawGame();
+    updateHud();
+  }
   projectLinks.forEach(link => link.addEventListener('click', () => completeQuest('project', 'Étape 01 débloquée.')));
   document.querySelectorAll('.project details').forEach(details => details.addEventListener('toggle', () => {
     if (details.open) completeQuest('details', 'Étape 02 débloquée.');
