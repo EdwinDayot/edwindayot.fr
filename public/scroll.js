@@ -60,6 +60,73 @@
     reelButtons.forEach(button => button.addEventListener('click', () => switchReel(button)));
   }
 
+  const questItems = [...document.querySelectorAll('[data-quest-item]')];
+  const questScore = document.querySelector('#quest-score');
+  const questStatus = document.querySelector('#quest-status');
+  const questProgress = document.querySelector('.quest-progress');
+  const questFill = document.querySelector('#quest-progress-fill');
+  const questReset = document.querySelector('#quest-reset');
+  const questKey = 'edwin-dayot-exploration-v1';
+  const questNames = questItems.map(item => item.dataset.questItem);
+  let questState = {};
+
+  try {
+    questState = JSON.parse(window.localStorage.getItem(questKey) || '{}');
+  } catch (error) {
+    questState = {};
+  }
+
+  const showQuestToast = message => {
+    const toast = document.createElement('div');
+    toast.className = 'quest-toast';
+    toast.setAttribute('role', 'status');
+    toast.textContent = message;
+    document.body.append(toast);
+    window.requestAnimationFrame(() => toast.classList.add('is-visible'));
+    window.setTimeout(() => {
+      toast.classList.remove('is-visible');
+      window.setTimeout(() => toast.remove(), 280);
+    }, 2300);
+  };
+
+  const renderQuest = () => {
+    const complete = questNames.filter(name => questState[name]).length;
+    questItems.forEach(item => item.classList.toggle('is-complete', Boolean(questState[item.dataset.questItem])));
+    if (questScore) questScore.textContent = complete * 25;
+    if (questStatus) questStatus.textContent = `${complete} / ${questNames.length} étapes`;
+    if (questFill) questFill.style.width = `${(complete / questNames.length) * 100}%`;
+    questProgress?.setAttribute('aria-valuenow', String(complete));
+    document.body.classList.toggle('quest-complete', complete === questNames.length);
+  };
+
+  const completeQuest = (name, message) => {
+    if (!questNames.includes(name) || questState[name]) return;
+    questState[name] = true;
+    try {
+      window.localStorage.setItem(questKey, JSON.stringify(questState));
+    } catch (error) {
+      // The visual progression still works when storage is unavailable.
+    }
+    renderQuest();
+    showQuestToast(message);
+  };
+
+  renderQuest();
+  questReset?.addEventListener('click', () => {
+    questState = {};
+    try {
+      window.localStorage.removeItem(questKey);
+    } catch (error) {
+      // Ignore storage restrictions.
+    }
+    renderQuest();
+    showQuestToast('Parcours réinitialisé.');
+  });
+  projectLinks.forEach(link => link.addEventListener('click', () => completeQuest('project', 'Étape 01 débloquée.')));
+  document.querySelectorAll('.project details').forEach(details => details.addEventListener('toggle', () => {
+    if (details.open) completeQuest('details', 'Étape 02 débloquée.');
+  }));
+
   if ('IntersectionObserver' in window && projectLinks.length) {
     const initialProject = projectLinks.find(link => link.hash === window.location.hash) || projectLinks[0];
     initialProject?.setAttribute('aria-current', 'location');
@@ -68,11 +135,20 @@
         .filter(entry => entry.isIntersecting)
         .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
       if (!visible) return;
+      completeQuest('project', 'Étape 01 débloquée.');
       projectLinks.forEach(link => {
         link.toggleAttribute('aria-current', link.hash === `#${visible.target.id}`);
       });
     }, { threshold: [0.15, 0.45, 0.75], rootMargin: '-18% 0px -55% 0px' });
     projects.forEach(project => activeObserver.observe(project));
+  }
+
+  const contactSection = document.querySelector('.contact');
+  if ('IntersectionObserver' in window && contactSection) {
+    const contactObserver = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) completeQuest('contact', 'Parcours terminé.');
+    }, { threshold: 0.35 });
+    contactObserver.observe(contactSection);
   }
 
   if (projectLinks.length && window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
@@ -120,6 +196,7 @@
     image.setAttribute('aria-label', `Agrandir : ${image.alt}`);
 
     const openLightbox = () => {
+      completeQuest('capture', 'Étape 03 débloquée.');
       lightboxImage.src = image.currentSrc || image.src;
       lightboxImage.alt = image.alt;
       lightboxCaption.textContent = image.alt;
