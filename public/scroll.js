@@ -284,6 +284,201 @@
     drawGame();
     updateHud();
   }
+
+  const plantGame = document.querySelector('.plant-game');
+  const plantCards = [...document.querySelectorAll('.plant-card')];
+  const plantButtons = [...document.querySelectorAll('[data-water]')];
+  const plantPrompt = document.querySelector('#game-prompt');
+  const plantFeedback = document.querySelector('#game-feedback');
+  const plantRound = document.querySelector('#game-round');
+  const plantScore = document.querySelector('#game-score');
+  const plantStart = document.querySelector('#game-start');
+  const plantStartPanel = document.querySelector('.plant-game .game-start');
+  const plantStartLabel = plantStartPanel?.querySelector('span');
+  const plantStatus = document.querySelector('#game-status');
+
+  if (plantGame && plantStart && plantCards.length) {
+    const plants = new Map(plantCards.map(card => [card.dataset.plant, { moisture: Number(card.querySelector('.moisture-meter').getAttribute('aria-valuenow')) }]));
+    let phase = 'seed';
+    let selectedPlant = null;
+    let careCount = 0;
+    let careScore = 0;
+    let running = false;
+    let careLock = false;
+    let timer;
+    let updatePlantWorld = () => {};
+
+    const updatePlantCard = (card, plant) => {
+      const state = plants.get(plant);
+      const meter = card.querySelector('.moisture-meter');
+      const fill = card.querySelector('[data-moisture-fill]');
+      const label = card.querySelector('[data-moisture-label]');
+      meter.setAttribute('aria-valuenow', String(state.moisture));
+      fill.style.width = `${state.moisture}%`;
+      label.textContent = state.moisture < 35 ? 'soif' : state.moisture > 72 ? 'trop humide' : 'stable';
+      card.classList.toggle('is-thirsty', state.moisture < 35);
+      card.classList.toggle('is-overwatered', state.moisture > 72);
+    };
+
+    const setPhase = nextPhase => {
+      phase = nextPhase;
+      updatePlantWorld();
+      plantCards.forEach(card => {
+        const active = card.dataset.plant === selectedPlant;
+        card.classList.toggle('is-selected', active);
+        card.classList.toggle('is-sprouted', active && phase !== 'seed');
+        card.classList.toggle('is-growing', active && phase === 'care' && careCount > 3);
+      });
+      plantButtons.forEach(button => {
+        const active = button.dataset.water === selectedPlant;
+        button.disabled = phase === 'seed' ? false : !active || !running || careLock;
+        button.textContent = phase === 'seed' ? 'Planter + ' : phase === 'sprout' ? 'Faire germer ↗' : 'Arroser + ';
+      });
+      if (phase === 'seed') plantPrompt.textContent = 'Choisis un pot et plante ta graine.';
+      if (phase === 'sprout') plantPrompt.textContent = 'La graine est en terre. Donne-lui son premier soin.';
+      if (phase === 'care') plantPrompt.textContent = 'La pousse est là. Maintiens son humidité aussi longtemps que tu veux.';
+    };
+
+    const updateGameHud = () => {
+      plantRound.textContent = String(careCount);
+      plantScore.textContent = String(careScore);
+      plantCards.forEach(card => updatePlantCard(card, card.dataset.plant));
+    };
+
+    const startPlantGame = () => {
+      running = true;
+      phase = 'seed';
+      selectedPlant = null;
+      careCount = 0;
+      careScore = 0;
+      careLock = false;
+      plants.forEach(state => { state.moisture = 28; });
+      plantFeedback.textContent = 'Lis les jauges, puis choisis ton pot.';
+      plantStatus.textContent = 'Plante une graine pour commencer.';
+      plantStartPanel.classList.add('is-hidden');
+      setPhase('seed');
+      updateGameHud();
+      window.clearInterval(timer);
+      timer = window.setInterval(() => {
+        if (!running) return;
+        if (selectedPlant && phase === 'care') plants.get(selectedPlant).moisture = Math.max(0, plants.get(selectedPlant).moisture - 2);
+        updateGameHud();
+      }, 1000);
+    };
+
+    const worldHost = document.createElement('div');
+    worldHost.className = 'three-stage';
+    worldHost.innerHTML = '<canvas id="plant-world" aria-label="Scène 3D de la plante en cours de croissance"></canvas><span id="plant-world-label">Choisis un pot pour commencer.</span>';
+    plantGame.querySelector('.plant-game-content')?.prepend(worldHost);
+    const worldCanvas = worldHost.querySelector('canvas');
+    const worldLabel = worldHost.querySelector('span');
+
+    if (window.THREE && worldCanvas) {
+      try {
+        const scene = new window.THREE.Scene();
+        const camera = new window.THREE.PerspectiveCamera(32, 2, 0.1, 100);
+        camera.position.set(0, 1.7, 6.5);
+        camera.lookAt(0, 1, 0);
+        const renderer = new window.THREE.WebGLRenderer({ canvas: worldCanvas, alpha: true, antialias: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        renderer.setClearColor(0x000000, 0);
+        scene.add(new window.THREE.HemisphereLight(0xd9f5cb, 0x16251c, 2.2));
+        const keyLight = new window.THREE.DirectionalLight(0xc9f45a, 2.8);
+        keyLight.position.set(-3, 5, 4);
+        scene.add(keyLight);
+        const ground = new window.THREE.Mesh(new window.THREE.CircleGeometry(2.5, 48), new window.THREE.MeshStandardMaterial({ color: 0x19241d, roughness: 1 }));
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -0.45;
+        scene.add(ground);
+        const plantWorld = new window.THREE.Group();
+        const pot = new window.THREE.Mesh(new window.THREE.CylinderGeometry(.78, .58, .85, 32), new window.THREE.MeshStandardMaterial({ color: 0xc66f36, roughness: .65 }));
+        pot.position.y = 0;
+        plantWorld.add(pot);
+        const soil = new window.THREE.Mesh(new window.THREE.CylinderGeometry(.64, .64, .08, 32), new window.THREE.MeshStandardMaterial({ color: 0x332219, roughness: 1 }));
+        soil.position.y = .44;
+        plantWorld.add(soil);
+        const stem = new window.THREE.Mesh(new window.THREE.CylinderGeometry(.065, .09, 2.2, 12), new window.THREE.MeshStandardMaterial({ color: 0x4c9a4c, roughness: .8 }));
+        stem.position.y = 1.48;
+        const leaves = [];
+        for (let index = 0; index < 5; index += 1) {
+          const leaf = new window.THREE.Mesh(new window.THREE.SphereGeometry(.46, 20, 12), new window.THREE.MeshStandardMaterial({ color: index % 2 ? 0x8acb54 : 0xc9f45a, roughness: .72 }));
+          leaf.scale.set(.9, .18, .55);
+          const angle = (index / 5) * Math.PI * 2;
+          leaf.position.set(Math.cos(angle) * .52, 1.8 + (index % 2) * .42, Math.sin(angle) * .42);
+          leaf.rotation.y = -angle;
+          plantWorld.add(leaf);
+          leaves.push(leaf);
+        }
+        plantWorld.add(stem);
+        plantWorld.scale.setScalar(.08);
+        plantWorld.position.y = -.15;
+        scene.add(plantWorld);
+        const resizeWorld = () => {
+          const width = worldHost.clientWidth || 640;
+          const height = worldHost.clientHeight || 270;
+          renderer.setSize(width, height, false);
+          camera.aspect = width / height;
+          camera.updateProjectionMatrix();
+        };
+        const resizeObserver = new ResizeObserver(resizeWorld);
+        resizeObserver.observe(worldHost);
+        resizeWorld();
+        updatePlantWorld = () => {
+          const growth = phase === 'seed' ? .08 : phase === 'sprout' ? .52 : Math.min(1.08, .72 + careCount * .045);
+          plantWorld.scale.setScalar(growth);
+          plantWorld.rotation.y = selectedPlant ? (selectedPlant === 'monstera' ? -.22 : selectedPlant === 'calathea' ? .22 : 0) : 0;
+          worldLabel.textContent = phase === 'seed' ? 'Graine prête à planter' : phase === 'sprout' ? 'Première pousse' : `Croissance ${careCount}`;
+        };
+        const animateWorld = time => {
+          const secondsNow = time * .001;
+          plantWorld.rotation.z = Math.sin(secondsNow * 1.2) * .035;
+          leaves.forEach((leaf, index) => { leaf.rotation.z = Math.sin(secondsNow * 1.4 + index) * .12; });
+          renderer.render(scene, camera);
+          window.requestAnimationFrame(animateWorld);
+        };
+        updatePlantWorld();
+        window.requestAnimationFrame(animateWorld);
+      } catch (error) {
+        worldLabel.textContent = 'Scène 3D indisponible dans ce navigateur';
+      }
+    }
+
+    plantStart.addEventListener('click', startPlantGame);
+    plantButtons.forEach(button => button.addEventListener('click', () => {
+      if (!running) return;
+      const plant = button.dataset.water;
+      if (phase === 'seed') {
+        selectedPlant = plant;
+        careScore += 10;
+        setPhase('sprout');
+        plantFeedback.textContent = `Graine plantée dans le pot ${plant}.`;
+        plantStatus.textContent = 'Encore un geste pour faire germer la graine.';
+      } else if (phase === 'sprout' && plant === selectedPlant) {
+        careScore += 20;
+        plants.get(plant).moisture = 42;
+        setPhase('care');
+        plantFeedback.textContent = 'La pousse est sortie. La routine peut commencer.';
+        plantStatus.textContent = 'Arrose quand la jauge passe dans la zone soif.';
+      } else if (phase === 'care' && plant === selectedPlant) {
+        const state = plants.get(plant);
+        if (state.moisture > 68) {
+          careScore = Math.max(0, careScore - 5);
+          plantFeedback.textContent = 'Trop d’eau. Attends que la jauge redescende.';
+          return;
+        }
+        state.moisture = Math.min(80, state.moisture + 24);
+        careCount += 1;
+        careScore += 10;
+        if (careCount === 1) completeQuest('game', 'Étape 05 débloquée. La routine est lancée.');
+        careLock = true;
+        plantFeedback.textContent = `Soin ${careCount} réussi. La routine continue.`;
+        window.setTimeout(() => { careLock = false; setPhase('care'); updateGameHud(); }, 650);
+      }
+      updateGameHud();
+    }));
+    setPhase('seed');
+    updateGameHud();
+  }
   projectLinks.forEach(link => link.addEventListener('click', () => completeQuest('project', 'Étape 01 débloquée.')));
   document.querySelectorAll('.project details').forEach(details => details.addEventListener('toggle', () => {
     if (details.open) completeQuest('details', 'Étape 02 débloquée.');
