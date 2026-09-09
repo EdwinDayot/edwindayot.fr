@@ -297,7 +297,7 @@
   const plantStartLabel = plantStartPanel?.querySelector('span');
   const plantStatus = document.querySelector('#game-status');
 
-  if (plantGame && plantStart && plantCards.length) {
+  if (plantGame && plantStart && plantCards.length && !document.querySelector('#garden-world')) {
     const plants = new Map(plantCards.map(card => [card.dataset.plant, { moisture: Number(card.querySelector('.moisture-meter').getAttribute('aria-valuenow')) }]));
     let phase = 'seed';
     let selectedPlant = null;
@@ -478,6 +478,136 @@
     }));
     setPhase('seed');
     updateGameHud();
+  }
+
+  const gardenCanvas = document.querySelector('#garden-world');
+  if (gardenCanvas && window.THREE) {
+    const gardenStage = gardenCanvas.parentElement;
+    const gardenStatus = document.querySelector('#garden-status');
+    const gardenToast = document.querySelector('#garden-toast');
+    const gardenWaterCount = document.querySelector('#garden-water-count');
+    const gardenPlantCount = document.querySelector('#garden-plant-count');
+    const gardenCoins = document.querySelector('#garden-coins');
+    const gardenKeys = new Set();
+    const gardenWorld = new window.THREE.Scene();
+    gardenWorld.fog = new window.THREE.Fog(0xc9e1c2, 12, 32);
+    gardenWorld.background = new window.THREE.Color(0xc9e1c2);
+    const gardenCamera = new window.THREE.PerspectiveCamera(42, 1, .1, 60);
+    const gardenRenderer = new window.THREE.WebGLRenderer({ canvas: gardenCanvas, antialias: true });
+    gardenRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    gardenRenderer.shadowMap.enabled = true;
+    gardenRenderer.shadowMap.type = window.THREE.PCFSoftShadowMap;
+    gardenWorld.add(new window.THREE.HemisphereLight(0xf6ffe9, 0x6b806f, 2.3));
+    const gardenSun = new window.THREE.DirectionalLight(0xfff4d6, 3.2);
+    gardenSun.position.set(-6, 12, 7);
+    gardenSun.castShadow = true;
+    gardenWorld.add(gardenSun);
+    const gardenGround = new window.THREE.Mesh(new window.THREE.PlaneGeometry(28, 22), new window.THREE.MeshStandardMaterial({ color: 0xa9c59a, roughness: 1 }));
+    gardenGround.rotation.x = -Math.PI / 2;
+    gardenGround.receiveShadow = true;
+    gardenWorld.add(gardenGround);
+    const river = new window.THREE.Mesh(new window.THREE.PlaneGeometry(3.8, 22), new window.THREE.MeshStandardMaterial({ color: 0x8fd4d1, roughness: .25, metalness: .05, transparent: true, opacity: .9 }));
+    river.rotation.x = -Math.PI / 2;
+    river.position.set(4.7, .035, 0);
+    gardenWorld.add(river);
+    const riverBank = new window.THREE.Mesh(new window.THREE.BoxGeometry(4.6, .03, 22), new window.THREE.MeshStandardMaterial({ color: 0xd6d6a4, roughness: 1 }));
+    riverBank.position.set(4.7, -.03, 0);
+    gardenWorld.add(riverBank);
+    const wateringCan = new window.THREE.Group();
+    const canBody = new window.THREE.Mesh(new window.THREE.SphereGeometry(.28, 20, 12), new window.THREE.MeshStandardMaterial({ color: 0xffc978, roughness: .5 }));
+    canBody.scale.set(1, .72, 1);
+    const canSpout = new window.THREE.Mesh(new window.THREE.CylinderGeometry(.07, .1, .55, 12), new window.THREE.MeshStandardMaterial({ color: 0xffc978, roughness: .5 }));
+    canSpout.rotation.z = -Math.PI / 3;
+    canSpout.position.set(.33, .1, 0);
+    wateringCan.add(canBody, canSpout);
+    wateringCan.position.set(.55, .95, .05);
+    gardenWorld.add(wateringCan);
+    const player = new window.THREE.Group();
+    const playerBody = new window.THREE.Mesh(new window.THREE.CapsuleGeometry(.28, .48, 8, 16), new window.THREE.MeshStandardMaterial({ color: 0xf38b68, roughness: .75 }));
+    playerBody.position.y = .7;
+    const playerHead = new window.THREE.Mesh(new window.THREE.SphereGeometry(.3, 18, 12), new window.THREE.MeshStandardMaterial({ color: 0xffd2a8, roughness: .9 }));
+    playerHead.position.y = 1.3;
+    const playerHat = new window.THREE.Mesh(new window.THREE.CylinderGeometry(.42, .3, .13, 20), new window.THREE.MeshStandardMaterial({ color: 0x6b9f68, roughness: .8 }));
+    playerHat.position.y = 1.61;
+    player.add(playerBody, playerHead, playerHat);
+    player.position.set(-5, 0, 3.2);
+    gardenWorld.add(player);
+    const gardenPlants = [
+      { id: 'pilea', name: 'Pilea', position: [-2.9, 0, -2.8], color: 0x75b85b, potColor: 0xc8794a, growth: 0, upgrade: 0 },
+      { id: 'monstera', name: 'Monstera', position: [-.5, 0, -3.8], color: 0x3c8d6b, potColor: 0xe6d3b4, growth: 0, upgrade: 0 },
+      { id: 'calathea', name: 'Calathea', position: [2.2, 0, -2.2], color: 0x9d70b4, potColor: 0x8bb7af, growth: 0, upgrade: 0 }
+    ];
+    const plantModels = new Map();
+    const makeLeaf = (color, scale, position, rotation = 0) => {
+      const leaf = new window.THREE.Mesh(new window.THREE.SphereGeometry(.45, 16, 10), new window.THREE.MeshStandardMaterial({ color, roughness: .78 }));
+      leaf.scale.set(...scale);
+      leaf.position.set(...position);
+      leaf.rotation.z = rotation;
+      leaf.castShadow = true;
+      return leaf;
+    };
+    const makePlant = data => {
+      const group = new window.THREE.Group();
+      const pot = new window.THREE.Mesh(new window.THREE.CylinderGeometry(.55, .42, .58, 24), new window.THREE.MeshStandardMaterial({ color: data.potColor, roughness: .65 }));
+      pot.position.y = .3;
+      pot.castShadow = true;
+      const soil = new window.THREE.Mesh(new window.THREE.CylinderGeometry(.45, .45, .06, 24), new window.THREE.MeshStandardMaterial({ color: 0x473126, roughness: 1 }));
+      soil.position.y = .6;
+      group.add(pot, soil);
+      const plant = new window.THREE.Group();
+      const stem = new window.THREE.Mesh(new window.THREE.CylinderGeometry(.045, .07, 1.9, 10), new window.THREE.MeshStandardMaterial({ color: 0x4c8e57, roughness: .8 }));
+      stem.position.y = 1.45;
+      plant.add(stem);
+      if (data.id === 'pilea') {
+        for (let index = 0; index < 6; index += 1) { const angle = index * 1.05; plant.add(makeLeaf(data.color, [.55, .11, .42], [Math.cos(angle) * .5, 1.25 + index % 3 * .32, Math.sin(angle) * .4], angle)); }
+      } else if (data.id === 'monstera') {
+        for (let index = 0; index < 4; index += 1) { const angle = index * 1.5; plant.add(makeLeaf(data.color, [.25, .75, .11], [Math.cos(angle) * .48, 1.35 + index % 2 * .45, Math.sin(angle) * .38], -angle)); }
+      } else {
+        for (let index = 0; index < 5; index += 1) { const angle = index * 1.25; const leaf = makeLeaf(data.color, [.2, .8, .1], [Math.cos(angle) * .38, 1.35 + index % 2 * .35, Math.sin(angle) * .32], -angle); leaf.material = new window.THREE.MeshStandardMaterial({ color: index % 2 ? 0x9d70b4 : 0xc794cf, roughness: .75 }); plant.add(leaf); }
+      }
+      plant.scale.setScalar(.1);
+      plant.position.y = .58;
+      group.add(plant);
+      group.position.set(...data.position);
+      group.userData = { pot, plant, data };
+      gardenWorld.add(group);
+      plantModels.set(data.id, group);
+    };
+    gardenPlants.forEach(makePlant);
+    let gardenWater = 0;
+    let gardenResource = 0;
+    let lastGardenFrame = performance.now();
+    const refreshGardenHud = () => {
+      gardenWaterCount.textContent = String(gardenWater);
+      gardenCoins.textContent = String(gardenResource);
+      gardenPlantCount.textContent = `${gardenPlants.filter(plant => plant.growth > 0).length} / 3`;
+    };
+    const sayGarden = message => { gardenStatus.textContent = message; gardenToast.textContent = message; gardenToast.classList.add('is-visible'); window.clearTimeout(sayGarden.timer); sayGarden.timer = window.setTimeout(() => gardenToast.classList.remove('is-visible'), 1800); };
+    const nearestPlant = () => gardenPlants.map(plant => ({ plant, distance: player.position.distanceTo(new window.THREE.Vector3(...plant.position)) })).sort((a, b) => a.distance - b.distance)[0];
+    const updatePlantModel = data => { const model = plantModels.get(data.id); const growth = Math.min(1.35, .1 + data.growth * .18); model.userData.plant.scale.setScalar(growth); model.userData.pot.material.color.setHex(data.upgrade === 0 ? data.potColor : data.upgrade === 1 ? 0xe8d6a8 : 0xa9e2d6); model.userData.pot.scale.setScalar(1 + data.upgrade * .07); };
+    const gardenAction = action => {
+      const closest = nearestPlant();
+      const nearRiver = Math.abs(player.position.x - river.position.x) < 2.3;
+      if (action === 'fill' || (action === 'act' && nearRiver && (!closest || closest.distance > 2.2))) { gardenWater = 100; refreshGardenHud(); sayGarden('Arrosoir rempli à la rivière.'); return; }
+      if (action === 'upgrade' || action === 'act') {
+        if (!closest || closest.distance > 2.2) { if (action === 'upgrade') sayGarden('Approche-toi d’un pot pour l’améliorer.'); return; }
+        if (gardenWater === 0 && action === 'act') { sayGarden('La rivière est à droite.'); return; }
+        if (action === 'upgrade') { if (closest.plant.upgrade >= 2) return sayGarden('Ce pot est déjà au niveau maximum.'); if (gardenResource < (closest.plant.upgrade + 1) * 2) return sayGarden('Il faut plus de ressources.'); gardenResource -= (closest.plant.upgrade + 1) * 2; closest.plant.upgrade += 1; updatePlantModel(closest.plant); refreshGardenHud(); sayGarden(`${closest.plant.name} a un nouveau pot.`); return; }
+        if (gardenWater < 20) return sayGarden('Ton arrosoir est vide.');
+        gardenWater -= 20; closest.plant.growth += 1; gardenResource += 1; updatePlantModel(closest.plant); refreshGardenHud(); sayGarden(`${closest.plant.name} grandit. Continue doucement.`); return;
+      }
+      if (action === 'water') gardenAction('act');
+    };
+    const updateGardenStatus = () => { const closest = nearestPlant(); if (Math.abs(player.position.x - river.position.x) < 2.3) gardenStatus.textContent = gardenWater < 100 ? 'E · remplir l’arrosoir dans la rivière' : 'Arrosoir plein. Retourne voir tes plantes.'; else if (closest.distance < 2.2) gardenStatus.textContent = `${closest.plant.name} · E arroser · U améliorer le pot`; else gardenStatus.textContent = 'Explore le jardin. Approche-toi d’une plante ou de la rivière.'; };
+    const resizeGarden = () => { const width = gardenStage.clientWidth || 800; const height = gardenStage.clientHeight || 480; gardenRenderer.setSize(width, height, false); gardenCamera.aspect = width / height; gardenCamera.updateProjectionMatrix(); };
+    new ResizeObserver(resizeGarden).observe(gardenStage);
+    const gardenAnimate = time => { const delta = Math.min((time - lastGardenFrame) / 1000, .05); lastGardenFrame = time; const x = (gardenKeys.has('d') || gardenKeys.has('ArrowRight') ? 1 : 0) - (gardenKeys.has('a') || gardenKeys.has('ArrowLeft') ? 1 : 0); const z = (gardenKeys.has('s') || gardenKeys.has('ArrowDown') ? 1 : 0) - (gardenKeys.has('w') || gardenKeys.has('ArrowUp') ? 1 : 0); player.position.x += x * delta * 4; player.position.z += z * delta * 4; player.position.x = Math.max(-8, Math.min(8, player.position.x)); player.position.z = Math.max(-8, Math.min(8, player.position.z)); gardenCamera.position.lerp(new window.THREE.Vector3(player.position.x + 6.5, 9, player.position.z + 8), .08); gardenCamera.lookAt(player.position.x, .5, player.position.z); wateringCan.position.copy(player.position).add(new window.THREE.Vector3(.55, .95, .05)); wateringCan.rotation.y = Math.sin(time * .002) * .08; river.material.opacity = .84 + Math.sin(time * .0015) * .06; plantModels.forEach(model => { model.userData.plant.rotation.z = Math.sin(time * .0012 + model.position.x) * .035; }); updateGardenStatus(); gardenRenderer.render(gardenWorld, gardenCamera); window.requestAnimationFrame(gardenAnimate); };
+    window.addEventListener('keydown', event => { if (['w', 'a', 's', 'd', 'ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight'].includes(event.key)) { gardenKeys.add(event.key); event.preventDefault(); } if (event.key.toLowerCase() === 'e') gardenAction('act'); if (event.key.toLowerCase() === 'u') gardenAction('upgrade'); if (event.key.toLowerCase() === 'f') gardenAction('fill'); });
+    window.addEventListener('keyup', event => gardenKeys.delete(event.key));
+    document.querySelectorAll('[data-garden-action]').forEach(button => { button.addEventListener('click', () => { const action = button.dataset.gardenAction; if (['left', 'right', 'forward', 'back'].includes(action)) { const key = { left: 'a', right: 'd', forward: 'w', back: 's' }[action]; gardenKeys.add(key); window.setTimeout(() => gardenKeys.delete(key), 260); } else if (action === 'upgrade') gardenAction('upgrade'); else gardenAction('act'); }); });
+    resizeGarden();
+    refreshGardenHud();
+    window.requestAnimationFrame(gardenAnimate);
   }
   projectLinks.forEach(link => link.addEventListener('click', () => completeQuest('project', 'Étape 01 débloquée.')));
   document.querySelectorAll('.project details').forEach(details => details.addEventListener('toggle', () => {
