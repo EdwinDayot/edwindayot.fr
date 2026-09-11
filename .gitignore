@@ -4,3 +4,5 @@
 !.env.example
 *.tar.gz
 node_modules/
+.pi/
+.agents/

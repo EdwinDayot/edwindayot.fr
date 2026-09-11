@@ -1,0 +1,12 @@
+{
+  "name": "edwindayot-portfolio",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/garden-rules.cjs tests/garden-living.cjs tests/garden-model-attachments.cjs tests/garden-water-direction.cjs && node tests/site.cjs && python3 tests/validate-html.py",
+    "test:browser": "node tests/garden-play.cjs && node tests/garden-interface.cjs && node tests/garden-size.cjs && node tests/garden-flow.cjs && node tests/garden-living-browser.cjs && node tests/garden-shadows.cjs",
+    "test:visual": "node tests/garden-visual.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}

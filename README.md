@@ -1,6 +1,6 @@
 # edwindayot.fr
 
-Portfolio d’Edwin Dayot : Plant Calendar, Fate, Shorts et Cove. Site statique avec un petit script de progression au défilement, sans dépendance de compilation. Contenu en français, mise en page responsive, détails de projets accessibles au clavier, métadonnées et sitemap.
+Portfolio d’Edwin Dayot : Plant Calendar, Fate, Shorts et Cove. Site statique sans compilation, avec un jardin Three.js jouable. Contenu en français, détails de projets accessibles au clavier, métadonnées et sitemap.
 
 ## Prévisualisation
 
@@ -8,7 +8,7 @@ Portfolio d’Edwin Dayot : Plant Calendar, Fate, Shorts et Cove. Site statique 
 python3 -m http.server 4174 --directory public
 ```
 
-Ouvrir http://localhost:4174. Les sections de projets se développent via les éléments HTML natifs `details`.
+Ouvrir http://localhost:4174 pour le jeu ou http://localhost:4174/portfolio/ pour les projets. Les sections de projets se développent via les éléments HTML natifs `details`.
 
 ## Docker / OVH
 
@@ -24,11 +24,17 @@ Le déploiement de production utilise `/home/debian/edwindayot-landing`. Avant t
 
 ## Contenu
 
-Modifier `public/index.html` et `public/styles.css`. Les chiffres et responsabilités viennent du CV d’Edwin ; la charge testée sur Cove est explicitement distinguée d’une audience en production. Les liens API préexistants sont conservés, sans garantie de disponibilité ajoutée. Aucune donnée de rémunération ou de disponibilité privée n’est publiée.
+Le jeu occupe `public/index.html`. Modifier le contenu du portfolio dans `public/portfolio/index.html` et sa présentation dans `public/styles.css`. Les chiffres et responsabilités viennent du CV d’Edwin ; la charge testée sur Cove est explicitement distinguée d’une audience en production. La section des anciens services API a été supprimée.
 
 ## Direction visuelle
 
-Narration en quatre chapitres inspirée de scroll-world (oso95/scroll-world). La progression et les transitions sont réalisées en HTML/CSS/JavaScript ; aucune vidéo IA, scène 3D ou capture produit inventée. Le contenu reste lisible sans JavaScript et avec reduced-motion.
+Les quatre projets restent dans le flux normal de la page. Le jardin utilise Three.js hébergé localement, des modèles botaniques originaux et des textures créées dans le code. Aucun modèle ne représente une capture produit. Le mouvement décoratif respecte la préférence de réduction des animations.
+
+## Jardin et tests
+
+Voir [le fonctionnement du jardin, les modèles et les tests](docs/garden.md). Les modules de `public/game/` séparent économie, progression, construction, irrigation, sauvegarde et rendu. La simulation reste exécutable sans WebGL. Le jeu propose douze espèces, quatre grandes parcelles dont un sous-bois arboré, des échanges et des équipements automatisés. Son interface est dessinée en Canvas : inventaire, fabrication, carte, carnet et commandes. Les 85 sites de ressources se travaillent à la hache, à la pioche ou à la pelle en maintenant E, le clic ou l’action tactile ; ils se renouvellent après 90 à 120 secondes. Déplacement immédiat avec ZQSD/flèches, barre rapide personnalisable `1–5`, inventaire `I`, action `E`, déplacement d’objet `F`. Les plans se construisent directement dans le monde ; les conduites et le niveau des citernes rendent l’irrigation visible.
+
+`npm test` vérifie les règles. `npm run test:browser` joue un parcours desktop et mobile contre le serveur local. `npm run test:visual` produit des captures des douze espèces et mesure une scène de 48 pots et 192 décorations. La dépendance Playwright est réservée aux tests, et n’est pas copiée dans l’image Nginx.
 
 ## Déploiement reproductible
 

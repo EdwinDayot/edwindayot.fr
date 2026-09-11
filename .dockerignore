@@ -3,3 +3,8 @@
 README.md
 AGENTS.md
 *.tar.gz
+node_modules
+.agents
+tests
+docs
+package*.json
