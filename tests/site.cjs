@@ -1,7 +1,45 @@
-const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
-const pages=['public/index.html','public/portfolio/index.html'];
-for(const file of pages){const html=fs.readFileSync(file,'utf8'),ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);assert.equal(ids.length,new Set(ids).size,'Unique IDs in '+file);assert.match(html,/<!doctype html>/i);assert.match(html,/<html lang="fr">/);assert.equal((html.match(/<main\b/g)||[]).length,1);
- for(const [,link]of html.matchAll(/(?:src|href)="([^"]+)"/g)){if(/^(https?:|mailto:|data:)/.test(link))continue;const [pathname,hash]=link.split('#');let target=pathname?path.join('public',pathname):file;if(fs.existsSync(target)&&fs.statSync(target).isDirectory())target=path.join(target,'index.html');assert.ok(fs.existsSync(target),`${file}: ${link} exists`);if(hash)assert.match(fs.readFileSync(target,'utf8'),new RegExp(`id="${hash}"`),`${link} anchor exists`);}
+const fs = require("node:fs"),
+  path = require("node:path"),
+  assert = require("node:assert/strict");
+const pages = ["public/index.html", "public/portfolio/index.html"];
+for (const file of pages) {
+  const html = fs.readFileSync(file, "utf8"),
+    ids = [...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]);
+  assert.equal(ids.length, new Set(ids).size, "Unique IDs in " + file);
+  assert.match(html, /<!doctype html>/i);
+  assert.match(html, /<html lang="fr">/);
+  assert.equal((html.match(/<main\b/g) || []).length, 1);
+  for (const [, link] of html.matchAll(/(?:src|href)="([^"]+)"/g)) {
+    if (/^(https?:|mailto:|data:)/.test(link)) continue;
+    const [pathname, hash] = link.split("#");
+    let target = pathname ? path.join("public", pathname) : file;
+    if (fs.existsSync(target) && fs.statSync(target).isDirectory())
+      target = path.join(target, "index.html");
+    assert.ok(fs.existsSync(target), `${file}: ${link} exists`);
+    if (hash)
+      assert.match(
+        fs.readFileSync(target, "utf8"),
+        new RegExp(`id="${hash}"`),
+        `${link} anchor exists`,
+      );
+  }
 }
-const hashes=require('./portfolio-content.sha256.json'),after=fs.readFileSync('public/portfolio/index.html','utf8');for(const [section,hash]of Object.entries(hashes)){const re=new RegExp(`<article[^>]*id="${section}"[\\s\\S]*?</article>`);assert.equal(require('node:crypto').createHash('sha256').update(after.match(re)[0]).digest('hex'),hash,section+' factual content and assets retained verbatim');}
-const compose=fs.readFileSync('docker-compose.yml','utf8');assert.match(compose,/container_name: edwindayot-landing/);assert.match(compose,/traefik-public/);console.log('PASS: HTML structure, unique IDs, all internal links/assets, canonical paths and verbatim project preservation.');
+const hashes = require("./portfolio-content.sha256.json"),
+  after = fs.readFileSync("public/portfolio/index.html", "utf8");
+for (const [section, hash] of Object.entries(hashes)) {
+  const re = new RegExp(`<article[^>]*id="${section}"[\\s\\S]*?</article>`);
+  assert.equal(
+    require("node:crypto")
+      .createHash("sha256")
+      .update(after.match(re)[0])
+      .digest("hex"),
+    hash,
+    section + " factual content and assets retained verbatim",
+  );
+}
+const compose = fs.readFileSync("docker-compose.yml", "utf8");
+assert.match(compose, /container_name: edwindayot-landing/);
+assert.match(compose, /traefik-public/);
+console.log(
+  "PASS: HTML structure, unique IDs, all internal links/assets, canonical paths and verbatim project preservation.",
+);

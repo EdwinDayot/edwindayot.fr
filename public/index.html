@@ -1,22 +1,90 @@
 <!doctype html>
 <html lang="fr">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Le jardin d’Edwin Dayot | Product engineer</title>
-<meta name="description" content="Un jardin 3D à explorer, cultiver et aménager. Découvrez aussi les projets d’Edwin Dayot, product engineer IA, mobile et web.">
-<meta name="theme-color" content="#e8eddf"><link rel="canonical" href="https://edwindayot.fr/">
-<meta property="og:type" content="website"><meta property="og:locale" content="fr_FR"><meta property="og:title" content="Le jardin d’Edwin Dayot"><meta property="og:url" content="https://edwindayot.fr/"><meta property="og:description" content="Cultiver un jardin, découvrir un parcours de product engineer."><meta property="og:image" content="https://edwindayot.fr/assets/edwin-hero.png">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/garden.css">
-<script src="/game/redirect.js" defer></script><script src="/vendor/three.min.js" defer></script>
-<script src="/game/data.js" defer></script><script src="/game/construction.js" defer></script><script src="/game/irrigation.js" defer></script><script src="/game/economy.js" defer></script><script src="/game/progression.js" defer></script><script src="/garden-state.js" defer></script><script src="/game/save.js" defer></script><script src="/garden-models.js" defer></script><script src="/game/botany.js" defer></script><script src="/game/lighting.js" defer></script><script src="/game/render.js" defer></script><script src="/game/hud.js" defer></script><script src="/garden.js" defer></script>
-</head>
-<body>
-<header class="site-header"><a class="identity" href="/portfolio/">Edwin Dayot<span>Product engineer</span></a><a class="portfolio-link" href="/portfolio/">Voir le portfolio <span aria-hidden="true">↗</span></a></header>
-<main class="garden-shell" id="jardin" tabindex="0" aria-label="Jardin. Flèches ou ZQSD pour marcher immédiatement, E pour agir, 1 à 5 pour équiper, I pour l’inventaire.">
-<div class="garden-stage"><canvas id="garden-world" aria-label="Pépinière 3D. Clique sur le terrain pour marcher, sur un objet pour l’approcher."></canvas></div>
-<div id="garden-fallback"><h1>Edwin Dayot</h1><p>Product engineer : IA, mobile et web.</p><p>Le jardin interactif nécessite JavaScript et WebGL.</p><a class="primary" href="/portfolio/">Découvrir les projets</a></div>
-<canvas id="garden-hud" hidden tabindex="0" role="application" aria-label="Jardin. ZQSD ou flèches pour marcher. 1 à 5 pour équiper, I inventaire, E maintenir pour travailler. Dans l’inventaire : flèches et Entrée, 1 à 5 pour affecter, Échap pour fermer."></canvas>
-<p id="game-announcement" class="sr-only" role="status" aria-live="polite"></p>
-<input id="import-file" type="file" accept="application/json,.json" hidden>
-</main>
-</body></html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Le jardin d’Edwin Dayot | Product engineer</title>
+    <meta
+      name="description"
+      content="Un jardin 3D à explorer, cultiver et aménager. Découvrez aussi les projets d’Edwin Dayot, product engineer IA, mobile et web."
+    />
+    <meta name="theme-color" content="#e8eddf" />
+    <link rel="canonical" href="https://edwindayot.fr/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="fr_FR" />
+    <meta property="og:title" content="Le jardin d’Edwin Dayot" />
+    <meta property="og:url" content="https://edwindayot.fr/" />
+    <meta
+      property="og:description"
+      content="Cultiver un jardin, découvrir un parcours de product engineer."
+    />
+    <meta
+      property="og:image"
+      content="https://edwindayot.fr/assets/edwin-hero.png"
+    />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/garden.css" />
+    <script src="/game/redirect.js" defer></script>
+    <script src="/vendor/three.min.js" defer></script>
+    <script src="/game/data.js" defer></script>
+    <script src="/game/construction.js" defer></script>
+    <script src="/game/irrigation.js" defer></script>
+    <script src="/game/economy.js" defer></script>
+    <script src="/game/progression.js" defer></script>
+    <script src="/garden-state.js" defer></script>
+    <script src="/game/save.js" defer></script>
+    <script src="/garden-models.js" defer></script>
+    <script src="/game/botany.js" defer></script>
+    <script src="/game/lighting.js" defer></script>
+    <script src="/game/render.js" defer></script>
+    <script src="/game/hud.js" defer></script>
+    <script src="/garden.js" defer></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="identity" href="/portfolio/"
+        >Edwin Dayot<span>Product engineer</span></a
+      ><a class="portfolio-link" href="/portfolio/"
+        >Voir le portfolio <span aria-hidden="true">↗</span></a
+      >
+    </header>
+    <main
+      class="garden-shell"
+      id="jardin"
+      tabindex="0"
+      aria-label="Jardin. Flèches ou ZQSD pour marcher immédiatement, E pour agir, 1 à 5 pour équiper, I pour l’inventaire."
+    >
+      <div class="garden-stage">
+        <canvas
+          id="garden-world"
+          aria-label="Pépinière 3D. Clique sur le terrain pour marcher, sur un objet pour l’approcher."
+        ></canvas>
+      </div>
+      <div id="garden-fallback">
+        <h1>Edwin Dayot</h1>
+        <p>Product engineer : IA, mobile et web.</p>
+        <p>Le jardin interactif nécessite JavaScript et WebGL.</p>
+        <a class="primary" href="/portfolio/">Découvrir les projets</a>
+      </div>
+      <canvas
+        id="garden-hud"
+        hidden
+        tabindex="0"
+        role="application"
+        aria-label="Jardin. ZQSD ou flèches pour marcher. 1 à 5 pour équiper, I inventaire, E maintenir pour travailler. Dans l’inventaire : flèches et Entrée, 1 à 5 pour affecter, Échap pour fermer."
+      ></canvas>
+      <p
+        id="game-announcement"
+        class="sr-only"
+        role="status"
+        aria-live="polite"
+      ></p>
+      <input
+        id="import-file"
+        type="file"
+        accept="application/json,.json"
+        hidden
+      />
+    </main>
+  </body>
+</html>

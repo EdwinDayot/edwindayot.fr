@@ -39,11 +39,11 @@ Noé propose un pot à acheter et l’accès à l’atelier. Les équipements re
 
 Les ressources sont réparties sur 85 sites permanents : 53 arbres, 16 veines de pierre et 16 bancs d’argile, avec chaque type présent dans les quatre zones. Tous les arbres, y compris ceux du sous-bois, peuvent être coupés.
 
-| Ressource | Outil | Gestes | Renouvellement |
-| --- | --- | --- | --- |
-| Bois | Hache | 3 | 120 secondes |
-| Pierre | Pioche | 4 | 100 secondes |
-| Argile | Pelle | 3 | 90 secondes |
+| Ressource | Outil  | Gestes | Renouvellement |
+| --------- | ------ | ------ | -------------- |
+| Bois      | Hache  | 3      | 120 secondes   |
+| Pierre    | Pioche | 4      | 100 secondes   |
+| Argile    | Pelle  | 3      | 90 secondes    |
 
 Chaque site donne trois unités uniquement au dernier geste. Le travail partiel est sauvegardé. Les gestes sont espacés d’au moins 0,65 seconde ; une mauvaise cible, un outil incorrect ou un geste trop rapide ne donne rien. Souches, éclats et excavations restent visibles pendant le renouvellement. Les souches et les veines gardent leur empreinte au sol pour que la repousse ne puisse pas bloquer le personnage. Le renouvellement avance aussi pendant l’absence. L’eau est gratuite au ponton. Le paquet de secours est gratuit lorsqu’il ne reste aucune plante ni graine/jeune plant utilisable.
 
@@ -66,20 +66,20 @@ Les goutteurs servent les plantes en dessous de 65 % d’humidité, avec une rot
 
 Aucune compilation n’est nécessaire. Les scripts sont hébergés localement ; Three.js reste la version déjà présente dans le projet.
 
-| Fichier | Responsabilité |
-| --- | --- |
-| `public/game/data.js` | Espèces, zones, ressources, recettes, prix et récompenses d’équilibrage |
-| `public/game/economy.js` | Inventaire, crédits et débits atomiques |
-| `public/game/progression.js` | Demandes accessibles, découvertes, plans et récompenses permanentes |
-| `public/game/construction.js` | Placement, collisions, accessibilité et recherche de chemin |
-| `public/game/irrigation.js` | Graphe des raccordements, stocks, débit, répartition |
-| `public/garden-state.js` | Commandes validées, simulation à pas fixe, validation des sauvegardes et migration |
-| `public/game/save.js` | Stockage, sauvegarde de secours, export/import et rattrapage |
-| `public/garden-models.js`, `public/game/botany.js` | Douze silhouettes originales et modèles de détail |
-| `public/game/lighting.js` | Calcul pur du cycle solaire depuis le temps sauvegardé |
-| `public/game/render.js` | Monde, caméra, personnage, animation et instanciation |
-| `public/game/hud.js` | Interface Canvas, icônes des objets, zones de clic, inventaire et navigation des panneaux |
-| `public/garden.js` | Commandes clavier/souris/tactiles, action maintenue, sons et cycle de vie de la page |
+| Fichier                                            | Responsabilité                                                                            |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `public/game/data.js`                              | Espèces, zones, ressources, recettes, prix et récompenses d’équilibrage                   |
+| `public/game/economy.js`                           | Inventaire, crédits et débits atomiques                                                   |
+| `public/game/progression.js`                       | Demandes accessibles, découvertes, plans et récompenses permanentes                       |
+| `public/game/construction.js`                      | Placement, collisions, accessibilité et recherche de chemin                               |
+| `public/game/irrigation.js`                        | Graphe des raccordements, stocks, débit, répartition                                      |
+| `public/garden-state.js`                           | Commandes validées, simulation à pas fixe, validation des sauvegardes et migration        |
+| `public/game/save.js`                              | Stockage, sauvegarde de secours, export/import et rattrapage                              |
+| `public/garden-models.js`, `public/game/botany.js` | Douze silhouettes originales et modèles de détail                                         |
+| `public/game/lighting.js`                          | Calcul pur du cycle solaire depuis le temps sauvegardé                                    |
+| `public/game/render.js`                            | Monde, caméra, personnage, animation et instanciation                                     |
+| `public/game/hud.js`                               | Interface Canvas, icônes des objets, zones de clic, inventaire et navigation des panneaux |
+| `public/garden.js`                                 | Commandes clavier/souris/tactiles, action maintenue, sons et cycle de vie de la page      |
 
 Les règles s’exécutent dans Node sans WebGL. Les commandes refusées ne consomment rien. La pose consomme d’abord l’objet en réserve, ou fabrique directement depuis un plan connu après validation de l’emplacement et du coût. Les événements de commande déclenchent les sons et animations.
 

@@ -7,6 +7,7 @@
     "test:visual": "node tests/garden-visual.cjs"
   },
   "devDependencies": {
-    "playwright": "1.63.0"
+    "playwright": "1.63.0",
+    "prettier": "^3.9.6"
   }
 }
