@@ -1,15 +1,16 @@
 (() => {
+  const A = (window.GardenApp = {});
   const D = GardenData,
     C = GardenConstruction,
     I = GardenIrrigation,
     R = GardenRules,
     S = GardenSave,
     $ = (id) => document.getElementById(id);
-  let storage;
+  A.storage = undefined;
   try {
-    storage = localStorage;
+    A.storage = localStorage;
   } catch {
-    storage = {
+    A.storage = {
       getItem() {
         throw Error();
       },
@@ -18,56 +19,56 @@
       },
     };
   }
-  const store = new S.SaveStore(storage),
-    loaded = store.load();
-  let game = loaded.game,
-    view,
-    ui;
+  A.store = new S.SaveStore(A.storage);
+  A.loaded = A.store.load();
+  A.game = A.loaded.game;
+  A.view = undefined;
+  A.ui = undefined;
   try {
-    view = new GardenView($("garden-world"), game);
+    A.view = new GardenView($("garden-world"), A.game);
   } catch (error) {
     console.warn("Jardin WebGL indisponible.", error);
     return;
   }
   $("garden-fallback").hidden = true;
   $("garden-hud").hidden = false;
-  let activeSlot = 1,
-    panel = "",
-    tab = "bag",
-    inventoryItem = null,
-    selected = null,
-    build = null,
-    wireStart = null,
-    pendingAction = null,
-    pointer = null,
-    paused = false,
-    toast = "",
-    toastUntil = 0,
-    importReady = null,
-    cutting = null;
-  let last = performance.now(),
-    saveClock = 0,
-    syncClock = 0,
-    hiddenAt = null,
-    nextMine = 0,
-    holdMine = false,
-    press = null,
-    audio = null,
-    ambient = null,
-    lastStep = 0;
-  const canvas = $("garden-hud"),
-    keys = new Set(),
-    stick = { x: 0, z: 0 },
-    touch =
-      matchMedia("(pointer:coarse)").matches || navigator.maxTouchPoints > 0,
-    reduced = matchMedia("(prefers-reduced-motion:reduce)");
-  const held = () => game.s.hotbar[activeSlot];
-  const label = (id) => D.tools[id] || D.itemName(id);
-  const costs = (c) =>
+  A.activeSlot = 1;
+  A.panel = "";
+  A.tab = "bag";
+  A.inventoryItem = null;
+  A.selected = null;
+  A.build = null;
+  A.wireStart = null;
+  A.pendingAction = null;
+  A.pointer = null;
+  A.paused = false;
+  A.toast = "";
+  A.toastUntil = 0;
+  A.importReady = null;
+  A.cutting = null;
+  A.last = performance.now();
+  A.saveClock = 0;
+  A.syncClock = 0;
+  A.hiddenAt = null;
+  A.nextMine = 0;
+  A.holdMine = false;
+  A.press = null;
+  A.audio = null;
+  A.ambient = null;
+  A.lastStep = 0;
+  A.canvas = $("garden-hud");
+  A.keys = new Set();
+  A.stick = { x: 0, z: 0 };
+  A.touch =
+    matchMedia("(pointer:coarse)").matches || navigator.maxTouchPoints > 0;
+  A.reduced = matchMedia("(prefers-reduced-motion:reduce)");
+  A.held = () => A.game.s.hotbar[A.activeSlot];
+  A.label = (id) => D.tools[id] || D.itemName(id);
+  A.costs = (c) =>
     Object.entries(c)
       .map(([id, n]) => `${n} ${D.itemName(id)}`)
       .join(" · ");
-  function name(e) {
+  A.name = function name(e) {
     return (
       e?.name ||
       (e?.plant && D.species.find((s) => s.id === e.plant.species).name) ||
@@ -75,26 +76,26 @@
       D.mining[e?.type]?.name ||
       "Le jardin"
     );
-  }
-  function announce(text) {
-    toast = text;
-    toastUntil = performance.now() + 4200;
+  };
+  A.announce = function announce(text) {
+    A.toast = text;
+    A.toastUntil = performance.now() + 4200;
     $("game-announcement").textContent = text;
-  }
-  function save() {
-    game.s.player = { ...view.position };
-    if (!store.save(game)) announce(store.message);
-  }
-  function sound(kind) {
-    if (!game.s.settings.sound) return;
+  };
+  A.save = function save() {
+    A.game.s.player = { ...A.view.position };
+    if (!A.store.save(A.game)) A.announce(A.store.message);
+  };
+  A.sound = function sound(kind) {
+    if (!A.game.s.settings.sound) return;
     try {
-      audio ??= new (window.AudioContext || window.webkitAudioContext)();
-      if (audio.state === "suspended") audio.resume();
-      if (!ambient) {
-        const buffer = audio.createBuffer(
+      A.audio ??= new (window.AudioContext || window.webkitAudioContext)();
+      if (A.audio.state === "suspended") A.audio.resume();
+      if (!A.ambient) {
+        const buffer = A.audio.createBuffer(
             1,
-            audio.sampleRate * 3,
-            audio.sampleRate,
+            A.audio.sampleRate * 3,
+            A.audio.sampleRate,
           ),
           data = buffer.getChannelData(0);
         let n = 0;
@@ -102,21 +103,21 @@
           n = (n + (Math.random() * 2 - 1) * 0.02) / 1.025;
           data[i] = n;
         }
-        ambient = audio.createBufferSource();
-        ambient.buffer = buffer;
-        ambient.loop = true;
-        const g = audio.createGain();
+        A.ambient = A.audio.createBufferSource();
+        A.ambient.buffer = buffer;
+        A.ambient.loop = true;
+        const g = A.audio.createGain();
         g.gain.value = 0.035;
-        ambient.connect(g).connect(audio.destination);
-        ambient.start();
+        A.ambient.connect(g).connect(A.audio.destination);
+        A.ambient.start();
       }
-      const o = audio.createOscillator(),
-        g = audio.createGain(),
-        now = audio.currentTime;
+      const o = A.audio.createOscillator(),
+        g = A.audio.createGain(),
+        now = A.audio.currentTime;
       o.type = kind === "mine" || kind === "step" ? "triangle" : "sine";
       o.frequency.setValueAtTime(
         kind === "mine"
-          ? held() === "pickaxe"
+          ? A.held() === "pickaxe"
             ? 460
             : 140
           : kind === "step"
@@ -131,945 +132,9 @@
         now + 0.012,
       );
       g.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
-      o.connect(g).connect(audio.destination);
+      o.connect(g).connect(A.audio.destination);
       o.start();
       o.stop(now + 0.24);
     } catch {}
-  }
-  function execute(c) {
-    const result = game.command(c, { position: view.position });
-    if (result.ok) {
-      save();
-      view.sync();
-      view.action(result.kind, selected);
-      sound(result.kind);
-    }
-    if (c.type !== "mine" || !result.ok || selected?.ready > game.s.elapsed)
-      announce(result.message);
-    return result;
-  }
-  function resetInput() {
-    keys.clear();
-    stick.x = stick.z = 0;
-    holdMine = false;
-    press = null;
-  }
-  function cancelBuild() {
-    build = null;
-    view.showPreview(null);
-  }
-  function closePanel() {
-    view.endInspection();
-    panel = "";
-    cutting = null;
-    resetInput();
-    canvas.focus({ preventScroll: true });
-    selectSlot(activeSlot);
-  }
-  function openPanel(p) {
-    if (p !== "inspection") view.endInspection();
-    if (p === "nursery") cutting = null;
-    panel = p;
-    $("game-announcement").textContent =
-      "Panneau ouvert. Tab ou flèches pour choisir, Entrée pour valider, Échap pour fermer.";
-    resetInput();
-    view.routes = [];
-    pendingAction = null;
-    ui.focus = 0;
-    canvas.focus({ preventScroll: true });
-  }
-  function selectSlot(i) {
-    activeSlot = i;
-    cancelBuild();
-    wireStart = null;
-    view.connectionPreview(null, null);
-    pendingAction = null;
-    holdMine = false;
-    view.held = held();
-    if (D.recipes[held()]) startBuild(held());
-  }
-  function startBuild(item, id) {
-    const e = id ? game.s.entities.find((e) => e.id === id) : null;
-    panel = "";
-    wireStart = null;
-    view.connectionPreview(null, null);
-    view.routes = [];
-    pendingAction = null;
-    build = {
-      item: e ? e.type : item,
-      id: id || null,
-      restore: !!e?.stored,
-      x: e && !e.stored ? e.x : Math.round(view.position.x * 2) / 2,
-      z: e && !e.stored ? e.z : Math.round((view.position.z - 1.5) * 2) / 2,
-      rotation: e?.rotation || 0,
-    };
-    pointer = null;
-    view.showPreview(build);
-    updateBuild();
-  }
-  function updateBuild() {
-    if (!build) return;
-    const recipe = D.recipes[build.item];
-    build.error =
-      C.distance(view.position, build) > 6
-        ? "Rapproche-toi pour construire."
-        : C.distance(view.position, build) <
-            C.radius({ type: build.item }) + 0.24
-          ? "Éloigne-toi de cet emplacement."
-          : !build.id &&
-              !game.has({ [build.item]: 1 }) &&
-              (!game.s.plans.includes(build.item) || !game.has(recipe.cost))
-            ? "Matériaux manquants : " + costs(recipe.cost)
-            : C.placement(game.s, { ...build, type: build.item }, build.id);
-    build.cost = game.s.inventory[build.item]
-      ? `${game.s.inventory[build.item]} en réserve`
-      : "Fabrication à la pose · " + costs(recipe.cost);
-    view.updatePreview(build);
-  }
-  function confirmBuild() {
-    if (!build) return;
-    updateBuild();
-    if (build.error) return announce(build.error);
-    const result = execute({
-      type: build.id ? (build.restore ? "restore" : "move") : "place",
-      ...build,
-      fabricate: true,
-    });
-    if (result.ok) {
-      selected = build.id
-        ? game.s.entities.find((e) => e.id === build.id)
-        : game.s.entities.at(-1);
-      view.selected = selected;
-      if (build.id) cancelBuild();
-      else updateBuild();
-    }
-  }
-  function canMove() {
-    return (
-      selected &&
-      game.s.entities.includes(selected) &&
-      !selected.stored &&
-      C.distance(view.position, selected) < 1.85
-    );
-  }
-  function target(id) {
-    return (
-      game.s.entities.find((e) => e.id === id) ||
-      game.s.resources.find((r) => r.id === id) ||
-      D.caches.find((c) => c.id === id) ||
-      D.visitors.find((v) => v.id === id) ||
-      (id === "river"
-        ? { id, x: 3.5, z: 4 }
-        : id?.startsWith("zone-")
-          ? {
-              id,
-              x: D.zones[+id.split("-")[1]].gate[0],
-              z: D.zones[+id.split("-")[1]].gate[1],
-            }
-          : null)
-    );
-  }
-  function go(id) {
-    selected = target(id);
-    if (!selected) return;
-    panel = "";
-    resetInput();
-    view.selected = selected;
-    if (!view.go(selected)) announce("Le passage n’est pas encore accessible.");
-  }
-  function context() {
-    const e = selected;
-    if (!e)
-      return {
-        label: "E · Agir",
-        status: ["axe", "pickaxe", "shovel"].includes(held())
-          ? `${label(held())} · vise une ressource, puis maintiens E`
-          : "ZQSD / flèches · I pour équiper tes objets",
-      };
-    const far = C.distance(view.position, e) >= 1.85,
-      near = (() => {
-        const s = game.s,
-          tool = held();
-        if (
-          tool === "hose" &&
-          ["tank", "pump", "pipe", "drip", "pot", "reservoir"].includes(
-            e.type,
-          ) &&
-          game.s.entities.includes(e)
-        )
-          return {
-            label: wireStart ? "E · Relier" : "E · Choisir le départ",
-            status: wireStart
-              ? I.orientation(wireStart, e) === -1
-                ? `${name(e)} → ${name(wireStart)}`
-                : `${name(wireStart)} ${I.orientation(wireStart, e) === 1 ? "→" : "↔"} ${name(e)}`
-              : `${name(e)} · ${I.status(s, e).message}`,
-            wire: true,
-          };
-        if (e.id === "river")
-          return {
-            label: "E · Remplir",
-            status: "Ponton · eau gratuite",
-            command: "fill",
-          };
-        if (e.id.startsWith("resource-")) {
-          const spec = D.mining[e.type],
-            remaining = Math.max(0, Math.ceil(e.ready - s.elapsed));
-          return {
-            label: remaining
-              ? "Renouvellement"
-              : tool === spec.tool
-                ? `Maintenir E · ${spec.verb}`
-                : `Équiper ${D.tools[spec.tool]}`,
-            status: remaining
-              ? `${spec.name} · revient dans ${remaining} s`
-              : `${spec.name} · ${e.work || 0}/${spec.hits} · +3 ${D.itemName(e.type)}`,
-            progress: remaining
-              ? 1 - remaining / spec.renew
-              : (e.work || 0) / spec.hits,
-            command: !remaining && tool === spec.tool ? "mine" : null,
-            tool: spec.tool,
-          };
-        }
-        if (e.id.startsWith("zone-")) {
-          const z = D.zones[+e.id.split("-")[1]];
-          return {
-            label: "E · Ouvrir",
-            status: `${z.name} · ${costs(z.cost)} · réputation ${z.rep}`,
-            command: "unlock",
-            zone: z.id,
-          };
-        }
-        if (e.id.startsWith("cache-"))
-          return {
-            label: "E · Découvrir",
-            status: "Cache botanique · une nouvelle espèce",
-            command: "discover",
-          };
-        if (e.id === "lea") {
-          const r = s.requests.find((r) => game.has({ [r.item]: r.quantity }));
-          return r
-            ? {
-                label: "E · Échanger",
-                status: `Léa · ${r.quantity} ${D.itemName(r.item)} → 18 feuilles + une graine`,
-                command: "trade",
-                request: r.id,
-              }
-            : {
-                label: "E · Voir les demandes",
-                status: "Léa · graines, boutures et fleurs",
-                panel: "visitor",
-              };
-        }
-        if (e.id === "noe")
-          return {
-            label: "E · Voir les plans",
-            status: "Noé · pots et équipements",
-            panel: "inventory",
-          };
-        if (e.id === "iris")
-          return {
-            label: "E · Partager",
-            status: `Iris · ${s.discovered.length} espèces découvertes`,
-            command: "botany",
-          };
-        if (e.type === "tank")
-          return {
-            label: "E · Verser l’arrosoir",
-            status: `Citerne ${Math.floor(e.water)}/160 · ${I.status(s, e).message}`,
-            command: "fillTank",
-          };
-        if (e.type === "collector")
-          return {
-            label: "E · Récupérer",
-            status: `Collecteur · ${Object.values(e.buffer).reduce((a, b) => a + b, 0)}/24`,
-            command: "withdraw",
-          };
-        if (e.type === "nursery") {
-          const sp = e.job && D.species.find((p) => p.id === e.job.species);
-          return e.job
-            ? {
-                label:
-                  e.job.remaining === 0
-                    ? "E · Récupérer"
-                    : "Multiplication en cours",
-                status: `${sp.name} · ${e.job.remaining === 0 ? "jeune plant prêt" : Math.ceil(e.job.remaining) + " s restantes"}`,
-                progress: 1 - e.job.remaining / 180,
-                command: e.job.remaining === 0 ? "collectYoung" : null,
-              }
-            : {
-                label: "E · Multiplier",
-                status: "Choisir une bouture dans le sac",
-                panel: "nursery",
-              };
-        }
-        if (!I.isPot(e))
-          return {
-            label: "F · Déplacer",
-            status: `${name(e)} · ${I.status(s, e).message}`,
-            move: true,
-          };
-        if (!e.plant)
-          return {
-            label: /^(seed|young):/.test(tool)
-              ? "E · Planter"
-              : "Équiper une graine",
-            status: /^(seed|young):/.test(tool)
-              ? `${label(tool)} · ${s.inventory[tool] || 0} en réserve`
-              : "Pot vide · graines et jeunes plants dans I",
-            command: /^(seed|young):/.test(tool) ? "plant" : null,
-            species: tool.split(":")[1],
-            source: tool.split(":")[0],
-          };
-        const p = e.plant,
-          stage =
-            p.growth < 0.12
-              ? "Graine"
-              : p.growth < 0.28
-                ? "Germe"
-                : p.growth < 1
-                  ? "Jeune plante"
-                  : "Adulte";
-        return {
-          label:
-            tool === "water"
-              ? "E · Arroser"
-              : p.ready
-                ? "E · Récolter"
-                : "Observer",
-          status: `${name(e)} · ${stage} · ${p.ready}/3 prêts`,
-          command: tool === "water" ? "water" : p.ready ? "collect" : null,
-        };
-      })();
-    return far ? { ...near, go: true } : near;
-  }
-  function wire() {
-    const e = selected;
-    if (!["tank", "pump", "pipe", "drip", "pot", "reservoir"].includes(e.type))
-      return announce("Choisis une installation d’irrigation.");
-    if (!wireStart) {
-      wireStart = e;
-      announce(
-        "Installation choisie · vise la suivante. Le sens de l’eau est automatique.",
-      );
-      return;
-    }
-    if (wireStart === e) {
-      wireStart = null;
-      view.connectionPreview(null, null);
-      return;
-    }
-    const exists = game.s.links.some(
-      (l) => l.includes(e.id) && l.includes(wireStart.id),
-    );
-    if (
-      execute({
-        type: exists ? "disconnect" : "connect",
-        id: wireStart.id,
-        to: e.id,
-      }).ok
-    ) {
-      wireStart = e;
-      view.connectionPreview(null, null);
-    }
-  }
-  function act() {
-    if (paused) return announce("Simulation en pause. Échap pour reprendre.");
-    if (build) return confirmBuild();
-    const c = context();
-    if (c.go) {
-      if (view.go(selected)) pendingAction = selected.id;
-      return;
-    }
-    if (c.wire) return wire();
-    if (c.panel) {
-      if (selected.id === "noe") tab = "craft";
-      return openPanel(c.panel);
-    }
-    if (c.move && canMove()) return startBuild(null, selected.id);
-    if (!c.command) return announce(c.status);
-    const result = execute({
-      type: c.command,
-      id: selected?.id,
-      tool: held(),
-      zone: c.zone,
-      request: c.request,
-      species: c.species,
-      source: c.source,
-    });
-    if (c.command === "mine") nextMine = performance.now() + 700;
-    if (result.ok && ["unlock", "discover"].includes(c.command)) {
-      selected = null;
-      view.selected = null;
-    }
-  }
-  function replaceGame(next) {
-    view.endInspection();
-    cancelBuild();
-    game = next;
-    view.game = game;
-    view.routes = [];
-    selected = null;
-    view.selected = null;
-    wireStart = null;
-    view.connectionPreview(null, null);
-    view.sync();
-    if (game.s.player && C.walkable(game.s, game.s.player.x, game.s.player.z))
-      view.position = { ...game.s.player };
-    else if (!C.walkable(game.s, view.position.x, view.position.z))
-      view.position = { x: 0, z: 4 };
-    selectSlot(activeSlot);
-  }
-  function dispatch(action, data = {}) {
-    switch (action) {
-      case "panel":
-        openPanel(data.panel);
-        break;
-      case "close":
-        closePanel();
-        break;
-      case "tab":
-        tab = data.tab;
-        ui.page = 0;
-        break;
-      case "page":
-        ui.page = Math.max(0, ui.page + data.delta);
-        break;
-      case "item":
-        inventoryItem = data.item;
-        announce(label(data.item));
-        break;
-      case "slot":
-        selectSlot(data.slot);
-        break;
-      case "assign":
-        if (inventoryItem)
-          execute({ type: "equip", item: inventoryItem, slot: data.slot });
-        else announce("Choisis d’abord un objet.");
-        break;
-      case "act":
-        act();
-        break;
-      case "move":
-        if (canMove()) startBuild(null, selected.id);
-        break;
-      case "place":
-        confirmBuild();
-        break;
-      case "rotate":
-        if (build) {
-          build.rotation = (build.rotation + 1) % 4;
-          updateBuild();
-        }
-        break;
-      case "cancel":
-        cancelBuild();
-        break;
-      case "store":
-        if (build?.id && execute({ type: "store", id: build.id }).ok) {
-          cancelBuild();
-          selected = null;
-          view.selected = null;
-        }
-        break;
-      case "restore":
-        startBuild(null, data.id);
-        break;
-      case "reserve":
-        openPanel("reserve");
-        break;
-      case "buy":
-        execute({ type: "buy", item: "pot" });
-        break;
-      case "go":
-        go(data.id);
-        break;
-      case "inspect": {
-        const e = data.id
-          ? target(data.id)
-          : game.s.entities.find(
-              (e) => !e.stored && e.plant?.species === data.species,
-            );
-        if (e?.plant) {
-          cancelBuild();
-          wireStart = null;
-          view.connectionPreview(null, null);
-          selected = e;
-          view.selected = e;
-          openPanel("inspection");
-          view.inspect(e);
-        } else announce("Plante cette espèce pour la voir dans le jardin.");
-        break;
-      }
-      case "inspect-orbit":
-        view.angle += (data.delta * Math.PI) / 4;
-        break;
-      case "choose-cutting":
-        cutting = data.species;
-        break;
-      case "confirm-cutting":
-        if (
-          cutting === data.species &&
-          execute({ type: "multiply", id: selected?.id, species: cutting }).ok
-        )
-          closePanel();
-        break;
-      case "trade":
-      case "replace":
-        execute({ type: action, request: data.request });
-        break;
-      case "setting":
-        execute({
-          type: "settings",
-          key: data.key,
-          value: !game.s.settings[data.key],
-        });
-        if (data.key === "sound") {
-          if (game.s.settings.sound) sound("plant");
-          else audio?.suspend();
-        }
-        break;
-      case "pause":
-        paused = !paused;
-        resetInput();
-        break;
-      case "rescue":
-        execute({ type: "rescue" });
-        break;
-      case "export": {
-        save();
-        const url = URL.createObjectURL(
-            new Blob([JSON.stringify(game.serialize(), null, 2)], {
-              type: "application/json",
-            }),
-          ),
-          a = document.createElement("a");
-        a.href = url;
-        a.download = "mon-jardin.json";
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-        break;
-      }
-      case "import":
-        if (importReady) {
-          try {
-            replaceGame(store.import(importReady));
-            importReady = null;
-            panel = "";
-            announce("Partie importée.");
-          } catch (e) {
-            announce(e.message);
-          }
-        } else $("import-file").click();
-        break;
-      case "backup":
-        try {
-          replaceGame(store.restore());
-          panel = "";
-          announce("Copie précédente restaurée.");
-        } catch (e) {
-          announce(e.message);
-        }
-        break;
-      case "zoom-in":
-        view.span = Math.max(7, view.span - 2);
-        break;
-      case "zoom-out":
-        view.span = Math.min(34, view.span + 2);
-        break;
-      case "orbit":
-        view.angle += Math.PI / 4;
-        break;
-      case "network":
-        view.network = !view.network;
-        break;
-    }
-  }
-  ui = new GardenHUD(canvas, view, dispatch);
-  $("import-file").onchange = async (e) => {
-    try {
-      const file = e.target.files[0];
-      if (!file) return;
-      if (file.size > 2e6) throw Error("Fichier trop volumineux.");
-      const raw = await file.text(),
-        s = JSON.parse(raw);
-      R.validate(s.version === 2 ? R.migrate(s) : s);
-      importReady = raw;
-      announce(
-        "Fichier valide. Clique à nouveau sur Importer pour confirmer le remplacement. Une copie sera conservée.",
-      );
-    } catch (e) {
-      announce("Import refusé : " + e.message);
-    } finally {
-      e.target.value = "";
-    }
   };
-  const keyMap = {
-    ArrowLeft: "left",
-    ArrowRight: "right",
-    ArrowUp: "up",
-    ArrowDown: "down",
-    a: "left",
-    q: "left",
-    w: "up",
-    z: "up",
-    s: "down",
-    d: "right",
-  };
-  window.addEventListener("keydown", (e) => {
-    if (
-      e.ctrlKey ||
-      e.metaKey ||
-      e.altKey ||
-      e.target.closest?.(".site-header") ||
-      e.target.tagName === "INPUT"
-    )
-      return;
-    const key = /^Digit[1-5]$/.test(e.code)
-      ? e.code.slice(-1)
-      : e.key.length === 1
-        ? e.key.toLowerCase()
-        : e.key;
-    if (key === "i" && !e.repeat) {
-      e.preventDefault();
-      panel ? closePanel() : openPanel("inventory");
-      return;
-    }
-    if (key === "Escape") {
-      e.preventDefault();
-      if (panel) closePanel();
-      else if (build) cancelBuild();
-      else if (wireStart) {
-        wireStart = null;
-        view.connectionPreview(null, null);
-      } else openPanel("settings");
-      return;
-    }
-    if (panel) {
-      if (/^[1-5]$/.test(key) && panel === "inventory") {
-        e.preventDefault();
-        dispatch("assign", { slot: +key - 1 });
-      } else if (
-        ["Tab", "ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"].includes(key)
-      ) {
-        e.preventDefault();
-        ui.keyboard = true;
-        const delta =
-          e.shiftKey || ["ArrowLeft", "ArrowUp"].includes(key) ? -1 : 1;
-        ui.focus = (ui.focus + delta + ui.buttons.length) % ui.buttons.length;
-        $("game-announcement").textContent =
-          ui.buttons[ui.focus]?.label || ui.buttons[ui.focus]?.item || "Objet";
-      } else if (key === "Enter" || key === " ") {
-        e.preventDefault();
-        ui.activate(ui.buttons[ui.focus]);
-      }
-      return;
-    }
-    if (key === "Shift") {
-      keys.add("sprint");
-      return;
-    }
-    if (keyMap[key]) {
-      e.preventDefault();
-      keys.add(keyMap[key]);
-      pendingAction = null;
-      view.routes = [];
-      return;
-    }
-    if (key === "e") {
-      e.preventDefault();
-      keys.add("act");
-      if (!e.repeat) act();
-      return;
-    }
-    if (e.repeat) return;
-    if (/^[1-5]$/.test(key)) {
-      e.preventDefault();
-      selectSlot(+key - 1);
-    } else if (key === "Enter") {
-      e.preventDefault();
-      act();
-    } else if (key === "v" && selected?.plant)
-      dispatch("inspect", { id: selected.id });
-    else if (key === "f") dispatch("move");
-    else if (key === "g") dispatch("store");
-    else if (key === "r") dispatch("rotate");
-    else if (key === "n") dispatch("network");
-    else if (key === "j") openPanel("notebook");
-    else if (key === "m") openPanel("map");
-  });
-  addEventListener("keyup", (e) => {
-    const key = e.key.toLowerCase();
-    keys.delete(
-      e.key === "Shift"
-        ? "sprint"
-        : key === "e"
-          ? "act"
-          : keyMap[e.key] || keyMap[key],
-    );
-  });
-  addEventListener("blur", resetInput);
-  function aim(x, y) {
-    pointer = { x, y };
-    if (build) {
-      const p = view.pick(x, y);
-      if (p) {
-        build.x = Math.round(p.x * 2) / 2;
-        build.z = Math.round(p.z * 2) / 2;
-        updateBuild();
-      }
-    } else if (wireStart) {
-      const p = view.pick(x, y),
-        e = view.pickTarget(x, y) || (p && view.targetAt(p));
-      view.connectionPreview(
-        wireStart,
-        e || p,
-        !!e && I.canConnect(wireStart, e),
-      );
-    }
-  }
-  function worldClick(x, y) {
-    if (paused) return;
-    const p = view.pick(x, y);
-    if (!p) return;
-    if (build) {
-      aim(x, y);
-      confirmBuild();
-      return;
-    }
-    const found = view.pickTarget(x, y) || view.targetAt(p);
-    if (found) {
-      selected = found;
-      view.selected = found;
-      if (C.distance(view.position, found) < 1.85) act();
-      else if (view.go(found)) pendingAction = found.id;
-      holdMine = found.id.startsWith("resource-");
-    } else {
-      pendingAction = null;
-      view.terrain(p);
-    }
-  }
-  function joystick(x, y, b) {
-    const dx = x - b.x - b.w / 2,
-      dz = y - b.y - b.h / 2,
-      n = Math.max(26, Math.hypot(dx, dz));
-    stick.x = Math.abs(dx) > 4 ? dx / n : 0;
-    stick.z = Math.abs(dz) > 4 ? dz / n : 0;
-    view.routes = [];
-    pendingAction = null;
-  }
-  canvas.onpointerdown = (e) => {
-    if (e.button === 2) return;
-    canvas.focus({ preventScroll: true });
-    canvas.setPointerCapture(e.pointerId);
-    ui.keyboard = false;
-    const b = ui.hit(e.clientX, e.clientY);
-    press = { id: e.pointerId, x: e.clientX, y: e.clientY, button: b };
-    if (b?.action === "joystick") joystick(e.clientX, e.clientY, b);
-    else if (b?.action === "act") {
-      act();
-      holdMine = selected?.id.startsWith("resource-");
-    } else if (!b && !panel) worldClick(e.clientX, e.clientY);
-  };
-  canvas.onpointermove = (e) => {
-    ui.pointer = { x: e.clientX, y: e.clientY };
-    ui.hover = ui.hit(e.clientX, e.clientY);
-    if (press?.button?.action === "joystick") {
-      joystick(e.clientX, e.clientY, press.button);
-      return;
-    }
-    if (
-      press?.button?.item &&
-      Math.hypot(e.clientX - press.x, e.clientY - press.y) > 7
-    )
-      ui.drag = {
-        item: press.button.item,
-        slot: press.button.inventory ? null : press.button.slot,
-      };
-    if (!ui.hover && !panel) aim(e.clientX, e.clientY);
-  };
-  canvas.onpointerup = (e) => {
-    const b = ui.hit(e.clientX, e.clientY);
-    if (ui.drag) {
-      if (b && ["slot", "assign"].includes(b.action)) {
-        execute(
-          ui.drag.slot === null
-            ? { type: "equip", item: ui.drag.item, slot: b.data.slot }
-            : { type: "swapSlots", a: ui.drag.slot, b: b.data.slot },
-        );
-        if (!panel) selectSlot(activeSlot);
-      }
-    } else if (
-      press?.button &&
-      b?.id === press.button.id &&
-      !["joystick", "act"].includes(b.action)
-    )
-      ui.activate(b);
-    ui.drag = null;
-    press = null;
-    holdMine = false;
-    stick.x = stick.z = 0;
-  };
-  canvas.onpointercancel = () => {
-    ui.drag = null;
-    resetInput();
-  };
-  canvas.oncontextmenu = (e) => {
-    e.preventDefault();
-    cancelBuild();
-    wireStart = null;
-    view.connectionPreview(null, null);
-    pendingAction = null;
-    holdMine = false;
-  };
-  canvas.addEventListener(
-    "wheel",
-    (e) => {
-      e.preventDefault();
-      if (panel) ui.page = Math.max(0, ui.page + Math.sign(e.deltaY));
-      else
-        view.span = Math.max(7, Math.min(34, view.span + Math.sign(e.deltaY)));
-    },
-    { passive: false },
-  );
-  $("garden-world").addEventListener("webglcontextlost", (e) => {
-    e.preventDefault();
-    paused = true;
-    save();
-    canvas.hidden = true;
-    $("garden-fallback").hidden = false;
-  });
-  function frame(now) {
-    const raw = (now - last) / 1000;
-    last = now;
-    const dt = Math.min(raw, 0.08);
-    if (!document.hidden) {
-      if (!paused) {
-        game.step(Math.min(raw, D.OFFLINE_CAP));
-        saveClock += dt;
-      }
-      if (saveClock > 5) {
-        saveClock = 0;
-        save();
-      }
-      syncClock += dt;
-      if (syncClock > 0.25) {
-        syncClock = 0;
-        view.sync();
-        if (build) updateBuild();
-      }
-      const axis =
-        paused || panel
-          ? { x: 0, z: 0 }
-          : {
-              x: Number(keys.has("right")) - Number(keys.has("left")) + stick.x,
-              z: Number(keys.has("down")) - Number(keys.has("up")) + stick.z,
-              sprint: keys.has("sprint"),
-            };
-      if (paused || panel) view.routes = [];
-      const before = { ...view.position };
-      view.frame(dt, axis, reduced.matches || game.s.settings.reduced);
-      if (C.distance(before, view.position) > 0.005 && now - lastStep > 360) {
-        sound("step");
-        lastStep = now;
-      }
-      if ((axis.x || axis.z) && !build) {
-        const near = view.targetAt(view.position);
-        if (near) {
-          selected = near;
-          view.selected = near;
-        }
-      }
-      if (build && pointer && !ui.hover && !panel) {
-        const p = view.pick(pointer.x, pointer.y);
-        if (
-          p &&
-          (Math.round(p.x * 2) / 2 !== build.x ||
-            Math.round(p.z * 2) / 2 !== build.z)
-        )
-          aim(pointer.x, pointer.y);
-      }
-      if (pendingAction && !view.routes.length) {
-        const id = pendingAction;
-        pendingAction = null;
-        if (selected?.id === id && C.distance(view.position, selected) < 1.85)
-          act();
-      }
-      if (
-        !panel &&
-        !paused &&
-        !build &&
-        (keys.has("act") || holdMine) &&
-        now >= nextMine &&
-        context().command === "mine"
-      )
-        act();
-      if (now > toastUntil) toast = "";
-      const s = game.s,
-        c = context(),
-        zone = C.zoneAt(view.position.x, view.position.z);
-      ui.draw({
-        s,
-        activeSlot,
-        held: held(),
-        panel,
-        tab,
-        item: inventoryItem,
-        selected,
-        build,
-        context: c,
-        canMove: canMove(),
-        network: view.network,
-        stick,
-        touch,
-        paused,
-        toast,
-        toastUntil,
-        importReady: !!importReady,
-        cutting,
-        reduced: reduced.matches || s.settings.reduced,
-        pressed: !!press || keys.has("act"),
-        zone: zone?.name || "Le jardin",
-        worldLabel: selected?.id.startsWith("resource-")
-          ? D.mining[selected.type].name
-          : name(selected),
-        hint: "Hache · arbres     Pioche · pierre     Pelle · argile     Maintiens E pour travailler",
-      });
-      const accessible = `${s.inventory.coins} feuilles. ${view.lighting?.height >= 0 ? "Jour" : "Nuit"}. ${selected ? c.status + ". " + c.label + ". " + (selected.plant ? "V inspecter. " : "") : ""}I inventaire. E agir ou maintenir. F déplacer.`;
-      if (canvas.getAttribute("aria-label") !== accessible)
-        canvas.setAttribute("aria-label", accessible);
-      if (!paused) view.adaptQuality(raw);
-    }
-    requestAnimationFrame(frame);
-  }
-  document.addEventListener("visibilitychange", () => {
-    resetInput();
-    if (document.hidden) {
-      hiddenAt = Date.now();
-      save();
-      audio?.suspend();
-    } else {
-      if (hiddenAt && !paused) {
-        const summary = game.catchUp();
-        save();
-        view.sync();
-        if (summary.seconds > 30)
-          announce(
-            `${summary.produced} productions pendant ton absence. ${summary.stopped} installations en attente. Les ressources se renouvellent aussi.`,
-          );
-      }
-      hiddenAt = null;
-      last = performance.now();
-    }
-  });
-  addEventListener("pagehide", save);
-  view.held = held();
-  save();
-  canvas.focus({ preventScroll: true });
-  requestAnimationFrame(frame);
-  if (loaded.summary.seconds > 30)
-    announce(
-      `${loaded.summary.produced} productions pendant ton absence. ${loaded.summary.stopped} installations en attente.`,
-    );
-  else if (loaded.message) announce(loaded.message);
 })();
