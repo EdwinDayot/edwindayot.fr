@@ -1,0 +1,216 @@
+.hero-art img {
+  width: 100%;
+  height: 100%;
+  min-height: 580px;
+  display: block;
+  object-fit: cover;
+}
+.hero-art figcaption {
+  position: absolute;
+  z-index: 1;
+  left: 24px;
+  bottom: 22px;
+  color: #d8dfd5;
+  font-size: 0.8rem;
+  letter-spacing: 0.03em;
+}
+.signal-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-block: 1px solid var(--line);
+  padding: 20px 0;
+  margin-bottom: clamp(120px, 16vw, 240px);
+}
+.signal-row p {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0;
+  padding-left: 24px;
+  border-left: 1px solid var(--line);
+}
+.signal-row p:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+.signal-row strong {
+  font-size: 1.15rem;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+}
+.signal-row span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.intro-block {
+  max-width: 960px;
+  margin-bottom: clamp(120px, 17vw, 250px);
+}
+.intro-block h2,
+.section-head h2,
+.about h2,
+.api-section h2,
+.contact h2 {
+  margin: 24px 0 22px;
+  font-size: clamp(2.7rem, 6vw, 6rem);
+  line-height: 0.94;
+  letter-spacing: -0.08em;
+  font-weight: 500;
+}
+.intro-block > p:last-child {
+  max-width: 520px;
+  margin: 0 0 0 auto;
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+.work {
+  margin-bottom: clamp(120px, 16vw, 240px);
+}
+.section-head {
+  max-width: 620px;
+  margin-bottom: 42px;
+}
+.section-head h2 {
+  margin-top: 0;
+}
+.section-head p {
+  margin: 0;
+  color: var(--muted);
+  max-width: 420px;
+}
+.project-nav {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 17px;
+}
+.project-nav a {
+  font-size: 0.82rem;
+  color: var(--muted);
+  transition: color 0.25s ease;
+}
+.project-nav a:hover {
+  color: var(--accent);
+}
+.project {
+  border-radius: var(--radius);
+  padding: clamp(28px, 5vw, 72px);
+  margin-bottom: 28px;
+  overflow: hidden;
+}
+.project-feature {
+  background: #dce8d2;
+  color: #182018;
+}
+.project-dark {
+  background: #25204a;
+  color: #f4eff7;
+}
+.project-acid {
+  background: #b9e95d;
+  color: #182016;
+}
+.project-outline {
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.project-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 58px;
+  color: inherit;
+  font:
+    700 0.68rem/1.2 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+.project-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(220px, 0.85fr);
+  gap: clamp(38px, 8vw, 140px);
+  align-items: end;
+}
+.project-copy {
+  max-width: 620px;
+}
+.app-heading {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.app-heading img {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  object-fit: cover;
+}
+.project h3 {
+  margin: 0;
+  font-size: clamp(2.4rem, 5vw, 5.8rem);
+  line-height: 0.92;
+  letter-spacing: -0.08em;
+  font-weight: 500;
+}
+.project-lead {
+  margin: 28px 0 12px;
+  font-size: 1.18rem;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+.project-copy > p:not(.project-lead) {
+  max-width: 570px;
+  margin: 0;
+  color: inherit;
+  opacity: 0.82;
+}
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 26px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.tags li {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 0.71rem;
+  opacity: 0.72;
+}
+.project-note {
+  align-self: end;
+  max-width: 240px;
+}
+.project-note strong {
+  display: block;
+  font-size: clamp(3rem, 6vw, 6.8rem);
+  letter-spacing: -0.1em;
+  line-height: 0.85;
+  font-weight: 500;
+}
+.project-note span {
+  display: block;
+  margin-top: 13px;
+  color: inherit;
+  opacity: 0.7;
+  font-size: 0.77rem;
+  line-height: 1.35;
+}
+.project-note p {
+  margin: 32px 0 0;
+  padding-top: 15px;
+  border-top: 1px solid currentColor;
+  font-size: 0.78rem;
+  opacity: 0.75;
+}
+.phone-gallery {
+  margin: 76px -10px 0;
+}

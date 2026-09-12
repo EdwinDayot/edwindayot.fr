@@ -1,0 +1,246 @@
+@media (max-width: 900px) {
+  :root {
+    --wrap: min(100% - 40px, 720px);
+  }
+  .hero {
+    min-height: auto;
+    grid-template-columns: 1fr;
+    gap: 50px;
+    padding-top: 54px;
+  }
+  .hero h1 {
+    max-width: 650px;
+    font-size: clamp(3.3rem, 11vw, 5.5rem);
+  }
+  .hero-art {
+    min-height: 420px;
+  }
+  .hero-art img {
+    min-height: 420px;
+  }
+  .signal-row {
+    margin-bottom: 120px;
+  }
+  .intro-block > p:last-child {
+    margin-left: 0;
+    margin-top: 32px;
+  }
+  .project-grid,
+  .about,
+  .api-section {
+    grid-template-columns: 1fr;
+    gap: 46px;
+  }
+  .project-note {
+    max-width: none;
+  }
+  .project-note p {
+    max-width: 240px;
+  }
+  .about {
+    padding-block: 90px;
+  }
+  .contact h2 {
+    font-size: clamp(3.2rem, 11vw, 7rem);
+  }
+}
+@media (max-width: 600px) {
+  :root {
+    --wrap: calc(100% - 32px);
+  }
+  .site-header {
+    height: 66px;
+  }
+  .site-header nav {
+    gap: 14px;
+    font-size: 0.75rem;
+  }
+  .hero {
+    padding-top: 44px;
+    padding-bottom: 55px;
+  }
+  .hero h1 {
+    font-size: clamp(3.1rem, 15vw, 5rem);
+  }
+  .hero-intro {
+    font-size: 1.04rem;
+  }
+  .hero-actions {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 22px;
+  }
+  .hero-art,
+  .hero-art img {
+    min-height: 330px;
+  }
+  .signal-row {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    margin-bottom: 100px;
+    padding: 17px 0;
+  }
+  .signal-row p {
+    padding: 0;
+    border: 0;
+  }
+  .intro-block {
+    margin-bottom: 100px;
+  }
+  .intro-block h2,
+  .section-head h2,
+  .about h2,
+  .api-section h2 {
+    font-size: clamp(2.8rem, 14vw, 4.5rem);
+  }
+  .project {
+    padding: 23px 20px 28px;
+    margin-bottom: 18px;
+  }
+  .project-meta {
+    margin-bottom: 42px;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .project h3 {
+    font-size: clamp(2.7rem, 14vw, 4.3rem);
+  }
+  .project-lead {
+    margin-top: 22px;
+  }
+  .phone-gallery {
+    margin-top: 58px;
+  }
+  .phone-row {
+    gap: 10px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding: 0 10px 12px;
+  }
+  .phone-row img {
+    min-width: 63%;
+    scroll-snap-align: center;
+    border-radius: 13px;
+  }
+  .phone-row-two {
+    display: flex;
+    justify-content: flex-start;
+  }
+  .phone-row-two img {
+    min-width: 68%;
+  }
+  .phone-row img:nth-child(2),
+  .phone-row-two img:nth-child(2) {
+    transform: none;
+  }
+  .detail-grid {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+  .cove-diagram {
+    gap: 12px;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    margin-top: 52px;
+    padding: 20px 10px;
+  }
+  .timeline li {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .api-section {
+    padding-block: 62px;
+    gap: 30px;
+  }
+  .api-links {
+    grid-template-columns: 1fr;
+  }
+  .contact {
+    padding-block: 35px 90px;
+  }
+  .contact h2 {
+    margin-bottom: 40px;
+    font-size: clamp(3rem, 15vw, 5rem);
+  }
+  .site-footer {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .site-footer div {
+    flex-wrap: wrap;
+    gap: 18px;
+  }
+}
+@supports (animation-timeline: scroll()) {
+  .reading-progress {
+    transform-origin: left;
+    animation: reading-progress linear both;
+    animation-timeline: scroll(root);
+  }
+  @keyframes reading-progress {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .reveal,
+  .js .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .button,
+  .phone-row img {
+    transition: none;
+  }
+  .phone-row img:hover {
+    transform: none;
+  }
+  .hero-art img {
+    min-height: 0;
+  }
+  .reading-progress {
+    animation: none;
+    transform: scaleX(1);
+  }
+}
+@media print {
+  body {
+    background: #fff;
+    color: #111;
+  }
+  .site-header nav,
+  .hero-art,
+  .reading-progress,
+  .hero-actions,
+  .project-nav,
+  .phone-gallery,
+  .api-section,
+  .site-footer {
+    display: none;
+  }
+  .project,
+  .project-outline {
+    break-inside: avoid;
+    border: 1px solid #ddd;
+    background: #fff;
+    color: #111;
+  }
+  .reveal,
+  .js .reveal {
+    opacity: 1;
+    transform: none;
+  }
+  .detail-grid {
+    display: grid;
+  }
+}
+

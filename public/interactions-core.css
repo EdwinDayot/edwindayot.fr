@@ -1,0 +1,190 @@
+/* Exploration layer: a quiet progress reward for reading the case studies. */
+.exploration-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  transition: color 0.25s ease;
+}
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  background: transparent;
+  transition:
+    background 0.25s ease,
+    box-shadow 0.25s ease;
+}
+.exploration-status.is-complete {
+  color: var(--accent);
+}
+.exploration-status.is-complete .status-dot {
+  background: var(--accent);
+  box-shadow: 0 0 0 4px #b4ed6320;
+}
+.surprise-button {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  padding: 7px 11px;
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease,
+    background-color 0.2s ease;
+}
+.surprise-button:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  background: #b4ed630b;
+}
+.surprise-button:active {
+  transform: translateY(0) scale(0.97);
+}
+.surprise-button:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 4px;
+}
+.chapter-nav a {
+  transition:
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+.chapter-nav a:hover {
+  transform: translateY(-2px);
+}
+.button {
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+}
+.button:active {
+  transform: translateY(1px) scale(0.98);
+  background: #ffffff08;
+}
+.tags li {
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+.tags li:hover {
+  color: var(--project-accent);
+  border-color: var(--project-accent);
+  transform: translateY(-2px);
+}
+.project-proof .big-number,
+.project-proof .big-words {
+  transition:
+    letter-spacing 0.35s ease,
+    color 0.35s ease;
+}
+.project:hover .project-proof .big-number,
+.project:hover .project-proof .big-words {
+  letter-spacing: -0.1em;
+  color: var(--ink);
+}
+.project {
+  position: relative;
+  overflow: hidden;
+  transition:
+    border-color 0.35s ease,
+    transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.project::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    260px circle at var(--pointer-x, 50%) var(--pointer-y, 50%),
+    color-mix(in srgb, var(--project-accent) 15%, transparent),
+    transparent 70%
+  );
+  transition: opacity 0.35s ease;
+}
+.project:hover {
+  border-color: color-mix(in srgb, var(--project-accent) 70%, var(--line));
+  transform: translateY(-3px);
+}
+.project:hover::before {
+  opacity: 1;
+}
+.project > * {
+  position: relative;
+  z-index: 1;
+}
+.project.is-targeted {
+  animation: target-pulse 0.75s cubic-bezier(0.16, 1, 0.3, 1) 2;
+}
+@keyframes target-pulse {
+  50% {
+    border-color: var(--project-accent);
+    box-shadow: 0 0 0 5px
+      color-mix(in srgb, var(--project-accent) 18%, transparent);
+  }
+}
+.lightbox {
+  width: min(92vw, 680px);
+  max-height: 92vh;
+  padding: 22px;
+  background: #111516;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  box-shadow: 0 30px 100px #000b;
+}
+.lightbox::backdrop {
+  background: #050606cc;
+  backdrop-filter: blur(8px);
+}
+.lightbox figure {
+  margin: 0;
+  display: grid;
+  place-items: center;
+  gap: 14px;
+}
+.lightbox img {
+  display: block;
+  max-width: 100%;
+  max-height: 78vh;
+  width: auto;
+  height: auto;
+  border-radius: 12px;
+}
+.lightbox figcaption {
+  width: 100%;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.lightbox-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: #111516;
+  color: var(--ink);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 2;
+}
+.lightbox-close:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+@supports (animation-timeline: view()) {
