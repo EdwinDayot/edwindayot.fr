@@ -14,15 +14,25 @@ const context = new Proxy(
   },
 );
 const window = { THREE };
-vm.runInNewContext(
-  fs.readFileSync(path.join(__dirname, "../public/garden-models.js"), "utf8"),
-  {
-    window,
-    document: {
-      createElement: () => ({ width: 0, height: 0, getContext: () => context }),
+for (const file of [
+  "garden-models.js",
+  "garden-models-leaf.js",
+  "garden-models-plant.js",
+]) {
+  vm.runInNewContext(
+    fs.readFileSync(path.join(__dirname, "../public/", file), "utf8"),
+    {
+      window,
+      document: {
+        createElement: () => ({
+          width: 0,
+          height: 0,
+          getContext: () => context,
+        }),
+      },
     },
-  },
-);
+  );
+}
 
 for (const type of ["pilea", "monstera", "calathea"]) {
   test(`${type}: petioles and blades stay connected during growth and sway`, () => {
