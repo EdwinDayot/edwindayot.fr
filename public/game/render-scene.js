@@ -130,17 +130,101 @@
           [0.85, 0.07, 0.1],
         );
         g.userData.arm = arm;
-      } else if (type === "collector") {
-        this.shape(g, "box", this.mat.wood, [0, 0.35, 0], [0.85, 0.7, 0.8]);
-        this.shape(g, "box", this.mat.cream, [0, 0.73, 0], [0.95, 0.08, 0.9]);
+      } else if (type === "composter") {
+        this.shape(g, "box", this.mat.wood, [0, 0.32, 0], [0.85, 0.64, 0.8]);
+        this.shape(
+          g,
+          "box",
+          this.mat.wood,
+          [0, 0.32, 0.41],
+          [0.85, 0.64, 0.04],
+        );
+        this.shape(g, "ball", this.mat.soil, [0, 0.66, 0], [0.62, 0.22, 0.56]);
+        for (let i = 0; i < 3; i++)
+          this.shape(
+            g,
+            "ball",
+            M.mat(0x6d8a52),
+            [(i - 1) * 0.22, 0.78, 0.05],
+            [0.11, 0.09, 0.11],
+          );
+      } else if (type === "collector" || type === "collectorT2") {
+        // Tier 2 reuses the exact same model, only bigger — same visual
+        // language as the recipe's bigger capacity/range, no new geometry.
+        const s = type === "collectorT2" ? 1.25 : 1;
+        this.shape(
+          g,
+          "box",
+          this.mat.wood,
+          [0, 0.35 * s, 0],
+          [0.85 * s, 0.7 * s, 0.8 * s],
+        );
+        this.shape(
+          g,
+          "box",
+          this.mat.cream,
+          [0, 0.73 * s, 0],
+          [0.95 * s, 0.08 * s, 0.9 * s],
+        );
         const orb = this.shape(
           g,
           "ball",
           this.mat.metal,
-          [0, 0.85, 0],
-          [0.1, 0.1, 0.1],
+          [0, 0.85 * s, 0],
+          [0.1 * s, 0.1 * s, 0.1 * s],
         );
         g.userData.orb = orb;
+      } else if (type === "greenhouse") {
+        const glass = (this.greenhouseGlass ??= M.mat(0xcbe8e2, {
+          transparent: true,
+          opacity: 0.4,
+          roughness: 0.15,
+        }));
+        for (const [x, z] of [
+          [-0.7, -0.7],
+          [0.7, -0.7],
+          [-0.7, 0.7],
+          [0.7, 0.7],
+        ])
+          this.shape(g, "box", this.mat.wood, [x, 0.55, z], [0.08, 1.1, 0.08]);
+        this.shape(g, "box", glass, [0, 0.55, 0], [1.4, 1.1, 1.4]);
+        this.shape(g, "box", this.mat.wood, [0, 1.15, 0], [1.5, 0.08, 1.5]);
+      } else if (type === "autoPlanter") {
+        this.shape(g, "box", this.mat.wood, [0, 0.14, 0], [0.85, 0.28, 0.7]);
+        this.shape(g, "cylinder", this.mat.bark, [0, 0.55, 0], [0.3, 0.5, 0.3]);
+        this.shape(g, "cylinder", this.mat.wood, [0, 0.83, 0], [0.4, 0.1, 0.4]);
+        for (let i = 0; i < 3; i++)
+          this.shape(
+            g,
+            "ball",
+            this.mat.bark,
+            [(i - 1) * 0.2, 0.3, 0.22],
+            [0.05, 0.05, 0.05],
+          );
+      } else if (type === "seedDispenser") {
+        this.shape(g, "cylinder", this.mat.stone, [0, 0.1, 0], [0.4, 0.2, 0.4]);
+        this.shape(
+          g,
+          "cylinder",
+          this.mat.bark,
+          [0, 0.5, 0],
+          [0.28, 0.6, 0.28],
+        );
+        this.shape(
+          g,
+          "cylinder",
+          this.mat.wood,
+          [0, 0.83, 0],
+          [0.35, 0.1, 0.35],
+        );
+        const spout = this.shape(
+          g,
+          "cylinder",
+          this.mat.wood,
+          [0.32, 0.35, 0],
+          [0.08, 0.3, 0.08],
+        );
+        spout.rotation.z = Math.PI / 3;
       } else if (type === "lantern") {
         this.shape(g, "cylinder", this.mat.bark, [0, 0.4, 0], [0.1, 0.8, 0.1]);
         this.shape(

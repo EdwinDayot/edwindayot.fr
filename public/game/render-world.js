@@ -4,9 +4,14 @@
     D = window.GardenData,
     C = window.GardenConstruction,
     B = window.GardenBotany,
+    Terrain = window.GardenTerrain,
+    Geo = window.GardenGeometry,
+    River = window.GardenRiver,
     G = window.GardenView;
-  if (!T || !M || !B || !G) return;
+  if (!T || !M || !B || !Terrain || !Geo || !River || !G) return;
   Object.assign(G.prototype, {
+    // y is an absolute world height; callers add Terrain.terrainHeight(x, z)
+    // themselves before calling this (see buildZones(), buildHouse()).
     label(text, x, y, z, width = 2) {
       const c = document.createElement("canvas");
       c.width = 512;
@@ -99,22 +104,169 @@
       p.userData = { legs, arms, can };
       return p;
     },
+    // A grid clipped to the zone's real polygon (Épic 4.1's organic contour,
+    // not the old rectangle) with each vertex sampling terrainHeight (Épic
+    // 4.2) — a cell is drawn when its center is inside the polygon, which
+    // approximates the contour at grid resolution instead of a full
+    // polygon-clip triangulation (no such library here); at this game's
+    // low-poly style and camera distance the step below reads as a smooth
+    // organic edge, not a staircase.
+    groundGeometry(polygon, step = 0.375) {
+      let minX = Infinity,
+        maxX = -Infinity,
+        minZ = Infinity,
+        maxZ = -Infinity;
+      for (const [x, z] of polygon) {
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minZ = Math.min(minZ, z);
+        maxZ = Math.max(maxZ, z);
+      }
+      const cols = Math.ceil((maxX - minX) / step) + 1,
+        rows = Math.ceil((maxZ - minZ) / step) + 1,
+        positions = [],
+        indices = [],
+        vertexAt = new Map(),
+        vertexIndex = (i, j) => {
+          const key = i + "," + j;
+          if (vertexAt.has(key)) return vertexAt.get(key);
+          const x = minX + i * step,
+            zPos = minZ + j * step,
+            n = positions.length / 3;
+          positions.push(x, Terrain.terrainHeight(x, zPos), zPos);
+          vertexAt.set(key, n);
+          return n;
+        };
+      for (let i = 0; i < cols - 1; i++)
+        for (let j = 0; j < rows - 1; j++) {
+          const cx = minX + (i + 0.5) * step,
+            cz = minZ + (j + 0.5) * step;
+          if (!Geo.pointInPolygon(polygon, cx, cz)) continue;
+          const a = vertexIndex(i, j),
+            b = vertexIndex(i + 1, j),
+            c = vertexIndex(i + 1, j + 1),
+            d = vertexIndex(i, j + 1);
+          indices.push(a, b, c, a, c, d);
+        }
+      const geo = new T.BufferGeometry();
+      geo.setAttribute("position", new T.Float32BufferAttribute(positions, 3));
+      geo.setIndex(indices);
+      geo.computeVertexNormals();
+      // Ombre du relief cuite en couleurs de sommet (indépendante du soleil) : les
+      // pentes abruptes et les creux de base de colline sont assombris, les plateaux
+      // restent clairs. C'est ce qui rend les 8 collines du terrain lisibles à tout
+      // moment, même quand le soleil les éclaire de face — le dôme éclairé se
+      // confondait avec la plaine claire (l'auto-ombre seule ne suffisait pas).
+      const nrm = geo.attributes.normal,
+        pos = geo.attributes.position,
+        colors = new Float32Array(pos.count * 3),
+        form = new Float32Array(pos.count);
+      for (let v = 0; v < pos.count; v++) {
+        const x = pos.getX(v),
+          y = pos.getY(v),
+          z = pos.getZ(v);
+        let slope = 1 - nrm.getY(v);
+        slope = slope < 0.22 ? 0 : (slope - 0.22) / 0.78;
+        let cavity = 0;
+        for (let a = 0; a < 8; a++) {
+          const ang = (a / 8) * Math.PI * 2;
+          cavity += Math.max(0, Terrain.terrainHeight(x + Math.cos(ang) * 2.2, z + Math.sin(ang) * 2.2) - y);
+        }
+        cavity = Math.min(1, (cavity / 8) * 0.6);
+        const shade = 1 - Math.min(0.45, slope * 0.28 + cavity * 0.35);
+        form[v] = shade;
+        colors[v * 3] = colors[v * 3 + 1] = colors[v * 3 + 2] = shade;
+      }
+      geo.setAttribute("color", new T.Float32BufferAttribute(colors, 3));
+      geo.userData.shadeForm = form;
+      return geo;
+    },
+    // Modulation cuite de l'ombre du relief selon la direction réelle du soleil
+    // (see reBakeTerrain callers). Un dôme convexe projette son auto-ombre sur
+    // sa pente lointaine — cachée derrière le sommet — donc la shadow map seule
+    // ne rend jamais les 8 collines lisibles. On module la couleur de sommet de
+    // chaque pente par le cos²(angle avec le soleil), qui exagère le Lambert
+    // physique déjà appliqué par la lumière directionnelle : les faces au vent
+    // du soleil s'éclairent, les faces opposées s'assombrissent, d'où un relief
+    // net de n'importe quel angle. weight = facteur jour (0 la nuit) pour
+    // revenir à la seule forme cuite.
+    reBakeTerrain(sunDir, weight) {
+      if (!this.grounds) return;
+      const sx = sunDir.x,
+        sy = sunDir.y,
+        sz = sunDir.z;
+      for (const { geo } of this.grounds) {
+        const form = geo.userData.shadeForm,
+          nrm = geo.attributes.normal,
+          col = geo.attributes.color,
+          arr = col.array;
+        for (let v = 0; v < col.count; v++) {
+          const d =
+            nrm.getX(v) * sx + nrm.getY(v) * sy + nrm.getZ(v) * sz;
+          const f = d > 0 ? d * d : 0;
+          const s = form[v] * (1 + (0.42 + 0.9 * f - 1) * weight);
+          arr[v * 3] = arr[v * 3 + 1] = arr[v * 3 + 2] = s;
+        }
+        col.needsUpdate = true;
+      }
+    },
+    // A flat ribbon of quads centered on River.riverX(z) — the water and
+    // soil bank share this, offset by their own half-widths, so the curve
+    // in game/river.js is the single source of truth for both what's drawn
+    // and where a pump is legally "at the river" (construction.js).
+    riverRibbon(halfWidth, y, zFrom, zTo, step = 1) {
+      const positions = [],
+        indices = [];
+      let i = 0;
+      for (let z = zFrom; z <= zTo + 1e-9; z += step) {
+        const cx = River.riverX(z);
+        positions.push(cx - halfWidth, y, z, cx + halfWidth, y, z);
+        if (i > 0) {
+          const a = (i - 1) * 2,
+            b = a + 1,
+            c = i * 2,
+            d = c + 1;
+          indices.push(a, c, b, b, c, d);
+        }
+        i++;
+      }
+      const geo = new T.BufferGeometry();
+      geo.setAttribute("position", new T.Float32BufferAttribute(positions, 3));
+      geo.setIndex(indices);
+      geo.computeVertexNormals();
+      return geo;
+    },
     buildZones() {
       for (const z of D.zones) {
         const [a, b, c, d] = z.bounds,
           group = new T.Group();
         this.scene.add(group);
-        this.shape(
-          group,
-          "box",
-          M.mat([0xaabd8c, 0x91ab80, 0xc4c591, 0xbec0a1][z.id]),
-          [(a + b) / 2, -0.25, (c + d) / 2],
-          [b - a, 0.45, d - c],
+        const ground = new T.Mesh(
+          this.groundGeometry(z.polygon),
+          M.mat([0xaabd8c, 0x91ab80, 0xc4c591, 0xbec0a1][z.id], { vertexColors: true }),
         );
-        const text = this.label(z.name, (a + b) / 2, 0.2, c + 1, 2.6);
+        // Le relief est lisible par deux couches : l'ombre cuite en couleurs de
+        // sommet (voir groundGeometry) est l'indicateur permanent ; l'auto-ombre
+        // ci-dessous (collines réelles projetées sur elles-mêmes) vient en accent,
+        // orientée par le soleil du jour.
+        ground.castShadow = true;
+        ground.receiveShadow = true;
+        group.add(ground);
+        (this.grounds || (this.grounds = [])).push({ geo: ground.geometry });
+        const text = this.label(
+          z.name,
+          (a + b) / 2,
+          Terrain.terrainHeight((a + b) / 2, c + 1) + 0.2,
+          c + 1,
+          2.6,
+        );
         group.add(text);
         const gate = new T.Group();
-        gate.position.set(...[z.gate[0], 0, z.gate[1]]);
+        gate.position.set(
+          z.gate[0],
+          Terrain.terrainHeight(z.gate[0], z.gate[1]),
+          z.gate[1],
+        );
         for (const x of [-0.5, 0.5])
           this.shape(
             gate,
@@ -129,28 +281,27 @@
       }
     },
     buildFlora() {
-      this.shape(
-        this.scene,
-        "box",
+      const soil = new T.Mesh(
+        this.riverRibbon(1.8, -0.17, -35, 19),
         this.mat.soil,
-        [5.8, -0.17, -8],
-        [3.6, 0.3, 58],
       );
-      this.water = this.shape(
-        this.scene,
-        "box",
+      soil.castShadow = true;
+      soil.receiveShadow = true;
+      this.scene.add(soil);
+      this.water = new T.Mesh(
+        this.riverRibbon(1.625, -0.02, -35, 19),
         this.mat.water,
-        [5.8, -0.02, -8],
-        [3.25, 0.15, 58],
       );
       this.water.castShadow = false;
+      this.water.receiveShadow = true;
+      this.scene.add(this.water);
       // Repeated paths, shoreline rocks and tree crowns share one instanced draw each.
       const stones = new T.InstancedMesh(this.geo.ball, this.mat.stone, 320),
         dummy = new T.Object3D();
       let n = 0;
       for (let z = -35; z < 19; z += 1.2)
-        for (const x of [4.22, 7.43]) {
-          dummy.position.set(x, 0.03, z);
+        for (const offset of [-1.58, 1.63]) {
+          dummy.position.set(River.riverX(z) + offset, 0.03, z);
           dummy.scale.set(0.24, 0.11, 0.3);
           dummy.updateMatrix();
           stones.setMatrixAt(n++, dummy.matrix);
@@ -189,7 +340,11 @@
       );
       this.trunks = trunks;
       this.treeData.forEach((tree, i) => {
-        dummy.position.set(tree.x, 1.7 * tree.scale, tree.z);
+        dummy.position.set(
+          tree.x,
+          Terrain.terrainHeight(tree.x, tree.z) + 1.7 * tree.scale,
+          tree.z,
+        );
         dummy.scale.set(0.55, 3.4 * tree.scale, 0.55);
         dummy.updateMatrix();
         trunks.setMatrixAt(i, dummy.matrix);
@@ -215,7 +370,11 @@
       this.moss = moss;
       this.treeData.forEach((tree, i) => {
         for (let j = 0; j < 2; j++) {
-          dummy.position.set(tree.x + (j - 0.5) * 0.6, 0.005, tree.z);
+          dummy.position.set(
+            tree.x + (j - 0.5) * 0.6,
+            Terrain.terrainHeight(tree.x, tree.z) + 0.005,
+            tree.z,
+          );
           dummy.scale.set(1.7, 0.035, 1.25);
           dummy.updateMatrix();
           moss.setMatrixAt(i * 2 + j, dummy.matrix);

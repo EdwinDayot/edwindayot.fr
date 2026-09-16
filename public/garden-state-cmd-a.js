@@ -18,7 +18,7 @@
     typeof module !== "undefined"
       ? require("./garden-state-util.js")
       : root.GardenStateParts.util;
-  const { clone, finite, count, plant, knownItem } = util;
+  const { clone, finite, count, sow, knownItem } = util;
   const M = {
     commandSegA(c, ctx, st) {
       const { s, e, fail } = st;
@@ -67,9 +67,7 @@
         )
           return fail("Choisis une graine disponible et un pot vide.");
         this.pay({ [item]: 1 });
-        e.plant = plant(sp.id, c.source === "young" ? 0.3 : 0);
-        e.plant.ready = 0;
-        e.plant.source = c.source || "seed";
+        sow(e, sp.id, c.source || "seed");
         st.message = `${sp.name} planté. Un arrosage pour commencer.`;
       } else if (c.type === "water") {
         st.taken = true;

@@ -20,6 +20,14 @@
     typeof module !== "undefined"
       ? require("./game/progression.js")
       : root.GardenProgression;
+  const Automation =
+    typeof module !== "undefined"
+      ? require("./game/automation.js")
+      : root.GardenAutomation;
+  const Quests =
+    typeof module !== "undefined"
+      ? require("./game/quests.js")
+      : root.GardenQuests;
   const parts =
     typeof module !== "undefined"
       ? {
@@ -70,6 +78,7 @@
         "collect",
         "fillTank",
         "withdraw",
+        "load",
         "multiply",
         "collectYoung",
       ];
@@ -96,6 +105,15 @@
       s.elapsed++;
       for (const e of s.entities) e.running = false;
       I.tick(s);
+      // A sustained objective's timer runs continuously while the quest is
+      // active (not only when the player checks in), so its progress is
+      // already accurate on arrival, and survives offline catch-up like any
+      // other s.elapsed-based state.
+      for (const q of s.quests.active) {
+        const objective = D.quests[q.questId]?.objective;
+        if (objective?.type === "networkSustained")
+          Quests.evaluateObjective(objective, s, q);
+      }
       for (const e of s.entities) {
         if (e.stored) continue;
         if (e.plant) {
@@ -110,7 +128,8 @@
           if (p.moisture > 5) {
             const rate =
               (zone.light === sp.light ? 1 : 0.65) *
-              (p.moisture >= 20 && p.moisture <= 85 ? 1 : 0.45);
+              (p.moisture >= 20 && p.moisture <= 85 ? 1 : 0.45) *
+              (p.boostUntil > s.elapsed ? 1.5 : 1);
             if (p.growth < 1)
               p.growth = Math.min(
                 1,
@@ -126,31 +145,7 @@
             }
           }
         }
-        if (e.type === "nursery" && e.job?.remaining > 0) {
-          e.running = true;
-          e.job.remaining = Math.max(0, e.job.remaining - 1);
-          if (e.job.remaining === 0) {
-            e.running = false;
-            s.stats.produced++;
-          }
-        }
-        if (e.type === "collector") {
-          let room = 24 - Object.values(e.buffer).reduce((a, b) => a + b, 0);
-          e.running = room > 0;
-          for (const pot of s.entities) {
-            if (!room) break;
-            if (pot.stored || !pot.plant?.ready || C.distance(e, pot) > 4)
-              continue;
-            const p = pot.plant,
-              sp = D.species.find((o) => o.id === p.species),
-              q = Math.min(room, p.ready),
-              id = `${sp.product}:${sp.id}`;
-            e.buffer[id] = (e.buffer[id] || 0) + q;
-            p.ready -= q;
-            room -= q;
-            s.stats.collected += q;
-          }
-        }
+        Automation.tick(e, s);
       }
     }
     step(seconds) {
@@ -182,7 +177,7 @@
   }
   GardenState.commandSegs = [];
   if (typeof module !== "undefined")
-    for (const k of ["a", "b", "c"]) {
+    for (const k of ["a", "b", "c", "d", "e"]) {
       const M = require("./garden-state-cmd-" + k + ".js");
       Object.assign(GardenState.prototype, M);
       GardenState.commandSegs.push(...Object.values(M));

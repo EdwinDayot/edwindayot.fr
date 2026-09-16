@@ -5,9 +5,14 @@
     typeof module !== "undefined"
       ? require("./construction.js")
       : root.GardenConstruction;
-  const isPot = (e) => ["pot", "reservoir"].includes(e?.type),
+  // A "source" emits a substance (water for a pump, fertilizer for a
+  // composter) into the same physical network of tanks/pipes/drips; which
+  // substance a given tank/pipe/drip carries is derived from whichever
+  // source reaches it (see substanceOf), never stored on the entity itself.
+  const SOURCE = ["pump", "composter"],
+    isPot = (e) => ["pot", "reservoir"].includes(e?.type),
     network = (e) =>
-      ["pump", "tank", "pipe", "drip"].includes(e?.type) || isPot(e);
+      [...SOURCE, "tank", "pipe", "drip"].includes(e?.type) || isPot(e);
   const topology = new WeakMap(),
     telemetry = new WeakMap(),
     EPS = 1e-9;
@@ -19,15 +24,33 @@
     return network(a) && network(b) && C.distance(a, b) <= 4;
   }
   const outlet = (a, b) =>
-    a.type === "pump"
+    SOURCE.includes(a.type)
       ? ["pipe", "tank"].includes(b.type)
       : a.type === "tank"
         ? ["pipe", "drip"].includes(b.type)
         : a.type === "pipe"
           ? ["pipe", "tank", "drip"].includes(b.type)
           : a.type === "drip" && (b.type === "drip" || isPot(b));
-  function canConnect(a, b) {
-    return validLink(a, b) && (outlet(a, b) || outlet(b, a));
+  // A component can carry only one substance: reject a link that would
+  // merge two components fed by sources of different substances. A
+  // component with no source yet (a freshly placed tank) is neutral and
+  // can join either side.
+  function substancesOf(group) {
+    const set = new Set();
+    for (const e of group)
+      if (SOURCE.includes(e.type)) set.add(D.recipes[e.type].substance);
+    return set;
+  }
+  function crossesSubstance(s, a, b) {
+    const groups = components(s),
+      ga = groups.find((g) => g.some((e) => e.id === a.id)) || [a],
+      gb = groups.find((g) => g.some((e) => e.id === b.id)) || [b];
+    if (ga === gb) return false;
+    return new Set([...substancesOf(ga), ...substancesOf(gb)]).size > 1;
+  }
+  function canConnect(a, b, s) {
+    if (!validLink(a, b) || !(outlet(a, b) || outlet(b, a))) return false;
+    return !s || !crossesSubstance(s, a, b);
   }
   function orientation(a, b) {
     if (!canConnect(a, b)) return 0;
@@ -63,10 +86,10 @@
         for (const toId of adj.get(id) || []) {
           if (found.has(toId)) continue;
           const to = entities.get(toId);
-          // Pumps stop at storage; cisterns cannot discharge through pumps, other tanks or pots.
-          // Drips pass water along the irrigation line even when their own pot is wet.
+          // Sources stop at storage; cisterns cannot discharge through a source, other tanks or pots.
+          // Drips pass their substance along the line even when their own pot is wet/fed.
           const allowed = filling
-            ? ["pump", "pipe"].includes(from.type) &&
+            ? [...SOURCE, "pipe"].includes(from.type) &&
               ["pipe", "tank"].includes(to.type)
             : ["tank", "pipe"].includes(from.type)
               ? ["pipe", "drip"].includes(to.type)
@@ -79,8 +102,8 @@
       }
       return found;
     }
-    const pumps = objects
-        .filter((e) => e.type === "pump")
+    const sources = objects
+        .filter((e) => SOURCE.includes(e.type))
         .sort((a, b) => a.id.localeCompare(b.id)),
       tanks = objects
         .filter((e) => e.type === "tank")
@@ -89,9 +112,9 @@
       signature,
       entities,
       adj,
-      pumps,
+      sources,
       tanks,
-      pumpPaths: new Map(pumps.map((e) => [e.id, paths(e, true)])),
+      sourcePaths: new Map(sources.map((e) => [e.id, paths(e, true)])),
       tankPaths: new Map(tanks.map((e) => [e.id, paths(e, false)])),
     };
     topology.set(s, cached);
@@ -119,6 +142,17 @@
       groups.push(group);
     }
     return groups;
+  }
+  // Which substance a tank/pipe/drip currently carries, derived from
+  // whichever source reaches it. A tank no source reaches yet defaults to
+  // water: the watering can (fillTank) only ever pours water, with no pump
+  // required, so an unconnected or manually-filled tank must still drain
+  // as a water tank.
+  function substanceOf(g, id) {
+    for (const [sourceId, paths] of g.sourcePaths)
+      if (paths.has(id))
+        return D.recipes[g.entities.get(sourceId).type].substance;
+    return "water";
   }
   function invalidate(s) {
     telemetry.delete(s);
@@ -149,6 +183,7 @@
   const P = (root.GardenIrrigationParts = {
     D,
     C,
+    SOURCE,
     isPot,
     network,
     topology,
@@ -157,6 +192,8 @@
     validLink,
     outlet,
     canConnect,
+    crossesSubstance,
+    substanceOf,
     orientation,
     edgeKey,
     graph,
@@ -168,5 +205,6 @@
     activity,
   });
   // The water simulation is attached by irrigation-sim.js.
-  if (typeof module !== "undefined") module.exports = require("./irrigation-sim.js");
+  if (typeof module !== "undefined")
+    module.exports = require("./irrigation-sim.js");
 })(globalThis);

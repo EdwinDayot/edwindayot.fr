@@ -1,20 +1,32 @@
 /* All times are seconds, water in game units, distances in world units. */
 (function (root) {
+  const G =
+    typeof module !== "undefined"
+      ? require("./geometry.js")
+      : root.GardenGeometry;
   const P =
     typeof module !== "undefined"
       ? {
           ...require("./data-species.js"),
           ...require("./data-recipes.js"),
           ...require("./data-world.js"),
+          ...require("./data-buildings.js"),
+          ...require("./data-quests.js"),
         }
       : root.GardenDataParts;
-  const { species, zones, recipes, mining, tools, labels, itemName, balance } =
-    P;
-  const visitors = [
-    { id: "lea", name: "Léa · échanges", x: -5, z: 5 },
-    { id: "noe", name: "Noé · équipements", x: -3, z: 5 },
-    { id: "iris", name: "Iris · botaniste", x: -1, z: 5 },
-  ];
+  const {
+    species,
+    zones,
+    recipes,
+    mining,
+    tools,
+    labels,
+    itemName,
+    balance,
+    buildings,
+    visitors,
+    quests,
+  } = P;
   const resourcePositions = [
     [
       [-6, -3],
@@ -68,6 +80,7 @@
         .some((p) => Math.hypot(p.x - x, p.z - z) < 2)
     )
       return;
+    if (buildings.some((b) => Math.hypot(b.x - x, b.z - z) < 2.6)) return;
     trees.push({
       id: `tree-${trees.length}`,
       type: "tree",
@@ -132,7 +145,7 @@
       [-25, -31],
     ],
     clay: [
-      [-5, 8],
+      [-13, 3],
       [2, 11],
       [-12, 17],
       [-18, 7],
@@ -148,13 +161,7 @@
   };
   for (const [type, points] of Object.entries(sites))
     points.forEach(([x, z], i) => {
-      const zone = zones.find(
-        (q) =>
-          x >= q.bounds[0] &&
-          x < q.bounds[1] &&
-          z >= q.bounds[2] &&
-          z < q.bounds[3],
-      ).id;
+      const zone = G.zoneAt(zones, x, z).id;
       resources.push({
         id: `resource-extra-${type}-${i}`,
         type,
@@ -173,13 +180,7 @@
     )
       trees.splice(i, 1);
   for (const tree of trees) {
-    const zone = zones.find(
-      (q) =>
-        tree.x >= q.bounds[0] &&
-        tree.x < q.bounds[1] &&
-        tree.z >= q.bounds[2] &&
-        tree.z < q.bounds[3],
-    ).id;
+    const zone = G.zoneAt(zones, tree.x, tree.z).id;
     resources.push({
       id: `resource-${tree.id}`,
       type: "wood",
@@ -201,6 +202,8 @@
     zones,
     recipes,
     visitors,
+    buildings,
+    quests,
     resources,
     caches,
     labels,

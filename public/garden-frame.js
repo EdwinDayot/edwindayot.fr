@@ -117,7 +117,7 @@
           : A.name(A.selected),
         hint: "Hache · arbres     Pioche · pierre     Pelle · argile     Maintiens E pour travailler",
       });
-      const accessible = `${s.inventory.coins} feuilles. ${A.view.lighting?.height >= 0 ? "Jour" : "Nuit"}. ${A.selected ? c.status + ". " + c.label + ". " + (A.selected.plant ? "V inspecter. " : "") : ""}I inventaire. E agir ou maintenir. F déplacer.`;
+      const accessible = `${s.inventory.coins} feuilles. ${A.view.lighting?.height >= 0 ? "Jour" : "Nuit"}. ${A.selected ? c.status + ". " + c.label + ". " + (!A.selected.id.startsWith("zone-") ? "V inspecter. " : "") : ""}I inventaire. E agir ou maintenir. F déplacer.`;
       if (A.canvas.getAttribute("aria-label") !== accessible)
         A.canvas.setAttribute("aria-label", accessible);
       if (!A.paused) A.view.adaptQuality(raw);

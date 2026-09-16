@@ -104,7 +104,7 @@
     } else if (key === "Enter") {
       e.preventDefault();
       A.act();
-    } else if (key === "v" && A.selected?.plant)
+    } else if (key === "v" && A.selected && !A.selected.id.startsWith("zone-"))
       A.dispatch("inspect", { id: A.selected.id });
     else if (key === "f") A.dispatch("move");
     else if (key === "g") A.dispatch("store");

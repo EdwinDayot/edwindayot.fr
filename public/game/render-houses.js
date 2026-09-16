@@ -1,0 +1,339 @@
+(() => {
+  const T = window.THREE,
+    M = window.GardenModels,
+    D = window.GardenData,
+    Terrain = window.GardenTerrain,
+    G = window.GardenView;
+  if (!T || !M || !D || !Terrain || !G) return;
+  const WALL_H = 1.9;
+  // Data-driven interior props, keyed by the building's `props` list
+  // (data-buildings.js) instead of a per-id if-branch.
+  const PROPS = {
+    magnifier: (view, person) =>
+      view.shape(
+        person,
+        "box",
+        view.mat.cream,
+        [0.3, 0.75, 0.15],
+        [0.25, 0.3, 0.06],
+      ),
+  };
+  Object.assign(G.prototype, {
+    // Three closed houses in a row: walls, a two-pan roof, a door gap and a
+    // visitor standing inside. Collision is the wall circles in data.js; this
+    // is purely visual and clickable (see the userData.target traversal).
+    buildHouses() {
+      this.doors = [];
+      this.roofs = [];
+      for (const b of D.buildings) this.buildHouse(b);
+    },
+    // A gable end: rectangle-plus-triangle profile (eave to eave, up to the
+    // ridge) extruded to `thickness`, so the wall actually follows the roof
+    // pitch instead of a full-height rectangular block the sloped roof
+    // panels have to cut through (the "toit qui passe à travers les murs"
+    // bug — a flat block reaching roofHeight along the whole depth, while
+    // the roof itself is only that tall right at the ridge, z=0). Winding
+    // of each triangle is hand-picked (checked against the cross product)
+    // so every face's computed normal already points outward; there is no
+    // bottom face since this sits flush on top of the WALL_H rectangle
+    // wall built right below it and that seam is never visible.
+    gableGeometry(thickness, d2, wallH, ridgeH) {
+      const half = thickness / 2,
+        L0 = [-half, wallH, -d2],
+        L1 = [-half, wallH, d2],
+        L2 = [-half, ridgeH, 0],
+        R0 = [half, wallH, -d2],
+        R1 = [half, wallH, d2],
+        R2 = [half, ridgeH, 0],
+        geo = new T.BufferGeometry();
+      geo.setAttribute(
+        "position",
+        new T.Float32BufferAttribute([L0, L1, L2, R0, R1, R2].flat(), 3),
+      );
+      // 0,1,2 left cap · 3,5,4 right cap · 0,5,3 + 0,2,5 front slope ·
+      // 1,4,5 + 1,5,2 back slope.
+      geo.setIndex([0, 1, 2, 3, 5, 4, 0, 5, 3, 0, 2, 5, 1, 4, 5, 1, 5, 2]);
+      geo.computeVertexNormals();
+      return geo;
+    },
+    buildHouse(b) {
+      const group = new T.Group();
+      group.position.set(b.x, Terrain.terrainHeight(b.x, b.z), b.z);
+      this.scene.add(group);
+      const d2 = b.d / 2,
+        w2 = b.w / 2,
+        doorHalf = b.door.w / 2,
+        stone = this.mat.stone,
+        stoneDark = (this.stoneDark ??= M.mat(0x8f8a76)),
+        trim = M.mat(b.accent),
+        roofMat = M.mat(b.roofColor || 0x5c4632),
+        frontW = w2 - doorHalf;
+      const floor = this.shape(
+        group,
+        "box",
+        this.mat.cream,
+        [0, 0.02, 0],
+        [b.w - 0.1, 0.05, b.d - 0.1],
+      );
+      floor.castShadow = false;
+      // A low stone footer around the whole base, then walls of stacked
+      // fieldstone (two toned blocks per course) instead of wood planks.
+      this.shape(
+        group,
+        "box",
+        stoneDark,
+        [0, 0.1, 0],
+        [b.w + 0.08, 0.2, b.d + 0.08],
+      );
+      // Back wall, and the two gable-end walls: an eave-height rectangle
+      // plus a triangular cap that actually follows the roof pitch (see
+      // gableGeometry above) instead of a rectangle reaching the ridge
+      // height along the whole depth.
+      this.shape(group, "box", stone, [0, WALL_H / 2, d2], [b.w, WALL_H, 0.16]);
+      this.shape(group, "box", stone, [-w2, WALL_H / 2, 0], [0.16, WALL_H, b.d]);
+      this.shape(group, "box", stone, [w2, WALL_H / 2, 0], [0.16, WALL_H, b.d]);
+      const gable = this.gableGeometry(0.16, d2, WALL_H, b.roofHeight);
+      this.shape(group, gable, stone, [-w2, 0, 0]);
+      this.shape(group, gable, stone, [w2, 0, 0]);
+      // Front wall, split either side of the door.
+      for (const side of [-1, 1])
+        this.shape(
+          group,
+          "box",
+          stone,
+          [side * (doorHalf + frontW / 2), WALL_H / 2, -d2],
+          [frontW, WALL_H, 0.16],
+        );
+      // Visible fieldstone blocks studding each wall face, two alternating
+      // tones so the stonework reads at a glance instead of a flat slab.
+      let studIndex = 0;
+      const stud = (x, y, z, rot) => {
+        const s = this.shape(
+          group,
+          "box",
+          studIndex++ % 2 ? stoneDark : stone,
+          [x, y, z],
+          [0.34, 0.3, 0.34],
+        );
+        s.rotation.y = rot;
+      };
+      for (const y of [0.45, 0.95, 1.45]) {
+        stud(-b.w * 0.28, y, d2 + 0.01, 0);
+        stud(b.w * 0.28, y, d2 + 0.01, 0);
+        stud(-w2 - 0.01, y, -b.d * 0.22, Math.PI / 2);
+        stud(-w2 - 0.01, y, b.d * 0.22, Math.PI / 2);
+        stud(w2 + 0.01, y, -b.d * 0.22, Math.PI / 2);
+        stud(w2 + 0.01, y, b.d * 0.22, Math.PI / 2);
+      }
+      for (const side of [-1, 1])
+        for (const y of [0.45, 0.95, 1.45])
+          stud(side * (doorHalf + frontW * 0.5), y, -d2 - 0.01, 0);
+      // Corner quoins: stacked stone blocks proud of both wall faces.
+      for (const [cx, cz] of [
+        [-w2, d2],
+        [w2, d2],
+        [-w2, -d2],
+        [w2, -d2],
+      ])
+        for (let i = 0; i < 3; i++)
+          this.shape(
+            group,
+            "box",
+            i % 2 ? stoneDark : stone,
+            [cx, 0.32 + i * 0.55, cz],
+            [0.4, 0.5, 0.4],
+          );
+      this.shape(
+        group,
+        "box",
+        trim,
+        [0, WALL_H + 0.07, -d2],
+        [b.door.w + 0.3, 0.14, 0.16],
+      );
+      // Two roof panels sloping down from the ridge (z=0) to each eave, plus
+      // the ridge board and chimney: collected into `roofPieces` so
+      // updateDoors can hide the whole roof on approach (see there) — a
+      // closed roof over the whole footprint otherwise means the interior
+      // (floor, visitor, lamp) is never actually visible from the game's
+      // fixed elevated camera angle, door open or not.
+      const roofPieces = [],
+        dy = b.roofHeight - WALL_H,
+        len = Math.hypot(dy, d2),
+        angle = Math.atan2(dy, d2);
+      for (const side of [-1, 1]) {
+        const panel = this.shape(
+          group,
+          "box",
+          roofMat,
+          [0, (WALL_H + b.roofHeight) / 2, (side * d2) / 2],
+          [b.w + 0.3, 0.1, len],
+        );
+        panel.rotation.x = side * angle;
+        roofPieces.push(panel);
+      }
+      roofPieces.push(
+        this.shape(
+          group,
+          "box",
+          trim,
+          [0, b.roofHeight, 0],
+          [b.w + 0.34, 0.1, 0.14],
+        ),
+      );
+      // A stone chimney breast on a subset of houses (data-driven, see
+      // data-buildings.js), stood against the outside of the gable wall so
+      // it never has to cut through the sloped roof panel above it.
+      if (b.chimney) {
+        const chimTop = b.roofHeight + 0.6,
+          chimX = w2 + 0.22,
+          chimZ = d2 * 0.1;
+        roofPieces.push(
+          this.shape(
+            group,
+            "box",
+            stoneDark,
+            [chimX, chimTop / 2, chimZ],
+            [0.34, chimTop, 0.34],
+          ),
+          this.shape(
+            group,
+            "box",
+            stoneDark,
+            [chimX, chimTop + 0.08, chimZ],
+            [0.46, 0.14, 0.46],
+          ),
+        );
+      }
+      this.roofs.push({ pieces: roofPieces, x: b.door.x, z: b.door.z });
+      // Door leaf, visual-only: pivots open on approach (see updateDoors).
+      // Sized like a real door (not the full walkable gap, which stays wide
+      // for joystick/keyboard drift tolerance — see houseWalls() in
+      // data-buildings.js) and built from a wood panel + frame instead of
+      // one flat accent-colored slab, which read as an oversized colored
+      // wall against the new stone masonry.
+      const doorW = 1.3,
+        doorH = 1.65,
+        pivot = new T.Group();
+      pivot.position.set(-doorHalf, 0, -d2);
+      group.add(pivot);
+      this.shape(
+        pivot,
+        "box",
+        this.mat.bark,
+        [doorHalf, doorH / 2, 0],
+        [doorW, doorH, 0.08],
+      );
+      this.shape(
+        pivot,
+        "box",
+        M.mat(0x6b5540),
+        [doorHalf, doorH / 2, -0.03],
+        [doorW - 0.16, doorH - 0.16, 0.02],
+      );
+      this.shape(
+        pivot,
+        "box",
+        trim,
+        [doorHalf, doorH * 0.62, -0.045],
+        [0.06, 0.06, 0.09],
+      );
+      // Stone jambs filling the reveal between the door leaf and the
+      // wall's open gap (doorHalf*2 wide) on both sides.
+      for (const side of [-1, 1])
+        this.shape(
+          group,
+          "box",
+          stoneDark,
+          [side * (doorHalf - 0.12), WALL_H / 2, -d2],
+          [0.24, WALL_H, 0.14],
+        );
+      // A small hanging sign for the actual shopkeepers (role: "vendor"),
+      // planted in the yard beside the door — so a vendor reads differently
+      // at a glance from a resident who has nothing to sell.
+      if (b.role === "vendor") {
+        const signX = doorHalf + 0.55,
+          signZ = -d2 - 0.5,
+          postH = 1.1;
+        this.shape(
+          group,
+          "box",
+          stoneDark,
+          [signX, postH / 2, signZ],
+          [0.08, postH, 0.08],
+        );
+        this.shape(
+          group,
+          "box",
+          trim,
+          [signX, postH - 0.15, signZ],
+          [0.5, 0.28, 0.04],
+        );
+        this.shape(
+          group,
+          "ball",
+          M.mat(0xf3e6b8),
+          [signX, postH - 0.15, signZ - 0.03],
+          [0.06, 0.06, 0.02],
+        );
+      }
+      // A ceiling lamp fixture; the light itself joins the shared local-light pool.
+      this.shape(
+        group,
+        "ball",
+        M.mat(0xf3e6b8),
+        [0, WALL_H - 0.1, 0.3],
+        [0.1, 0.1, 0.1],
+      );
+      // One interior prop per visitor, non-collidable furniture.
+      this.shape(
+        group,
+        "box",
+        M.mat(0x7a8f6a),
+        [w2 - 0.55, 0.3, d2 - 0.55],
+        [0.55, 0.6, 0.5],
+      );
+      const person = this.person(b.personColor);
+      person.position.set(0, 0, -0.4);
+      person.rotation.y = Math.PI;
+      person.userData.can.visible = false;
+      person.userData.target = b.visitorId;
+      for (const prop of b.props) PROPS[prop]?.(this, person);
+      group.add(person);
+      group.traverse((o) => {
+        if (o.isMesh) o.userData.target = b.visitorId;
+      });
+      this.scene.add(
+        this.label(
+          D.visitors.find((v) => v.id === b.visitorId).name,
+          b.x,
+          Terrain.terrainHeight(b.x, b.z) + b.roofHeight + 0.15,
+          b.z,
+          1.6,
+        ),
+      );
+      this.nodes.set(b.visitorId, group);
+      this.doors.push({ pivot, x: b.door.x, z: b.door.z });
+    },
+    updateDoors(reduced) {
+      if (!this.doors) return;
+      const open = -Math.PI / 2.3;
+      for (let i = 0; i < this.doors.length; i++) {
+        const door = this.doors[i];
+        const near =
+          Math.hypot(this.position.x - door.x, this.position.z - door.z) < 1.8;
+        const target = near ? open : 0;
+        door.pivot.rotation.y = reduced
+          ? target
+          : door.pivot.rotation.y + (target - door.pivot.rotation.y) * 0.18;
+        // Lift the roof off the house you're at, otherwise the interior
+        // (floor, visitor, lamp) is never actually visible: from this
+        // game's fixed elevated camera angle a closed roof always covers
+        // the footprint from above regardless of which way the door faces.
+        // Cheap and instant (no fade) since updateBatches already checks
+        // .visible on every mesh each frame (render-light.js) — no batch
+        // rebuild needed.
+        for (const piece of this.roofs[i].pieces) piece.visible = !near;
+      }
+    },
+  });
+})();

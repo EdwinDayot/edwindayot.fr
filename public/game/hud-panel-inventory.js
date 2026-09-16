@@ -180,19 +180,6 @@
         30,
         "reserve",
       );
-      if (item === "pot")
-        this.button(
-          "buy",
-          "Acheter · 8 feuilles",
-          x + 152,
-          y + ph - 43,
-          153,
-          30,
-          "buy",
-          {},
-          false,
-          !m.s.inventory.coins || m.s.inventory.coins < 8,
-        );
       this.text("I · Fermer", x + pw - 20, y + ph - 27, 11, p.muted, "right");
     },
   });

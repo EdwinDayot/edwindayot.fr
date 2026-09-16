@@ -68,7 +68,13 @@
         A.openPanel("reserve");
         break;
       case "buy":
-        A.execute({ type: "buy", item: "pot" });
+        A.execute({ type: "buy", vendor: data.vendor, item: data.item });
+        break;
+      case "quest-accept":
+        A.execute({ type: "quest", action: "accept", questId: data.questId });
+        break;
+      case "quest-complete":
+        A.execute({ type: "quest", action: "complete", questId: data.questId });
         break;
       case "go":
         A.go(data.id);
@@ -79,7 +85,7 @@
           : A.game.s.entities.find(
               (e) => !e.stored && e.plant?.species === data.species,
             );
-        if (e?.plant) {
+        if (e) {
           A.cancelBuild();
           A.wireStart = null;
           A.view.connectionPreview(null, null);

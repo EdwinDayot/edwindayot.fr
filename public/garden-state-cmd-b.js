@@ -19,16 +19,11 @@
     commandSegB(c, ctx, st) {
       const { s, e, fail } = st;
       /* branch group */
-      if (c.type === "craft" || c.type === "buy") {
+      if (c.type === "craft") {
         st.taken = true;
         const recipe = D.recipes[c.item],
-          cost = c.type === "buy" ? D.balance.potPrice : recipe?.cost;
-        if (
-          !recipe ||
-          (c.type === "buy" && c.item !== "pot") ||
-          !s.plans.includes(c.item) ||
-          !this.has(cost)
-        )
+          cost = recipe?.cost;
+        if (!recipe || !s.plans.includes(c.item) || !this.has(cost))
           return fail("Plan ou matériaux manquants.");
         this.pay(cost);
         this.add(c.item, 1);
@@ -81,7 +76,12 @@
           obj.id = `e${s.nextId++}`;
           if (I.isPot(obj)) obj.plant = null;
           if (type === "tank") obj.water = 0;
-          if (type === "collector") obj.buffer = {};
+          if (
+            D.recipes[type].buffer ||
+            D.recipes[type].sow ||
+            D.recipes[type].dispense
+          )
+            obj.buffer = {};
           s.entities.push(obj);
         }
         const old = s.links.length;
@@ -114,13 +114,13 @@
         } else {
           if (
             index >= 0 ||
-            !I.canConnect(e, b) ||
+            !I.canConnect(e, b, s) ||
             [e, b].some(
               (o) => I.isPot(o) && s.links.some((l) => l.includes(o.id)),
             )
           )
             return fail(
-              "Relie pompe, citerne, tuyaux et goutteurs en chaîne (4 unités), puis chaque pot à un goutteur (1,8 unité).",
+              "Relie pompe/composteur, citerne, tuyaux et goutteurs en chaîne (4 unités), puis chaque pot à un goutteur (1,8 unité). Un même circuit ne mélange pas deux substances.",
             );
           s.links.push([e.id, b.id]);
         }
@@ -135,11 +135,30 @@
         st.message = `${q} unités versées dans la citerne.`;
       } else if (c.type === "withdraw") {
         st.taken = true;
-        if (e.type !== "collector" || !Object.values(e.buffer).some((n) => n))
-          return fail("Le collecteur est vide.");
+        const recipe = D.recipes[e.type];
+        if (
+          !(recipe?.buffer || recipe?.sow || recipe?.dispense) ||
+          !Object.values(e.buffer).some((n) => n)
+        )
+          return fail("Rien à récupérer ici.");
         for (const [id, n] of Object.entries(e.buffer)) this.add(id, n);
         e.buffer = {};
-        st.message = "Production du collecteur rangée dans l’inventaire.";
+        st.message = `${recipe.name} vidé dans la réserve.`;
+      } else if (c.type === "load") {
+        st.taken = true;
+        const recipe = D.recipes[e.type],
+          item = `${c.source || "seed"}:${c.species}`,
+          used = Object.values(e.buffer || {}).reduce((a, b) => a + b, 0);
+        if (
+          !recipe?.sow ||
+          !["seed", "young"].includes(c.source || "seed") ||
+          used >= recipe.capacity ||
+          !this.has({ [item]: 1 })
+        )
+          return fail("Choisis une graine disponible pour ce planteur.");
+        this.pay({ [item]: 1 });
+        e.buffer[item] = (e.buffer[item] || 0) + 1;
+        st.message = `Planteur chargé : ${D.itemName(item)}.`;
       } else if (c.type === "multiply") {
         st.taken = true;
         if (

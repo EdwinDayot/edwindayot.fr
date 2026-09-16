@@ -70,7 +70,21 @@ const url = process.env.GARDEN_URL || "http://127.0.0.1:4174/";
     // Reach a resource through the Canvas map, then hold the tactile action button.
     await click(t, "slot-2", true);
     await click(t, "open-map", true);
-    await click(t, "row-1", true);
+    // The map paginates once the village grows past one page of rows, so page
+    // forward until the target resource's row comes into view.
+    let mapId = null;
+    for (let tries = 0; tries < 10 && !mapId; tries++) {
+      mapId = await t.evaluate(() => {
+        const b = __hud.buttons.find(
+          (b) =>
+            b.action === "go" && b.data.id === __view.game.s.resources[0].id,
+        );
+        return b ? b.id : null;
+      });
+      if (!mapId) await click(t, "next", true);
+    }
+    assert.ok(mapId, "resource row never found across map pages");
+    await click(t, mapId, true);
     await t.waitForFunction(() => !__view.routes.length);
     await t.waitForTimeout(300);
     const act = await button(t, "act"),

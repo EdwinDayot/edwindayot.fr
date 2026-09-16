@@ -34,7 +34,10 @@
         if (!r) return fail("Demande introuvable.");
         if (c.type === "trade") {
           if (
-            !this.near(ctx, D.visitors[0]) ||
+            !this.near(
+              ctx,
+              D.visitors.find((v) => v.id === "lea"),
+            ) ||
             !this.has({ [r.item]: r.quantity })
           )
             return fail("Retrouve Léa avec la production demandée.");
@@ -49,7 +52,13 @@
         const milestone = [3, 6, 9, 12].find(
           (n) => s.discovered.length >= n && !s.botanyRewards.includes(n),
         );
-        if (!milestone || !this.near(ctx, D.visitors[2]))
+        if (
+          !milestone ||
+          !this.near(
+            ctx,
+            D.visitors.find((v) => v.id === "iris"),
+          )
+        )
           return fail("Retrouve Iris après de nouvelles découvertes.");
         P.botany(s, milestone);
         st.message = "Iris t’offre un banc et 8 feuilles pour ta collection.";

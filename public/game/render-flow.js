@@ -4,8 +4,9 @@
     D = window.GardenData,
     C = window.GardenConstruction,
     B = window.GardenBotany,
+    Terrain = window.GardenTerrain,
     G = window.GardenView;
-  if (!T || !M || !B || !G) return;
+  if (!T || !M || !B || !Terrain || !G) return;
   Object.assign(G.prototype, {
     sync() {
       const s = this.game.s,
@@ -51,7 +52,7 @@
           this.batchDirty = true;
         }
         m.root.userData.target = e.id;
-        m.root.position.set(e.x, 0, e.z);
+        m.root.position.set(e.x, Terrain.terrainHeight(e.x, e.z), e.z);
         m.root.rotation.y = (e.rotation * Math.PI) / 2;
         if (e.plant && m.species !== e.plant.species) {
           if (m.foliage) m.root.remove(m.foliage);
@@ -212,9 +213,35 @@
         (-(clientY - r.top) / r.height) * 2 + 1,
       );
       this.ray.setFromCamera(this.pointer, this.camera);
-      const target = new T.Vector3();
-      if (!this.ray.ray.intersectPlane(this.plane, target)) return null;
-      return { x: target.x, z: target.z };
+      const ray = this.ray.ray,
+        dirY = ray.direction.y;
+      if (dirY >= 0) return null; // this game's camera never looks upward
+      const at = (t) => ({
+        x: ray.origin.x + ray.direction.x * t,
+        z: ray.origin.z + ray.direction.z * t,
+        y: ray.origin.y + dirY * t,
+      });
+      // Bisection against the real heightfield, bracketed by y=MAX_HEIGHT
+      // (provably at or above every hill, so the ray is still above ground
+      // there) and y=0 (the flat floor, so the ray has reached or passed
+      // through ground by then) — replaces an earlier "reproject onto a
+      // flat plane, then jump straight to whatever height that guess
+      // landed on" approach. That single-jump reprojection could overshoot
+      // an entire hill and land on a distant flat point that coincidentally
+      // matched its own convergence check, producing a real, player-visible
+      // aiming error once Épic 4.2's hills got tall enough (reproduced via
+      // a pot-placement test near the zone0 hill) — bisection can't skip
+      // over a bump like that since it only ever narrows the bracket.
+      let lo = (Terrain.MAX_HEIGHT - ray.origin.y) / dirY,
+        hi = -ray.origin.y / dirY;
+      for (let i = 0; i < 22; i++) {
+        const mid = (lo + hi) / 2,
+          p = at(mid);
+        if (p.y - Terrain.terrainHeight(p.x, p.z) >= 0) lo = mid;
+        else hi = mid;
+      }
+      const point = at((lo + hi) / 2);
+      return { x: point.x, z: point.z };
     },
   });
 })();

@@ -21,8 +21,10 @@
     for (const plan of id === 1
       ? ["nursery"]
       : id === 2
-        ? ["pump", "collector"]
-        : [])
+        ? ["pump", "collector", "autoPlanter"]
+        : id === 3
+          ? ["composter", "collectorT2", "greenhouse", "seedDispenser"]
+          : [])
       if (!s.plans.includes(plan)) s.plans.push(plan);
   }
   function trade(s, item) {

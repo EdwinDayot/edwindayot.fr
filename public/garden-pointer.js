@@ -24,7 +24,7 @@
       A.view.connectionPreview(
         A.wireStart,
         e || p,
-        !!e && I.canConnect(A.wireStart, e),
+        !!e && I.canConnect(A.wireStart, e, A.game.s),
       );
     }
   };

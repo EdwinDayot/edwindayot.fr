@@ -197,7 +197,7 @@
     }
     if (c.wire) return A.wire();
     if (c.panel) {
-      if (A.selected.id === "noe") A.tab = "craft";
+      if (c.tab) A.tab = c.tab;
       return A.openPanel(c.panel);
     }
     if (c.move && A.canMove()) return A.startBuild(null, A.selected.id);

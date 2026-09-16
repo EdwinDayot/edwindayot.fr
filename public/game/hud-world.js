@@ -10,11 +10,18 @@
         this.view.objectHeight(m.selected),
       );
       if (!pt.visible) return;
-      const width = Math.min(m.selected.plant ? 350 : 320, this.w - 24),
-        height = 104;
-      const hovering = ["act", "move", "inspect-plant"].includes(
-          this.hover?.id,
-        ),
+      const hasGauge = !!m.context.gauge,
+        width = Math.min(300, this.w - 24),
+        topPad = 10,
+        labelH = 14,
+        gap1 = 5,
+        gaugeH = 10,
+        gap2 = 6,
+        buttonH = 44,
+        bottomPad = 8,
+        buttonTop = topPad + labelH + gap1 + (hasGauge ? gaugeH + gap2 : 0),
+        height = buttonTop + buttonH + bottomPad;
+      const hovering = ["act", "move", "inspect"].includes(this.hover?.id),
         pressed = m.pressed || false;
       if (m.reduced) this.bob = 0;
       else if (!hovering && !pressed)
@@ -61,16 +68,25 @@
       ctx.lineWidth = 2;
       ctx.stroke();
       this.plate(x, y, width, height);
-      this.wrap(
+      this.line(
         m.context.status,
         x + 12,
-        y + 20,
+        y + topPad + labelH / 2,
         width - 24,
-        11,
+        13,
         this.palette.ink,
       );
-      const row = y + height - 53,
-        count = 1 + Number(!!m.canMove) + Number(!!m.selected.plant),
+      if (hasGauge)
+        this.gauge(
+          x + 12,
+          y + topPad + labelH + gap1,
+          width - 24,
+          gaugeH,
+          m.context.gauge,
+        );
+      const inspectable = !m.selected.id.startsWith("zone-"),
+        row = y + buttonTop,
+        count = 1 + Number(!!m.canMove) + Number(inspectable),
         buttonW = (width - 24 - (count - 1) * 6) / count;
       this.button(
         "act",
@@ -98,9 +114,9 @@
           44,
           "move",
         );
-      if (m.selected.plant)
+      if (inspectable)
         this.button(
-          "inspect-plant",
+          "inspect",
           "V · Inspecter",
           x + 12 + (count - 1) * (buttonW + 6),
           row,
@@ -109,17 +125,6 @@
           "inspect",
           { id: m.selected.id },
         );
-      if (m.context.progress !== undefined) {
-        this.box(x + 12, y + height - 5, width - 24, 3, "#b8b59c", 1);
-        this.box(
-          x + 12,
-          y + height - 5,
-          (width - 24) * m.context.progress,
-          3,
-          "#66864b",
-          1,
-        );
-      }
     },
     drawMoisture(m, by) {
       this.moistureRects = [];
@@ -170,77 +175,6 @@
           );
         }
       }
-    },
-    drawInspection(m) {
-      this.buttons = [];
-      const e = m.s.entities.find((e) => e.id === this.view.inspection?.id);
-      if (!e?.plant) return;
-      const sp = D.species.find((sp) => sp.id === e.plant.species),
-        plant = e.plant,
-        mobile = this.w < 650,
-        pw = mobile ? this.w - 24 : 310,
-        ph = mobile ? 232 : 364,
-        x = mobile ? 12 : this.w - pw - 20,
-        y = mobile ? this.h - ph - 12 : 190,
-        p = this.palette;
-      this.panelRect = { x, y, w: pw, h: ph };
-      this.plate(x, y, pw, ph);
-      this.text(sp.name, x + 16, y + 26, 23, p.ink, "left", 700);
-      this.button("close", "×", x + pw - 54, y + 7, 44, 44, "close");
-      const stage =
-        plant.growth < 0.12
-          ? "Graine"
-          : plant.growth < 0.28
-            ? "Germe"
-            : plant.growth < 1
-              ? "Jeune plante"
-              : "Adulte";
-      const lines = [
-        sp.latin,
-        `${stage} · croissance ${Math.round(plant.growth * 100)} %`,
-        `Humidité ${Math.round(plant.moisture)} % · ${plant.ready}/3 productions`,
-        `${D.itemName(sp.product + ":" + sp.id)}`,
-        `Provenance : ${plant.source === "young" ? "jeune plant" : plant.source === "seed" ? "graine" : "jardin sauvegardé"}`,
-        `Origine : ${D.zones[sp.zone].name}`,
-        `Préférences ludiques : ${sp.light}, humidité 20–85 %`,
-      ];
-      lines.forEach((line, i) =>
-        this.text(
-          line,
-          x + 16,
-          y + 57 + i * (mobile ? 18 : 29),
-          mobile ? 11 : 12,
-          p.ink,
-        ),
-      );
-      this.button(
-        "inspect-left",
-        "−45°",
-        x + 16,
-        y + ph - 52,
-        54,
-        44,
-        "inspect-orbit",
-        { delta: -1 },
-      );
-      this.button(
-        "inspect-right",
-        "+45°",
-        x + 78,
-        y + ph - 52,
-        54,
-        44,
-        "inspect-orbit",
-        { delta: 1 },
-      );
-      this.text(
-        "La plante continue de grandir",
-        x + pw - 14,
-        y + ph - 30,
-        10,
-        p.muted,
-        "right",
-      );
     },
   });
 })();

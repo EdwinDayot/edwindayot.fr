@@ -24,7 +24,9 @@
       direction: [x / n, height, z / n],
       sunIntensity: 2.6 * sun,
       moonIntensity: 0.48 * moon,
-      ambient: 0.65 + 1.45 * day,
+      // Kept deliberately low: a bright hemisphere washes out slope shading
+      // and cast shadows, hiding the relief. The sun does the modelling.
+      ambient: 0.5 + 0.3 * day,
       day,
       night: 1 - smooth(-0.08, 0.18, height),
       sunColor: mix([1, 0.94, 0.8], [1, 0.55, 0.28], warm),

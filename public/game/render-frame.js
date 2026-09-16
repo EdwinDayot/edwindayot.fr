@@ -4,8 +4,10 @@
     D = window.GardenData,
     C = window.GardenConstruction,
     B = window.GardenBotany,
+    I = window.GardenIrrigation,
+    Terrain = window.GardenTerrain,
     G = window.GardenView;
-  if (!T || !M || !B || !G) return;
+  if (!T || !M || !B || !I || !Terrain || !G) return;
   Object.assign(G.prototype, {
     movePlayer(dt, axis, reduced) {
       const s = this.game.s;
@@ -37,7 +39,8 @@
       }
       this.player.position.set(
         this.position.x,
-        moving && !reduced ? Math.abs(Math.sin(this.time * 11)) * 0.025 : 0,
+        Terrain.terrainHeight(this.position.x, this.position.z) +
+          (moving && !reduced ? Math.abs(Math.sin(this.time * 11)) * 0.025 : 0),
         this.position.z,
       );
       this.player.userData.legs.forEach(
@@ -115,17 +118,33 @@
           m.crop.scale.setScalar(0.085 + p.ready * 0.02);
         }
         if (e.type === "tank") {
-          const l = m.root.userData.level;
+          const l = m.root.userData.level,
+            gauge = m.root.userData.gauge,
+            fertilizer = I.substance(this.game.s, e.id) === "fertilizer",
+            levelMat = fertilizer ? this.mat.fertilizer : this.mat.water,
+            gaugeMat = fertilizer
+              ? (this.fertilizerGaugeMat ??= M.mat(0x6d8a52))
+              : (this.waterGaugeMat ??= M.mat(0x438e9b));
+          if (l.material !== levelMat) {
+            l.material = levelMat;
+            this.batchDirty = true;
+          }
+          if (gauge.material !== gaugeMat) {
+            gauge.material = gaugeMat;
+            this.batchDirty = true;
+          }
           l.visible = e.water > 0;
-          l.position.y = 0.16 + (e.water / 160) * 1.08;
-          const gauge = m.root.userData.gauge;
-          gauge.scale.y = Math.max(0.02, (e.water / 160) * 0.98);
+          l.position.y = 0.16 + (e.water / D.recipes.tank.capacity) * 1.08;
+          gauge.scale.y = Math.max(
+            0.02,
+            (e.water / D.recipes.tank.capacity) * 0.98,
+          );
           gauge.position.y = 0.2 + gauge.scale.y / 2;
         }
         if (e.type === "pump")
           m.root.userData.arm.rotation.z =
             e.running && !reduced ? Math.sin(this.time * 4) * 0.25 : 0;
-        if (e.type === "collector")
+        if (D.recipes[e.type]?.buffer)
           m.root.userData.orb.scale.setScalar(
             e.running && !reduced ? 0.8 + Math.sin(this.time * 2) * 0.2 : 1,
           );

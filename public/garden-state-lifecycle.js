@@ -9,7 +9,7 @@
   function fresh(now) {
     return {
       version: 3,
-      landscape: 4,
+      landscape: 6,
       hotbar: [...D.defaultHotbar],
       updatedAt: now,
       elapsed: 0,
@@ -59,6 +59,7 @@
       settings: { hints: true, sound: false, reduced: false },
       stats: { produced: 0, collected: 0, waterUsed: 0 },
       botanyRewards: [],
+      quests: { active: [], completed: [] },
     };
   }
   function migrate(old, now = Date.now()) {

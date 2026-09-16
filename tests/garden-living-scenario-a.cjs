@@ -148,7 +148,7 @@ module.exports = async function runA(browser, url, mobile) {
     angle: __view.angle,
     position: { ...__view.position },
   }));
-  if (mobile) await click("inspect-plant");
+  if (mobile) await click("inspect");
   else await p.keyboard.press("v");
   await p.waitForFunction(() => !!__view.inspection);
   await p.waitForTimeout(200);

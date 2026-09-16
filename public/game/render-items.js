@@ -4,8 +4,9 @@
     D = window.GardenData,
     C = window.GardenConstruction,
     B = window.GardenBotany,
+    Terrain = window.GardenTerrain,
     G = window.GardenView;
-  if (!T || !M || !B || !G) return;
+  if (!T || !M || !B || !Terrain || !G) return;
   Object.assign(G.prototype, {
     itemIcon(id) {
       this.iconCache ??= new Map();
@@ -126,7 +127,7 @@
         );
     },
     inspect(entity) {
-      if (!entity?.plant || entity.stored) return false;
+      if (!entity || entity.stored) return false;
       if (!this.inspection)
         this.previousCamera = {
           angle: this.angle,
@@ -135,9 +136,10 @@
           position: this.camera.position.clone(),
           overview: this.overview,
         };
-      const model = this.models.get(entity.id);
-      if (!model) return false;
-      const bounds = new T.Box3().setFromObject(model.root),
+      const model = this.models.get(entity.id),
+        node = model?.root || this.nodes.get(entity.id);
+      if (!node) return false;
+      const bounds = new T.Box3().setFromObject(node),
         size = bounds.getSize(new T.Vector3()),
         center = bounds.getCenter(new T.Vector3());
       // Reserve the lower sheet on phones and the right sheet on wide displays.
@@ -190,7 +192,11 @@
     },
     updatePreview(b) {
       if (!this.preview) return;
-      this.preview.position.set(b.x, 0.025, b.z);
+      this.preview.position.set(
+        b.x,
+        Terrain.terrainHeight(b.x, b.z) + 0.025,
+        b.z,
+      );
       this.preview.rotation.y = (b.rotation * Math.PI) / 2;
       this.preview.traverse((o) => {
         if (o.isMesh) o.material.color.setHex(b.error ? 0xb5654f : 0x628b6a);

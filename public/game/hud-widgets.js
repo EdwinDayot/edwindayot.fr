@@ -61,6 +61,42 @@
         }
       }
     },
+    line(text, x, y, maxWidth, size = 13, color = this.palette.ink) {
+      this.ctx.font = `500 ${size}px "Trebuchet MS", sans-serif`;
+      let value = String(text);
+      if (this.ctx.measureText(value).width > maxWidth) {
+        while (
+          value.length > 1 &&
+          this.ctx.measureText(value + "…").width > maxWidth
+        )
+          value = value.slice(0, -1);
+        value += "…";
+      }
+      this.text(value, x, y, size, color);
+    },
+    gauge(x, y, w, h, g) {
+      const colors = {
+          water: "#5b9fa7",
+          amber: "#b67745",
+          growth: "#66864b",
+          ready: "#8a9878",
+        },
+        fill = colors[g.tone] || colors.water,
+        barW = w - 58;
+      this.box(x, y, barW, h, "#e3dcc2", h / 2, "#aa9570");
+      const fw =
+        g.fraction > 0 ? Math.max(h, barW * Math.min(1, g.fraction)) : 0;
+      if (fw) this.box(x, y, fw, h, fill, h / 2);
+      this.text(
+        g.text,
+        x + w,
+        y + h / 2 + 1,
+        11,
+        this.palette.ink,
+        "right",
+        700,
+      );
+    },
     wrap(text, x, y, width, size = 13, color = this.palette.muted) {
       this.ctx.font = `500 ${size}px "Trebuchet MS", sans-serif`;
       let line = "",

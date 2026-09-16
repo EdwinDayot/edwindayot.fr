@@ -4,8 +4,9 @@
     D = window.GardenData,
     C = window.GardenConstruction,
     B = window.GardenBotany,
+    Terrain = window.GardenTerrain,
     G = window.GardenView;
-  if (!T || !M || !B || !G) return;
+  if (!T || !M || !B || !Terrain || !G) return;
   Object.assign(G.prototype, {
     setQuality(level) {
       this.quality = level;
@@ -53,7 +54,7 @@
       ]) {
         const dir = direction.clone().multiplyScalar(sign),
           center = this.look.clone();
-        center.y = 0;
+        center.y = Terrain.terrainHeight(center.x, center.z);
         const right = new T.Vector3()
             .crossVectors(new T.Vector3(0, 1, 0), dir)
             .normalize(),
@@ -78,14 +79,32 @@
         light.shadow.camera.updateProjectionMatrix();
         light.castShadow = light.intensity > 0;
       }
+      // Les 8 collines n'ont jamais d'ombre lisible (auto-ombre cachée derrière
+      // le sommet) : on re-cuit leur shading orienté soleil tous les ~2 s — le
+      // soleil avance de 0,3°/s, l'étape est imperceptible, et le coût (quelques
+      // milliers de sommets, un upload de couleur) reste négligeable.
+      const bakeTime = this.game.s.elapsed + this.game.s.remainder;
+      if (!this._terrainBakeAt || Math.abs(bakeTime - this._terrainBakeAt) > 2) {
+        this._terrainBakeAt = bakeTime;
+        this.reBakeTerrain(direction, Math.min(1, lighting.sunIntensity / 2.6));
+      }
       if (this.lanternMaterial)
         this.lanternMaterial.emissiveIntensity = lighting.night * 1.8;
-      const candidates = this.game.s.entities.filter(
-        (e) =>
-          !e.stored &&
-          e.type === "lantern" &&
-          Math.hypot(e.x - this.look.x, e.z - this.look.z) < extent + 6,
-      );
+      const candidates = this.game.s.entities
+        .filter(
+          (e) =>
+            !e.stored &&
+            e.type === "lantern" &&
+            Math.hypot(e.x - this.look.x, e.z - this.look.z) < extent + 6,
+        )
+        .concat(
+          D.buildings
+            .map((b) => ({ id: b.visitorId + "-lamp", x: b.x, z: b.z }))
+            .filter(
+              (e) =>
+                Math.hypot(e.x - this.look.x, e.z - this.look.z) < extent + 6,
+            ),
+        );
       const distance = (e) => Math.hypot(e.x - this.look.x, e.z - this.look.z);
       const oldIds = this.localLights.map((l) => l.userData.entity);
       candidates.sort(

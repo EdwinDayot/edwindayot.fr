@@ -37,7 +37,13 @@
                   ? "Échanger"
                   : r.action === "restore"
                     ? "Reposer"
-                    : "Choisir",
+                    : r.action === "buy"
+                      ? "Acheter"
+                      : r.action === "quest-accept"
+                        ? "Accepter"
+                        : r.action === "quest-complete"
+                          ? "Terminer"
+                          : "Choisir",
               x + pw - 105,
               ry + 18,
               77,

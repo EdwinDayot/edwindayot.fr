@@ -1,16 +1,27 @@
 (function (root) {
   const D =
     typeof module !== "undefined" ? require("./data.js") : root.GardenData;
+  const G =
+    typeof module !== "undefined"
+      ? require("./geometry.js")
+      : root.GardenGeometry;
+  const River =
+    typeof module !== "undefined" ? require("./river.js") : root.GardenRiver;
   const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
-  const zoneAt = (x, z) =>
-    D.zones.find(
-      (q) =>
-        x >= q.bounds[0] &&
-        x < q.bounds[1] &&
-        z >= q.bounds[2] &&
-        z < q.bounds[3],
-    );
+  const zoneAt = (x, z) => G.zoneAt(D.zones, x, z);
   const radius = (e) => e.radius ?? D.recipes[e.type]?.radius ?? 0.5;
+  // Each house is a static ring of wall circles (data.js) with a gap at the
+  // door; they never move, so they are computed once for every save.
+  const buildingObstacles = (D.buildings || []).flatMap((b) =>
+    b.wallCircles.map((c) => ({ x: c.x, z: c.z, radius: c.r })),
+  );
+  const houseName = (visitorId) =>
+    (D.visitors.find((v) => v.id === visitorId)?.name || visitorId).split(
+      " · ",
+    )[0];
+  const insideHouse = (b, x, z, margin = 0) =>
+    Math.abs(x - b.x) < b.w / 2 + margin &&
+    Math.abs(z - b.z) < b.d / 2 + margin;
   // Old saves keep every placed object; a new landscape tree yields to that footprint.
   const trees = (s) =>
     D.trees.filter(
@@ -37,6 +48,7 @@
         D.visitors.map((v) => ({ ...v, type: "visitor" })),
         trees(s),
         resourceObstacles(s),
+        buildingObstacles,
       );
   function walkable(s, x, z, obs = obstacles(s)) {
     const zone = zoneAt(x, z);
@@ -121,25 +133,23 @@
       return "Utilise la grille de 0,5 unité.";
     const zone = zoneAt(e.x, e.z),
       r = radius(e);
+    // A true distance-to-contour test (Épic 4.1) replaces the old
+    // four-corner AABB approximation: if the whole disk of radius r around
+    // the center stays farther from every edge of the zone's polygon than
+    // r, the object's entire footprint is provably inside that one zone —
+    // it can't be straddling the boundary into an unlocked or nonexistent
+    // neighbor, whatever the polygon's shape.
     if (
       !zone ||
       !s.unlocked.includes(zone.id) ||
-      !zoneAt(e.x + r, e.z + r) ||
-      !zoneAt(e.x - r, e.z - r)
+      G.distanceToPolygonEdge(zone.polygon, e.x, e.z) < r
     )
       return "Cette parcelle est fermée ou en bordure du jardin.";
-    for (const [dx, dz] of [
-      [r, r],
-      [r, -r],
-      [-r, r],
-      [-r, -r],
-    ]) {
-      const q = zoneAt(e.x + dx, e.z + dz);
-      if (!q || !s.unlocked.includes(q.id))
-        return "Garde cet objet dans une parcelle ouverte.";
-    }
-    if (e.type === "pump" && e.x < 2.5)
-      return "La pompe doit être au bord de la rivière (x ≥ 2,5).";
+    if (e.type === "pump" && River.distanceToRiver(e.x, e.z) > 2.5)
+      return "La pompe doit être au bord de la rivière.";
+    for (const b of D.buildings || [])
+      if (insideHouse(b, e.x, e.z, r + 0.4))
+        return `Garde la maison de ${houseName(b.visitorId)} libre.`;
     const others = s.entities.filter((o) => !o.stored && o.id !== ignore);
     if (
       others.some((o) => distance(e, o) < r + radius(o) + 0.08) ||
@@ -165,7 +175,7 @@
     const all = others.concat(e),
       obs = all
         .filter((o) => !D.recipes[o.type].flat)
-        .concat(D.visitors, trees(s), resourceObstacles(s));
+        .concat(D.visitors, trees(s), resourceObstacles(s), buildingObstacles);
     const { parents } = flood(s, { x: 0, z: 4 }, obs);
     const targets = all.concat(
       D.visitors,
@@ -207,6 +217,7 @@
     path,
     approach,
     placement,
+    insideHouse,
   };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenConstruction = api;

@@ -25,6 +25,69 @@
             title: "Aucune bouture dans le sac",
             detail: "Récolte une plante qui produit des boutures.",
           });
+      } else if (m.panel === "shop") {
+        const building = D.buildings.find(
+          (b) => b.visitorId === m.selected?.id,
+        );
+        for (const ware of building?.roleData?.wares || []) {
+          const recipe = D.recipes[ware.item],
+            affordable = Object.entries(ware.cost).every(
+              ([k, n]) => (m.s.inventory[k] || 0) >= n,
+            );
+          rows.push({
+            title: recipe.name,
+            detail: Object.entries(ware.cost)
+              .map(([k, n]) => `${n} ${D.itemName(k)}`)
+              .join(", "),
+            action: "buy",
+            data: { vendor: building.visitorId, item: ware.item },
+            disabled: !affordable,
+          });
+        }
+        if (!rows.length)
+          rows.push({
+            title: "Rien en vitrine",
+            detail: "Repasse une prochaine fois.",
+          });
+      } else if (m.panel === "quest") {
+        const npcId = m.selected?.id;
+        for (const [id, quest] of Object.entries(D.quests)) {
+          if (
+            quest.npcId !== npcId ||
+            m.s.quests.completed.includes(id) ||
+            !quest.requires.every((r) => m.s.quests.completed.includes(r))
+          )
+            continue;
+          const active = m.s.quests.active.find((q) => q.questId === id);
+          if (!active) {
+            rows.push({
+              title: quest.title,
+              detail: "Disponible",
+              action: "quest-accept",
+              data: { questId: id },
+            });
+            continue;
+          }
+          const { progress, complete } = GardenQuests.evaluateObjective(
+            quest.objective,
+            m.s,
+            active,
+          );
+          rows.push({
+            title: quest.title,
+            detail: complete
+              ? "Objectif atteint !"
+              : `En cours · ${Math.round(progress * 100)}%`,
+            action: "quest-complete",
+            data: { questId: id },
+            disabled: !complete,
+          });
+        }
+        if (!rows.length)
+          rows.push({
+            title: "Rien pour l’instant",
+            detail: "Repasse plus tard.",
+          });
       } else if (m.panel === "map") {
         rows.push({
           title: "Le ponton",
@@ -32,6 +95,13 @@
           action: "go",
           data: { id: "river" },
         });
+        for (const v of D.visitors)
+          rows.push({
+            title: "Rendez-vous · " + v.name.split(" · ")[0],
+            detail: `${Math.round(GardenConstruction.distance(v, this.view.position))} unités`,
+            action: "go",
+            data: { id: v.id },
+          });
         for (const z of D.zones) {
           if (!m.s.unlocked.includes(z.id))
             rows.push({

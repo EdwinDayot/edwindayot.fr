@@ -4,35 +4,16 @@
     D = window.GardenData,
     C = window.GardenConstruction,
     B = window.GardenBotany,
+    Terrain = window.GardenTerrain,
     G = window.GardenView;
-  if (!T || !M || !B || !G) return;
+  if (!T || !M || !B || !Terrain || !G) return;
   Object.assign(G.prototype, {
     buildActors() {
-      for (const v of D.visitors) {
-        const p = this.person(
-          [0xdbaea0, 0x9fafc0, 0xc5c895][D.visitors.indexOf(v)],
-        );
-        p.position.set(v.x, 0, v.z);
-        p.rotation.y = Math.PI;
-        p.userData.can.visible = false;
-        p.userData.target = v.id;
-        if (v.id === "iris")
-          this.shape(
-            p,
-            "box",
-            this.mat.cream,
-            [0.3, 0.75, 0.15],
-            [0.25, 0.3, 0.06],
-          );
-        this.scene.add(p);
-        this.scene.add(this.label(v.name, v.x, 1.9, v.z, 1.6));
-        this.nodes.set(v.id, p);
-      }
       for (const r of D.resources) {
         const g = new T.Group(),
           full = new T.Group(),
           depleted = new T.Group();
-        g.position.set(r.x, 0, r.z);
+        g.position.set(r.x, Terrain.terrainHeight(r.x, r.z), r.z);
         g.add(full, depleted);
         g.userData = { full, depleted, target: r.id };
         if (r.type === "wood") {
@@ -116,7 +97,7 @@
       }
       for (const c of D.caches) {
         const g = new T.Group();
-        g.position.set(c.x, 0, c.z);
+        g.position.set(c.x, Terrain.terrainHeight(c.x, c.z), c.z);
         this.shape(g, "box", this.mat.wood, [0, 0.2, 0], [0.65, 0.4, 0.5]);
         const leaf = B.create(c.species);
         leaf.scale.setScalar(0.25);

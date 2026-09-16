@@ -14,26 +14,12 @@
     typeof module !== "undefined"
       ? require("./garden-state-util.js")
       : root.GardenStateParts.util;
+  const { migrateLandscape } =
+    typeof module !== "undefined"
+      ? require("./garden-state-migrate.js")
+      : { migrateLandscape: root.GardenStateParts.migrateLandscape };
   function validate(s) {
-    // Add renewable resource sites without crediting any resource or resetting an old cooldown.
-    if (
-      s?.version === 3 &&
-      (s.landscape === undefined || s.landscape === 2 || s.landscape === 3)
-    ) {
-      s = clone(s);
-      s.landscape = 4;
-      if (Array.isArray(s.resources))
-        s.resources = D.resources.map((def) => {
-          const old = s.resources.find((r) => r.id === def.id);
-          return {
-            ...def,
-            ready: old?.ready ?? 0,
-            work: old?.work ?? 0,
-            nextHit: old?.nextHit ?? 0,
-          };
-        });
-    }
-
+    s = migrateLandscape(s);
     if (
       !s ||
       s.version !== 3 ||
@@ -78,20 +64,25 @@
           !finite(e.plant.moisture, 0, 100) ||
           !finite(e.plant.progress, 0, 300) ||
           !count(e.plant.ready) ||
-          e.plant.ready > 3)
+          e.plant.ready > 3 ||
+          (e.plant.boostUntil !== undefined &&
+            !finite(e.plant.boostUntil, 0, Number.MAX_SAFE_INTEGER)))
       )
         throw Error("Plante invalide.");
       if (e.type === "tank" && !finite(e.water, 0, 160))
         throw Error("Citerne invalide.");
       if (
-        e.type === "collector" &&
+        (D.recipes[e.type]?.buffer ||
+          D.recipes[e.type]?.sow ||
+          D.recipes[e.type]?.dispense) &&
         (!e.buffer ||
           Object.entries(e.buffer).some(
             ([k, v]) => !knownItem(k) || !count(v),
           ) ||
-          Object.values(e.buffer).reduce((a, b) => a + b, 0) > 24)
+          Object.values(e.buffer).reduce((a, b) => a + b, 0) >
+            D.recipes[e.type].capacity)
       )
-        throw Error("Collecteur invalide.");
+        throw Error("Réserve invalide.");
       if (
         e.job &&
         (!D.species.some((p) => p.id === e.job.species) ||
@@ -114,6 +105,19 @@
       )
     )
       throw Error("Raccordement invalide.");
+    if (
+      I.components(s).some(
+        (group) =>
+          new Set(
+            group
+              .filter((e) => I.SOURCE.includes(e.type))
+              .map((e) => D.recipes[e.type].substance),
+          ).size > 1,
+      )
+    )
+      throw Error(
+        "Réseau invalide : substances incompatibles reliées ensemble.",
+      );
     for (const [key, allowed] of [
       ["unlocked", [0, 1, 2, 3]],
       ["discovered", D.species.map((p) => p.id)],
@@ -224,8 +228,27 @@
         ))
     )
       throw Error("Barre rapide invalide.");
+    if (
+      s.quests !== undefined &&
+      (typeof s.quests !== "object" ||
+        s.quests === null ||
+        !Array.isArray(s.quests.active) ||
+        !Array.isArray(s.quests.completed) ||
+        s.quests.active.some(
+          (q) =>
+            !q ||
+            typeof q.id !== "string" ||
+            !D.quests[q.questId] ||
+            typeof q.npcId !== "string" ||
+            typeof q.progress !== "object" ||
+            q.progress === null,
+        ) ||
+        s.quests.completed.some((id) => !D.quests[id]))
+    )
+      throw Error("Quêtes invalides.");
     const result = clone(s);
     result.hotbar ??= [...D.defaultHotbar];
+    result.quests ??= { active: [], completed: [] };
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };

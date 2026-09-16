@@ -3,8 +3,9 @@
     M = window.GardenModels,
     D = window.GardenData,
     C = window.GardenConstruction,
-    B = window.GardenBotany;
-  if (!T || !M || !B) return;
+    B = window.GardenBotany,
+    Terrain = window.GardenTerrain;
+  if (!T || !M || !B || !Terrain) return;
   class GardenView {
     constructor(canvas, game) {
       this.game = game;
@@ -21,7 +22,7 @@
       );
       this.renderer.outputColorSpace = T.SRGBColorSpace;
       this.renderer.toneMapping = T.ACESFilmicToneMapping;
-      this.renderer.toneMappingExposure = 1.12;
+      this.renderer.toneMappingExposure = 1;
       this.renderer.shadowMap.enabled = true;
       this.renderer.shadowMap.type = T.PCFSoftShadowMap;
       this.camera = new T.OrthographicCamera(-10, 10, 7, -7, 0.1, 100);
@@ -54,7 +55,7 @@
       this.quality = this.mobile ? 1 : 2;
       this.qualityClock = 0;
       this.slowTime = 0;
-      this.ambient = new T.HemisphereLight(0xfff7df, 0x69816f, 2.1);
+      this.ambient = new T.HemisphereLight(0xfff7df, 0x69816f, 0.8);
       this.scene.add(this.ambient);
       for (const name of ["sun", "moon"]) {
         const light = new T.DirectionalLight(
@@ -90,6 +91,7 @@
         bark: M.mat(0x8a7156),
         stone: M.mat(0xc5c5b2),
         water: M.mat(0x80c3c3, { roughness: 0.25 }),
+        fertilizer: M.mat(0x8a6a3e, { roughness: 0.4 }),
         cream: M.mat(0xeedeb9),
         metal: M.mat(0x8aafa4),
         soil: M.mat(0xb99875),
@@ -128,7 +130,6 @@
       }
       this.ray = new T.Raycaster();
       this.pointer = new T.Vector2();
-      this.plane = new T.Plane(new T.Vector3(0, 1, 0), 0);
       new ResizeObserver(() => this.resize()).observe(canvas.parentElement);
       this.resize();
       this.sync();
@@ -147,9 +148,19 @@
       this.buildZones();
       this.buildFlora();
       this.buildActors();
+      this.buildHouses();
     }
+    // y is an offset above the real ground height at (point.x, point.z), not
+    // an absolute world Y — every caller already means "N units above where
+    // this point actually sits", which only matches the render once terrain
+    // has real relief (Épic 4.2) if the ground height is added here instead
+    // of assumed to be 0.
     screenPoint(point, y = 0) {
-      const v = new T.Vector3(point.x, y, point.z).project(this.camera),
+      const v = new T.Vector3(
+          point.x,
+          Terrain.terrainHeight(point.x, point.z) + y,
+          point.z,
+        ).project(this.camera),
         r = this.canvas.getBoundingClientRect();
       return {
         x: ((v.x + 1) * r.width) / 2,
@@ -189,6 +200,8 @@
       return closest;
     }
     objectHeight(entity) {
+      const house = D.buildings?.find((b) => b.visitorId === entity.id);
+      if (house) return house.roofHeight + 0.2;
       const model = this.models.get(entity.id);
       if (model) {
         const bounds = new T.Box3().setFromObject(model.root);
@@ -196,14 +209,21 @@
       }
       return entity.type === "wood" ? 3.5 : 1.5;
     }
+    findEntity(id) {
+      const s = this.game.s;
+      return (
+        s.entities.find((e) => e.id === id) ||
+        s.resources.find((e) => e.id === id) ||
+        D.visitors.find((e) => e.id === id) ||
+        D.caches.find((e) => e.id === id) ||
+        (id === "river" ? { id, x: 3.5, z: 4, stored: false } : null)
+      );
+    }
     resize() {
       const r = this.canvas.parentElement.getBoundingClientRect();
       this.renderer.setSize(r.width, r.height, false);
       this.ratio = r.width / r.height;
-      if (this.inspection)
-        this.inspect(
-          this.game.s.entities.find((e) => e.id === this.inspection.id),
-        );
+      if (this.inspection) this.inspect(this.findEntity(this.inspection.id));
     }
     frame(dt, axis = { x: 0, z: 0 }, reduced = false) {
       this.time += dt;
@@ -214,6 +234,7 @@
       }
       this.movePlayer(dt, axis, reduced);
       this.animEntities(reduced);
+      this.updateDoors(reduced);
       this.ring.visible = !!this.selected && !this.preview;
       if (this.selected)
         this.ring.position.set(this.selected.x, 0.04, this.selected.z);

@@ -180,6 +180,25 @@ const url = process.env.GARDEN_URL || "http://127.0.0.1:4174/";
     console.log(
       "PASS Canvas world action: a far target shows its real action, walking then acting on arrival without a redundant Rejoindre button.",
     );
+    // The compact world card stays under 100px, and V opens a generic detail sheet on a resource.
+    assert.ok((await p.evaluate(() => __hud.actionRect.h)) <= 100);
+    await p.keyboard.press("v");
+    await p.waitForFunction(() => __hud.model.panel === "inspection");
+    assert.equal(
+      await p.evaluate(() => __hud.model.selected.id),
+      "resource-0-wood",
+    );
+    assert.ok(
+      await p.evaluate(
+        () => __hud.buttons.some((b) => b.id === "close") && !!__hud.panelRect,
+      ),
+    );
+    await click("close");
+    await p.waitForFunction(() => !__hud.model.panel);
+    assert.deepEqual(errors, []);
+    console.log(
+      "PASS Compact world card height and generic V detail sheet on a non-plant object.",
+    );
   } finally {
     await b.close();
   }
