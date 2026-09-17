@@ -58,13 +58,13 @@ Statut : todo
 
 ### C1.7 — Représentation modulaire des hybrides (rendu)
 Dépend de : C1.2 (schéma d'attributs stable), C1.3 (au moins un cultivar réel à afficher)
-Critère de sortie : le port fournit un squelette à points d'attache ; feuilles/fleurs/fruits proviennent d'une bibliothèque compatible avec le port du cultivar ; une graine visuelle déterministe (dérivée de l'id du cultivar) fixe la distribution des organes et reste identique entre deux sessions ; deux spécimens du même cultivar partagent géométrie/matériau (pas de doublon coûteux en triangles).
+Critère de sortie : le port fournit un squelette à points d'attache ; feuilles/fleurs/fruits proviennent d'une bibliothèque compatible avec le port du cultivar ; une graine visuelle déterministe (dérivée de l'id du cultivar) fixe la distribution des organes et reste identique entre deux sessions ; deux spécimens du même cultivar partagent géométrie/matériau (pas de doublon coûteux en triangles). Les teintes et matériaux utilisés doivent venir de [direction-artistique.md](direction-artistique.md) (palette/matériaux déjà en usage) — pas de nouvelle couleur inventée hors de ces familles sans raison documentée. Avant de marquer l'epic fait : capturer une scène de rendu, la lire avec Read (image), et comparer explicitement au guide (voir « Relecture multimodale réelle » dans [execution-continue.md](execution-continue.md)) ; consigner le résultat de cette relecture dans l'entrée de campagne.md.
 Fichiers probables : `public/game/botany.js`, `public/garden-models.js`
 Statut : todo
 
 ### C1.8 — Prototype visuel de validation
 Dépend de : C1.7
-Critère de sortie : six plantes fondatrices affichées à trois stades, croisements entre familles compatibles affichés côte à côte avec leurs parents ; capture Playwright vérifiant absence de pénétration de maillage grossière et cohérence d'échelle ; c'est la porte de sortie de la phase entière (design §15, ligne « ne pas produire les centaines de meubles avant que cette grammaire soit convaincante »).
+Critère de sortie : six plantes fondatrices affichées à trois stades, croisements entre familles compatibles affichés côte à côte avec leurs parents ; capture Playwright vérifiant absence de pénétration de maillage grossière et cohérence d'échelle ; relecture multimodale de ces captures contre `direction-artistique.md` (silhouette distincte sans étiquette, palette cohérente, proportions). C'est la porte de sortie de la phase entière (design §15, ligne « ne pas produire les centaines de meubles avant que cette grammaire soit convaincante ») — son résultat devient la référence photographique citée en fin de `direction-artistique.md`.
 Fichiers probables : nouveau `tests/campaign-botany-visual.cjs`
 Statut : todo
 
