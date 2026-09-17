@@ -6,6 +6,10 @@
     typeof module !== "undefined"
       ? require("./garden-state-util.js")
       : root.GardenStateParts.util;
+  const Clock =
+    typeof module !== "undefined"
+      ? require("./game/campaign-clock.js")
+      : root.GardenCampaignClock;
   function fresh(now) {
     return {
       version: 3,
@@ -81,6 +85,21 @@
       // already used by cultivars/campaignPot.
       specimens: [],
       specimenNextId: 1,
+      // Epic C2.2: the campaign's own daily count, distinct from s.elapsed (the free-garden's
+      // simulation tick count, untouched here). Incremented exactly once per "sleep" command,
+      // regardless of the hour reached beforehand ("dormir plus tôt", design §3).
+      campaignDay: 1,
+      // Plain, JSON-serialisable mirror of a fresh game/game/campaign-clock.js CampaignClock
+      // (activeSeconds/gameSeconds/paused only — never the class instance itself, nor its
+      // transient `_lastWall`, which is not meaningful across a save/reload and is re-armed by
+      // whatever wall-clock ticking wires this to the browser in a later epic, same "rules
+      // before rendering" posture as campaignPot/specimens above). "sleep" resets gameSeconds to
+      // 0 and paused to false: a new day always starts unpaused at 7h.
+      campaignClock: {
+        activeSeconds: Clock.DEFAULT_ACTIVE_SECONDS,
+        gameSeconds: 0,
+        paused: false,
+      },
     };
   }
   function migrate(old, now = Date.now()) {

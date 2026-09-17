@@ -18,6 +18,10 @@
     typeof module !== "undefined"
       ? require("./garden-state-migrate.js")
       : { migrateLandscape: root.GardenStateParts.migrateLandscape };
+  const Clock =
+    typeof module !== "undefined"
+      ? require("./game/campaign-clock.js")
+      : root.GardenCampaignClock;
   function validate(s) {
     s = migrateLandscape(s);
     if (
@@ -321,6 +325,20 @@
         Math.max(...s.specimens.map((sp) => Number(sp.id.slice(2))))
     )
       throw Error("Identifiants de spécimen invalides.");
+    if (
+      s.campaignDay !== undefined &&
+      (!count(s.campaignDay) || s.campaignDay < 1)
+    )
+      throw Error("Jour de campagne invalide.");
+    if (
+      s.campaignClock !== undefined &&
+      (typeof s.campaignClock !== "object" ||
+        s.campaignClock === null ||
+        !finite(s.campaignClock.activeSeconds, 1, Number.MAX_SAFE_INTEGER) ||
+        !finite(s.campaignClock.gameSeconds, 0, Clock.DAY_SECONDS) ||
+        typeof s.campaignClock.paused !== "boolean")
+    )
+      throw Error("Horloge de campagne invalide.");
     const result = clone(s);
     result.hotbar ??= [...D.defaultHotbar];
     result.quests ??= { active: [], completed: [] };
@@ -330,6 +348,12 @@
     result.campaignSeedBox ??= { seeded: false, cultivarId: null, retrievals: 0 };
     result.specimens ??= [];
     result.specimenNextId ??= 1;
+    result.campaignDay ??= 1;
+    result.campaignClock ??= {
+      activeSeconds: Clock.DEFAULT_ACTIVE_SECONDS,
+      gameSeconds: 0,
+      paused: false,
+    };
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };

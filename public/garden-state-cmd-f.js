@@ -1,7 +1,9 @@
 /* GardenState.command() branch group F (UMD: node module / browser prototype). Epic C1.3: the
    pot's two commands, sowPot and sleep. Neither targets a world entity (no c.id, no pot mesh
    yet — that is the campaign's own s.campaignPot, not the free-garden's "pot" entity type), so
-   neither is added to garden-state.js's `physical` list, which requires a nearby entity. */
+   neither is added to garden-state.js's `physical` list, which requires a nearby entity.
+   Epic C2.2 extends "sleep" with the campaign day/clock bilan (see its own comment below);
+   sowPot is unchanged. */
 (function (root) {
   const Genetics =
     typeof module !== "undefined"
@@ -42,6 +44,15 @@
           Cultivars.createCultivar(s, { name: "", parentIds: [a, b], traits });
         }
         s.campaignPot.pending = [];
+        // Epic C2.2: the atomic night bilan. "sleep" is the single command a scripted 23h
+        // transition and a voluntary early bedtime ("dormir plus tôt", design §3) both end up
+        // calling — neither reads s.campaignClock.gameSeconds beforehand, so an early sleep
+        // resolves identically to a full day's one, and no work/sale is simulated for whatever
+        // hours were skipped (this command never touches s.inventory/s.elapsed itself). Always
+        // exactly one day per call: a new day starts at 7h, unpaused.
+        s.campaignDay += 1;
+        s.campaignClock.gameSeconds = 0;
+        s.campaignClock.paused = false;
         st.message = "Une nouvelle nuit commence.";
       }
       return null;
