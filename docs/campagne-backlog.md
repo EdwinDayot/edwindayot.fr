@@ -48,13 +48,13 @@ Statut : fait (2026-09-17, voir docs/campagne.md et commit sur `maison-des-possi
 Dépend de : C1.4
 Critère de sortie : après le chapitre de botanique correspondant (voir C4.3), le joueur peut épingler un trait déjà observé chez un parent ; l'essai suivant garantit ce trait, les autres loci restent variables ; un test vérifie que 100 tirages avec un trait épinglé le conservent toujours et que les autres loci varient.
 Fichiers probables : `public/game/botany-genetics.js`
-Statut : todo
+Statut : todo (sauté ce déclenchement au profit de C1.6 : sa dépendance réelle inclut C4.3 — « Iris montre comment épingler un caractère déjà vu », design l.383 — qui vit en phase 4, pas encore détaillée ; implémenter le déverrouillage maintenant aurait forcé à inventer un contenu narratif hors ordre, ce que `orchestration.md` interdit explicitement pour les dépendances d'implémentation, pas seulement narratives)
 
 ### C1.6 — Multiplication fidèle
 Dépend de : C1.1
 Critère de sortie : multiplier un cultivar (bouture ou graine issue d'un spécimen déjà obtenu) crée un nouveau spécimen du même cultivar sans relancer aucun tirage ; un test compare les traits du spécimen source et du spécimen multiplié — identiques trait à trait.
 Fichiers probables : `public/garden-state-cmd-*.js`
-Statut : todo
+Statut : fait (2026-09-17, voir docs/campagne.md et commit sur `maison-des-possibles`). En pratique dans un nouveau `public/garden-state-cmd-h.js` (commandes `plantSpecimen`/`multiplySpecimen`, noms épelés en entier pour ne jamais entrer en collision avec les commandes physiques existantes `plant`/`multiply` de l'établi) ; `Cultivars.createSpecimen` (posé sans être câblé par C1.1) est maintenant câblé sur un nouveau champ de sauvegarde `s.specimens`.
 
 ### C1.7 — Représentation modulaire des hybrides (rendu)
 Dépend de : C1.2 (schéma d'attributs stable), C1.3 (au moins un cultivar réel à afficher)

@@ -74,6 +74,13 @@
       // inventory/economy.js, so this can never carry resale value (same "not wired yet" posture
       // documented at cultivars.js's own creation, C1.1).
       campaignSeedBox: { seeded: false, cultivarId: null, retrievals: 0 },
+      // Epic C1.6: specimens are physical instances of a cultivar (location + growth stage),
+      // never a copy of its traits — see cultivars.js's own header comment. Kept as its own
+      // array rather than folded into s.entities: nothing here is wired to the free-garden's
+      // entity/render system yet (that is C1.7's job), same "rules before rendering" posture
+      // already used by cultivars/campaignPot.
+      specimens: [],
+      specimenNextId: 1,
     };
   }
   function migrate(old, now = Date.now()) {

@@ -37,14 +37,12 @@ test("A second cultivar gets a distinct, incrementing id", () => {
   assert.deepEqual(second.parentIds, ["c1"]);
 });
 
-test("createSpecimen returns a plain reference to its cultivar, location and stage, not yet wired into entities", () => {
-  const specimen = Cultivars.createSpecimen({
-    cultivarId: "c1",
-    x: 2.5,
-    z: -1,
-    stage: 0.4,
-  });
-  assert.deepEqual(specimen, { cultivarId: "c1", x: 2.5, z: -1, stage: 0.4 });
+test("createSpecimen assigns a stable id and appends the specimen to s.specimens (wired by epic C1.6, see tests/campaign-multiply.cjs for the plantSpecimen/multiplySpecimen commands built on it)", () => {
+  const g = new GardenState(null, 1000);
+  const specimen = Cultivars.createSpecimen(g.s, { cultivarId: "c1", x: 2.5, z: -1 });
+  assert.deepEqual(specimen, { id: "sp1", cultivarId: "c1", x: 2.5, z: -1, stage: 0 });
+  assert.deepEqual(g.s.specimens, [specimen]);
+  assert.equal(g.s.specimenNextId, 2);
 });
 
 test("A v3 save without a cultivars field migrates to the empty default without altering the rest of its content", () => {

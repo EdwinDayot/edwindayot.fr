@@ -298,6 +298,29 @@
         !count(s.campaignSeedBox.retrievals))
     )
       throw Error("Boîte de semences invalide.");
+    if (
+      s.specimens !== undefined &&
+      (!Array.isArray(s.specimens) ||
+        new Set(s.specimens.map((sp) => sp?.id)).size !== s.specimens.length ||
+        s.specimens.some(
+          (sp) =>
+            !sp ||
+            !/^sp\d+$/.test(sp.id) ||
+            !s.cultivars?.some((c) => c.id === sp.cultivarId) ||
+            !finite(sp.x, -64, 64) ||
+            !finite(sp.z, -64, 64) ||
+            !count(sp.stage),
+        ))
+    )
+      throw Error("Spécimen invalide.");
+    if (s.specimenNextId !== undefined && !count(s.specimenNextId))
+      throw Error("Spécimen invalide.");
+    if (
+      s.specimens?.length &&
+      s.specimenNextId <=
+        Math.max(...s.specimens.map((sp) => Number(sp.id.slice(2))))
+    )
+      throw Error("Identifiants de spécimen invalides.");
     const result = clone(s);
     result.hotbar ??= [...D.defaultHotbar];
     result.quests ??= { active: [], completed: [] };
@@ -305,6 +328,8 @@
     result.cultivarNextId ??= 1;
     result.campaignPot ??= { capacity: 1, pending: [] };
     result.campaignSeedBox ??= { seeded: false, cultivarId: null, retrievals: 0 };
+    result.specimens ??= [];
+    result.specimenNextId ??= 1;
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };
