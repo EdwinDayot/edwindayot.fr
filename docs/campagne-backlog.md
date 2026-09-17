@@ -36,7 +36,7 @@ Statut : fait (2026-09-17, voir docs/campagne.md et commit sur `maison-des-possi
 Dépend de : C1.2, C2.1 (l'horloge quotidienne doit exister pour qu'« une nuit » ait un sens)
 Critère de sortie : poser deux graines compatibles dans le pot et dormir produit un cultivar dont chaque locus discret vient bien de l'un des deux parents à probabilité égale (vérifié statistiquement sur un grand nombre de tirages, seed fixée pour la reproductibilité du test) ; le résultat est fixé et sauvegardé à la confirmation de l'essai — recharger la partie ne le tire pas une seconde fois ; une seule paire par nuit au départ.
 Fichiers probables : `public/garden-state-cmd-*.js` (nouveau segment), `public/game/botany-genetics.js`
-Statut : todo
+Statut : fait (2026-09-17, voir docs/campagne.md et commit sur `maison-des-possibles`). En pratique le tirage vit dans un nouveau `public/game/botany-pot.js` (pas dans `botany-genetics.js`, laissé inchangé) ; le nouveau segment de commande est `public/garden-state-cmd-f.js` ; le champ de sauvegarde est `s.campaignPot` (pas `s.pot`, ambigu avec le type d'entité `"pot"` du jardin libre).
 
 ### C1.4 — Carnet de botanique
 Dépend de : C1.3

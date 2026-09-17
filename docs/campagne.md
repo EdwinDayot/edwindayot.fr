@@ -77,3 +77,26 @@ Premier epic de la phase 2 (Jardin d'imitation). Pose l'horloge de jeu propre à
 ```
 
 Aucun test navigateur ni visuel requis : aucun fichier de rendu touché ; `campaign-clock.js` n'est pas encore chargé par `index.html`, il n'est utilisé que par ses tests Node pour l'instant (le câblage à l'interface et au rendu viendra avec les epics qui introduisent les écrans concernés).
+
+## Vérification locale du 17 septembre 2026 — le pot : croisement, héritage par locus, résolution au réveil (epic C1.3)
+
+Troisième epic de la phase 1. Pose le tirage aléatoire du pot (design §4, « Héritage compréhensible, surprise conservée ») au-dessus de la grammaire posée par C1.2 : deux graines compatibles, croisées, produisent un cultivar fixé et sauvegardé — toujours aucune interface, aucun rendu (C1.4/C1.7 suivent).
+
+- Nouveau `public/game/botany-pot.js` : `resolvePotDraw(idA, idB, random = Math.random)` tire chacun des six axes (port, feuilles, fleurs, palette, humidite, fonction, dans l'ordre fixe déjà utilisé par `botany-genetics.js`) indépendamment — un appel `random()` par axe, parent A si `< 0,5` sinon parent B — puis rejette et retire l'intégralité des six axes si le résultat échoue `traitCombinationValid` (design §4 point 5), jusqu'à un tirage valide (garde anti-boucle à 1000 tentatives, purement défensive : `campaign-genetics.cjs` prouve déjà qu'une paire compatible a toujours au moins une combinaison valide). `random` reste injectable pour permettre un test statistique reproductible à seed fixe. Ne modifie ni ne dépend de rien d'autre que `botany-genetics.js` (inchangé).
+- Nouveau champ de sauvegarde `s.campaignPot = { capacity: 1, pending: [] }` (nommé ainsi et pas `s.pot` : ambigu avec le type d'entité `"pot"` du jardin libre, même logique de nommage explicite que `campaign-clock.js` face à `clock.js`). `capacity` fixée à 1 (« une paire par nuit au début », design §4) ; `pending` porte les paires posées mais pas encore résolues. `public/garden-state-lifecycle.js`/`public/garden-state-validate.js` suivent le patron déjà utilisé pour `cultivars`/`cultivarNextId` : champ optionnel, validé strictement s'il est présent, complété par défaut sinon — une sauvegarde existante sans ce champ continue de charger sans erreur.
+- Nouveau segment de commande `public/garden-state-cmd-f.js` (`public/garden-state.js` étendu pour le charger en Node) : `sowPot` valide deux espèces fondatrices connues, leur compatibilité (`crossCompatible`) et la capacité disponible avant d'ajouter la paire à `pending`, avec un refus explicite sinon ; `sleep` résout chaque paire en attente via `resolvePotDraw` puis fige un cultivar (`GardenCultivars.createCultivar`, nom laissé vide — le nommer est le travail de C1.4) dans `s.cultivars`, vide `pending`, et réussit aussi sans rien créer si `pending` est vide (« il reste possible de ne rien croiser »). Le résultat est résolu et sauvegardé une seule fois, de façon synchrone, au moment de la commande : un rechargement ne peut donc pas retirer, `resolvePotDraw` n'étant jamais appelé depuis `validate`/`fresh`/le chargement.
+- Nouveau `tests/campaign-pot.cjs` (9 tests), ajouté à la commande `test` de `package.json` : distribution statistique sur 10 000 tirages avec un générateur mulberry32 à seed fixe (20260917) sur la paire ronce-à-rubans×fraise timide (compatible, `fonction: null` des deux côtés donc jamais de rejet, ce qui isole la propriété 50/50 par locus du filtrage de validité déjà testé par `campaign-genetics.cjs`) — chacun des six axes reste dans 45–55 % ; persistance réelle après un aller-retour JSON sauvegarde/rechargement (le cultivar et `pending` restent identiques, aucun second tirage) ; une seule paire par nuit (un second `sowPot` avant tout `sleep` est refusé explicitement) ; `sleep` sans rien préparé réussit sans créer de cultivar ; une paire d'écart d'humidité supérieur à 1 est refusée par `sowPot` ; une espèce inconnue est refusée explicitement sans lever d'exception non capturée ; migration silencieuse d'une sauvegarde sans `campaignPot` vers la valeur par défaut, comparaison JSON complète avant/après ; sept formes malformées de `campaignPot` sont rejetées ; un test complémentaire vérifie que 500 tirages sur une paire à fonctions non nulles (oreille-de-pluie×menthe de velours, qui peut réellement déclencher le rejet-et-relance) restent toujours structurellement valides.
+
+**Résultat réellement exécuté** (vérifié indépendamment par l'orchestrateur, pas seulement rapporté par l'agent délégué) : `npm test` → 161 tests de règles/géométrie passent (152 existants + 9 nouveaux, zéro régression), plus les vérifications HTML/site existantes.
+
+```
+ℹ tests 161
+ℹ suites 0
+ℹ pass 161
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+```
+
+Aucun test navigateur ni visuel requis : aucun fichier de rendu touché (`render*.js`, `hud*.js`, `index.html`, `garden-models*.js`, `botany.js` inchangés) ; ni `botany-genetics.js` ni `cultivars.js` (déjà livrés par C1.2/C1.1) n'ont été modifiés, seulement réutilisés.

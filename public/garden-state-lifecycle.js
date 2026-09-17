@@ -62,6 +62,12 @@
       quests: { active: [], completed: [] },
       cultivars: [],
       cultivarNextId: 1,
+      // Named campaignPot, not pot: "pot" is already the free-garden's single-plant entity
+      // type (see D.recipes.pot), so reusing that name here would be ambiguous — same reasoning
+      // as campaign-clock.js distinguishing itself from a hypothetical clock.js (see its own
+      // header comment). capacity starts at 1 (design §4 "Capacité du pot": "une paire par nuit
+      // au début"); pending holds seed pairs not yet resolved by a "sleep" command.
+      campaignPot: { capacity: 1, pending: [] },
     };
   }
   function migrate(old, now = Date.now()) {

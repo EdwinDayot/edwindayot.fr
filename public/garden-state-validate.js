@@ -271,11 +271,25 @@
         Math.max(...s.cultivars.map((c) => Number(c.id.slice(1))))
     )
       throw Error("Identifiants de cultivar invalides.");
+    if (
+      s.campaignPot !== undefined &&
+      (typeof s.campaignPot !== "object" ||
+        s.campaignPot === null ||
+        !count(s.campaignPot.capacity) ||
+        s.campaignPot.capacity < 1 ||
+        !Array.isArray(s.campaignPot.pending) ||
+        s.campaignPot.pending.length > s.campaignPot.capacity ||
+        s.campaignPot.pending.some(
+          (p) => !p || typeof p.a !== "string" || typeof p.b !== "string",
+        ))
+    )
+      throw Error("Pot invalide.");
     const result = clone(s);
     result.hotbar ??= [...D.defaultHotbar];
     result.quests ??= { active: [], completed: [] };
     result.cultivars ??= [];
     result.cultivarNextId ??= 1;
+    result.campaignPot ??= { capacity: 1, pending: [] };
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };
