@@ -60,6 +60,12 @@ Cette limite doit rester énoncée honnêtement plutôt que maquillée : la qual
 - **Renommage commercial définitif** du jeu ou des Rainelles, et toute divergence par rapport à un choix déjà « confirmé par l'utilisateur » dans `game-design.md`.
 - **Sortir la routine d'une pause anti-emballement** (trois blocages consécutifs) — cette situation signale explicitement qu'une décision humaine est redevenue nécessaire.
 
-## Prochaine étape concrète
+## État : mécanisme activé le 17 septembre 2026
 
-Ce document décrit le mécanisme ; il ne l'active pas. L'activer suppose de trancher, avec l'utilisateur : quel dépôt distant utiliser (nouveau dépôt GitHub, privé par défaut, ou un dépôt existant à relier), quel modèle pour les déclenchements cloud, et la confirmation de la politique de fusion automatique décrite ci-dessus.
+Le dépôt distant relié est `github.com/EdwinDayot/edwindayot.fr` (**public** — visibilité vérifiée, à garder en tête : tout commit de campagne, y compris les epics bloqués et les anomalies, y est visible publiquement). Les branches `main` et `maison-des-possibles` y sont poussées.
+
+Une routine cloud récurrente y est active : cron horaire (`12 * * * *` UTC), modèle `claude-sonnet-5`, environnement « Default », prompt fixe reprenant exactement l'anatomie de déclenchement décrite plus haut. Premier déclenchement prévu le 17 septembre 2026 à 14:12 UTC, puis toutes les heures.
+
+La création a d'abord été bloquée par le classificateur de permissions du mode automatique ; débloquée en ajoutant une règle `"RemoteTrigger"` à `permissions.allow` dans `.claude/settings.json` (projet), à la demande explicite de l'utilisateur.
+
+À surveiller sans y intervenir : le bandeau de pause en tête de `campagne-backlog.md` (trois blocages consécutifs), et les entrées de `docs/campagne.md`/`docs/campagne-anomalies.md` au fil des déclenchements.

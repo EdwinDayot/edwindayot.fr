@@ -7,3 +7,4 @@ node_modules/
 .pi/
 .agents/
 .playwright-mcp/
+.claude/settings.local.json
