@@ -24,7 +24,7 @@ Porte de sortie (design §15) : *le joueur reconnaît des caractères parentaux,
 Dépend de : rien
 Critère de sortie : le modèle de sauvegarde distingue espèce fondatrice (déjà `D.species` existant), cultivar (id stable, nom, `parentIds`, traits figés) et spécimen (référence à un cultivar + emplacement + stade) ; une sauvegarde v3 existante charge sans cultivar (liste vide) et sans erreur ; un test vérifie qu'un cultivar créé puis rechargé garde exactement les mêmes traits et le même id.
 Fichiers probables : `public/garden-state.js`, `public/garden-state-migrate.js`, nouveau `public/game/data-cultivars.js`
-Statut : todo
+Statut : fait (2026-09-17, voir docs/campagne.md et commit sur `maison-des-possibles`). En pratique implémenté dans `public/game/cultivars.js` (pas `data-cultivars.js` : ce n'est pas un catalogue statique comme `data-species.js`, mais des fonctions pures sur l'état de sauvegarde, sur le modèle de `quests.js` face à `data-quests.js`) + `garden-state-lifecycle.js` + `garden-state-validate.js`.
 
 ### C1.2 — Grammaire des six premiers attributs
 Dépend de : C1.1

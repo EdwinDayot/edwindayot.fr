@@ -60,6 +60,8 @@
       stats: { produced: 0, collected: 0, waterUsed: 0 },
       botanyRewards: [],
       quests: { active: [], completed: [] },
+      cultivars: [],
+      cultivarNextId: 1,
     };
   }
   function migrate(old, now = Date.now()) {

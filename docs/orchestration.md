@@ -39,6 +39,8 @@ Ce ne sont pas des processus permanents mais des **postures de prompt** que l'or
 5. **Consigner** : commit dédié sur `maison-des-possibles`, entrée de changelog vérifiable, mise à jour du backlog.
 6. **Reprendre** à l'étape 1.
 
+**Le rapport d'un agent délégué n'est jamais la preuve.** Un fork ou sous-agent peut renvoyer un résumé de complétion plausible sans avoir rien fait (observé une fois : un fork a terminé en quelques secondes, zéro appel d'outil, et a paraphrasé un message précédent au lieu d'exécuter son mandat). Avant de consigner un epic comme fait, vérifier indépendamment l'état réel du dépôt (`git log`, `git show --stat`, présence des fichiers annoncés, `npm test` relancé soi-même) — jamais seulement la prose du rapport reçu.
+
 ## Portes de phase (reprises de la section 15 du design)
 
 Chaque phase du plan de réalisation devient un jalon de fusion, pas seulement un regroupement thématique. Le détail epic par epic est dans `campagne-backlog.md` ; voici le critère de sortie de chaque porte, tel que fixé par le design :

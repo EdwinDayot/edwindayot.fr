@@ -246,9 +246,36 @@
         s.quests.completed.some((id) => !D.quests[id]))
     )
       throw Error("Quêtes invalides.");
+    if (
+      s.cultivars !== undefined &&
+      (!Array.isArray(s.cultivars) ||
+        new Set(s.cultivars.map((c) => c?.id)).size !== s.cultivars.length ||
+        s.cultivars.some(
+          (c) =>
+            !c ||
+            !/^c\d+$/.test(c.id) ||
+            typeof c.name !== "string" ||
+            !Array.isArray(c.parentIds) ||
+            c.parentIds.length > 2 ||
+            c.parentIds.some((p) => typeof p !== "string") ||
+            typeof c.traits !== "object" ||
+            c.traits === null,
+        ))
+    )
+      throw Error("Cultivar invalide.");
+    if (s.cultivarNextId !== undefined && !count(s.cultivarNextId))
+      throw Error("Cultivar invalide.");
+    if (
+      s.cultivars?.length &&
+      s.cultivarNextId <=
+        Math.max(...s.cultivars.map((c) => Number(c.id.slice(1))))
+    )
+      throw Error("Identifiants de cultivar invalides.");
     const result = clone(s);
     result.hotbar ??= [...D.defaultHotbar];
     result.quests ??= { active: [], completed: [] };
+    result.cultivars ??= [];
+    result.cultivarNextId ??= 1;
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };
