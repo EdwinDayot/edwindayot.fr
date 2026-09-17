@@ -43,7 +43,17 @@
                         ? "Accepter"
                         : r.action === "quest-complete"
                           ? "Terminer"
-                          : "Choisir",
+                          : r.action === "keep-cultivar"
+                            ? "Garder"
+                            : r.action === "store-cultivar"
+                              ? "Réserver"
+                              : r.action === "give-cultivar"
+                                ? "Donner"
+                                : r.action === "compost-cultivar"
+                                  ? "Composter"
+                                  : r.action === "rename-cultivar"
+                                    ? "Renommer"
+                                    : "Choisir",
               x + pw - 105,
               ry + 18,
               77,

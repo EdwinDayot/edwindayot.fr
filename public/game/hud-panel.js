@@ -143,7 +143,65 @@
               });
           }
         }
-      } else if (m.panel === "notebook")
+      } else if (m.panel === "notebook") {
+        // Epic C1.4: pending campaign cultivars (a "disposition" not yet chosen) come first, each
+        // spread over three rows since a generic row only carries two buttons (action +
+        // alternate) — see the commit message for this epic for why five actions (keep, store,
+        // give, compost, rename) don't fit two rows here, unlike C1.3's own two-button panels.
+        const Genetics = window.GardenGenetics;
+        const AXIS_LABELS = {
+          port: "port",
+          feuilles: "feuillage",
+          fleurs: "floraison",
+          palette: "palette",
+          humidite: "humidité",
+          fonction: "fonction",
+        };
+        const founderName = (id) =>
+          Genetics?.founders.find((f) => f.id === id)?.name || id;
+        const differingAxes = (traits, parentId) => {
+          const parent = Genetics?.founders.find((f) => f.id === parentId);
+          if (!parent) return [];
+          return Object.keys(AXIS_LABELS)
+            .filter(
+              (axis) =>
+                JSON.stringify(traits[axis]) !==
+                JSON.stringify(parent.traits[axis]),
+            )
+            .map((axis) => AXIS_LABELS[axis]);
+        };
+        for (const cv of m.s.cultivars.filter(
+          (c) => c.disposition === undefined,
+        )) {
+          const [a, b] = cv.parentIds,
+            title = cv.name || "Nouveau résultat (sans nom)",
+            diffA = differingAxes(cv.traits, a),
+            diffB = differingAxes(cv.traits, b);
+          rows.push({
+            title,
+            detail:
+              `Issu de ${founderName(a)} × ${founderName(b)}. ` +
+              `Diffère de ${founderName(a)} sur ${diffA.length ? diffA.join(", ") : "rien"} ; ` +
+              `de ${founderName(b)} sur ${diffB.length ? diffB.join(", ") : "rien"}.`,
+            action: "keep-cultivar",
+            alternate: { action: "store-cultivar", data: { id: cv.id } },
+            data: { id: cv.id },
+          });
+          rows.push({
+            title,
+            detail:
+              "Donner ou composter : le carnet garde la découverte dans tous les cas.",
+            action: "give-cultivar",
+            alternate: { action: "compost-cultivar", data: { id: cv.id } },
+            data: { id: cv.id },
+          });
+          rows.push({
+            title,
+            detail: "Choisir un nom pour ce résultat.",
+            action: "rename-cultivar",
+            data: { id: cv.id },
+          });
+        }
         for (const sp of D.species) {
           const known = m.s.discovered.includes(sp.id);
           rows.push({
@@ -155,7 +213,7 @@
             data: { species: sp.id },
           });
         }
-      else if (m.panel === "visitor")
+      } else if (m.panel === "visitor")
         for (const r of m.s.requests)
           rows.push({
             title: `${r.quantity} ${D.itemName(r.item)}`,

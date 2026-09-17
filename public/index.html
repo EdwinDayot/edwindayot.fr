@@ -54,6 +54,15 @@
     <script src="/garden-state-cmd-c.js" defer></script>
     <script src="/garden-state-cmd-d.js" defer></script>
     <script src="/garden-state-cmd-e.js" defer></script>
+    <!-- Campaign layer (docs/campagne-backlog.md phase 1). botany-genetics/botany-pot/cultivars
+         must load before garden-state-cmd-f.js, which reads root.GardenGenetics/GardenPot/
+         GardenCultivars at script-execution time. C1.1-C1.3 had proven this purely in Node; wiring
+         it into the live page is completed here, as a prerequisite for C1.4's notebook commands. -->
+    <script src="/game/botany-genetics.js" defer></script>
+    <script src="/game/botany-pot.js" defer></script>
+    <script src="/game/cultivars.js" defer></script>
+    <script src="/garden-state-cmd-f.js" defer></script>
+    <script src="/garden-state-cmd-g.js" defer></script>
     <script src="/game/save.js" defer></script>
     <script src="/garden-models.js" defer></script>
     <script src="/garden-models-leaf.js" defer></script>
@@ -133,6 +142,14 @@
         id="import-file"
         type="file"
         accept="application/json,.json"
+        hidden
+      />
+      <input
+        id="cultivar-rename-input"
+        type="text"
+        maxlength="40"
+        autocomplete="off"
+        aria-label="Nouveau nom du cultivar"
         hidden
       />
     </main>

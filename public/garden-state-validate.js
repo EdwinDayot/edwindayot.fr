@@ -259,7 +259,11 @@
             c.parentIds.length > 2 ||
             c.parentIds.some((p) => typeof p !== "string") ||
             typeof c.traits !== "object" ||
-            c.traits === null,
+            c.traits === null ||
+            (c.disposition !== undefined &&
+              !["kept", "stored", "given", "composted"].includes(
+                c.disposition,
+              )),
         ))
     )
       throw Error("Cultivar invalide.");
@@ -284,12 +288,23 @@
         ))
     )
       throw Error("Pot invalide.");
+    if (
+      s.campaignSeedBox !== undefined &&
+      (typeof s.campaignSeedBox !== "object" ||
+        s.campaignSeedBox === null ||
+        typeof s.campaignSeedBox.seeded !== "boolean" ||
+        (s.campaignSeedBox.cultivarId !== null &&
+          typeof s.campaignSeedBox.cultivarId !== "string") ||
+        !count(s.campaignSeedBox.retrievals))
+    )
+      throw Error("Boîte de semences invalide.");
     const result = clone(s);
     result.hotbar ??= [...D.defaultHotbar];
     result.quests ??= { active: [], completed: [] };
     result.cultivars ??= [];
     result.cultivarNextId ??= 1;
     result.campaignPot ??= { capacity: 1, pending: [] };
+    result.campaignSeedBox ??= { seeded: false, cultivarId: null, retrievals: 0 };
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };

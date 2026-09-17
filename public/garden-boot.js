@@ -28,6 +28,30 @@
       e.target.value = "";
     }
   };
+  // Epic C1.4: the one free-form text field in the whole game (renaming a cultivar). Commits on
+  // Enter or on blur, then re-hides; Escape cancels without renaming. The global keydown listener
+  // just below already ignores `e.target.tagName === "INPUT"`, so ZQSD/WASD and the single-letter
+  // panel shortcuts never fire while this field is focused.
+  const renameInput = $("cultivar-rename-input");
+  const confirmRename = () => {
+    if (renameInput.hidden) return;
+    const id = renameInput.dataset.cultivarId,
+      name = renameInput.value;
+    renameInput.hidden = true;
+    if (id) A.execute({ type: "renameCultivar", id, name });
+  };
+  renameInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      confirmRename();
+      A.canvas.focus({ preventScroll: true });
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      renameInput.hidden = true;
+      A.canvas.focus({ preventScroll: true });
+    }
+  });
+  renameInput.addEventListener("blur", confirmRename);
   window.addEventListener("keydown", (e) => {
     if (
       e.ctrlKey ||

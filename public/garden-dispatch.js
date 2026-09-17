@@ -76,6 +76,36 @@
       case "quest-complete":
         A.execute({ type: "quest", action: "complete", questId: data.questId });
         break;
+      // Epic C1.4 (carnet de botanique). Suffixed "-cultivar" so these never collide with the
+      // free garden's own "store" action (built-object storage, keyed off A.build.id, not a
+      // cultivar id) — reusing the bare command names here would silently no-op instead of
+      // calling GardenState.command().
+      case "keep-cultivar":
+        A.execute({ type: "keepCultivar", id: data.id });
+        break;
+      case "store-cultivar":
+        A.execute({ type: "storeCultivar", id: data.id });
+        break;
+      case "give-cultivar":
+        A.execute({ type: "giveCultivar", id: data.id });
+        break;
+      case "compost-cultivar":
+        A.execute({ type: "compostCultivar", id: data.id });
+        break;
+      case "rename-cultivar": {
+        // Canvas draws no text field: reuse the same "HTML for what Canvas doesn't do well"
+        // principle already applied to the system file picker (see garden-structure.md). The
+        // input is shown/positioned only for the duration of this rename.
+        const cultivar = A.game.s.cultivars.find((cv) => cv.id === data.id);
+        if (!cultivar) break;
+        const input = $("cultivar-rename-input");
+        input.value = cultivar.name || "";
+        input.dataset.cultivarId = data.id;
+        input.hidden = false;
+        input.focus();
+        input.select();
+        break;
+      }
       case "go":
         A.go(data.id);
         break;

@@ -68,6 +68,12 @@
       // header comment). capacity starts at 1 (design §4 "Capacité du pot": "une paire par nuit
       // au début"); pending holds seed pairs not yet resolved by a "sleep" command.
       campaignPot: { capacity: 1, pending: [] },
+      // Epic C1.4: the house's seed box. `seeded` flips true only once, on the very first
+      // successful keepCultivar of the game (see garden-state-cmd-g.js); `cultivarId` then never
+      // changes again. `retrievals` counts free, non-consuming pickups — never branched onto
+      // inventory/economy.js, so this can never carry resale value (same "not wired yet" posture
+      // documented at cultivars.js's own creation, C1.1).
+      campaignSeedBox: { seeded: false, cultivarId: null, retrievals: 0 },
     };
   }
   function migrate(old, now = Date.now()) {
