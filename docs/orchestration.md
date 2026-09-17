@@ -1,6 +1,6 @@
 # Orchestration de « La Maison des possibles »
 
-Ce document explique **comment** [game-design.md](game-design.md) sera construit par des agents LLM, sans intervention humaine entre les sessions. Il ne redécrit pas le jeu ; il décrit le processus de fabrication. Le carnet de travail concret (la file d'epics, leur état) vit dans [campagne-backlog.md](campagne-backlog.md).
+Ce document explique **comment** [game-design.md](game-design.md) sera construit par des agents LLM, sans intervention humaine entre les sessions. Il ne redécrit pas le jeu ; il décrit le processus de fabrication, epic par epic. Le carnet de travail concret (la file d'epics, leur état) vit dans [campagne-backlog.md](campagne-backlog.md). Ce qu'il faut en plus pour que cette routine s'enchaîne seule, sans qu'un humain relance une session, sur toute la durée de la campagne, est décrit séparément dans [execution-continue.md](execution-continue.md).
 
 ## Principe directeur : continuer la discipline déjà éprouvée, pas en inventer une nouvelle
 
@@ -15,7 +15,7 @@ Le prototype existant (voir [garden.md](garden.md)) a déjà produit plus de vin
 
 ## Pourquoi une branche dédiée
 
-`public/` sert un site déployé (portfolio + jardin libre existant). La campagne est une transformation profonde et longue (section 15 du design : sept étapes, plusieurs dizaines d'heures agent cumulées). Le travail se fait sur la branche `maison-des-possibles`, avec un commit par epic vérifié. La fusion vers `main` se fait par **jalon de phase** (fin d'étape 1 à 7 du plan de réalisation), jamais automatiquement à chaque epic, pour qu'un humain (ou une session de revue dédiée) puisse regarder une tranche cohérente avant qu'elle n'atteigne le site servi. Rien dans ce processus ne pousse vers `origin` ni ne déploie : cela reste une décision distincte, hors du périmètre de cette orchestration.
+`public/` sert un site déployé (portfolio + jardin libre existant). La campagne est une transformation profonde et longue (section 15 du design : sept étapes, plusieurs dizaines d'heures agent cumulées). Le travail se fait sur la branche `maison-des-possibles`, avec un commit par epic vérifié. La fusion vers `main` se fait par **jalon de phase** (fin d'étape 1 à 7 du plan de réalisation), jamais à chaque epic pris isolément, pour que chaque tranche fusionnée soit cohérente et que son historique reste lisible. Comme aucun pipeline n'est connecté à `main` (aucun workflow CI, aucun déploiement automatique dans ce dépôt), cette fusion de phase peut faire partie de l'exécution automatisée elle-même une fois ses scénarios de validation vérifiés — voir [execution-continue.md](execution-continue.md) pour la politique exacte. Ce qui reste hors de ce processus, sans exception : pousser vers un service de déploiement ou publier le site servi.
 
 ## Rôles
 
@@ -53,7 +53,7 @@ Chaque phase du plan de réalisation devient un jalon de fusion, pas seulement u
 6. **Campagne complète (actes IV à VI)** — tous les parcours narratifs prévus concluent sans imposer l'exploitation ni inventer une faute.
 7. **Profondeur et finition** — saisons, extensions, catalogue décoratif, tactile et performances tenues sur les appareils de référence.
 
-Aucune phase ne fusionne vers `main` tant que ses scénarios de validation (section 16 du design, repris en tests automatisés) ne passent pas.
+Aucune phase ne fusionne vers `main` tant que ses scénarios de validation (section 16 du design, repris en tests automatisés) ne passent pas — voir [execution-continue.md](execution-continue.md) pour qui déclenche cette fusion sous exécution continue.
 
 ## Continuité entre sessions
 
@@ -67,8 +67,8 @@ Toute reprise de travail (nouvelle session, `/loop`, tâche planifiée) suit la 
 
 ## Ce qui reste une décision humaine explicite
 
-Cette orchestration couvre l'implémentation, pas la publication. Restent hors de son périmètre, à ne jamais déclencher automatiquement :
-- Fusionner `maison-des-possibles` dans `main`.
-- Pousser vers `origin` ou déployer.
+Cette orchestration couvre l'implémentation, pas la publication. Restent hors de son périmètre, à ne jamais déclencher automatiquement (voir [execution-continue.md](execution-continue.md) pour la liste complète et son raisonnement) :
+- Créer et autoriser l'infrastructure d'exécution continue elle-même (dépôt distant, routine planifiée).
+- Pousser vers un service de déploiement, ou publier le site servi.
 - Renommer définitivement le jeu ou les Rainelles (le design les qualifie lui-même de noms de travail).
 - Toute décision qui changerait un choix déjà « confirmé par l'utilisateur » dans le design (la culpabilisation de fin de campagne, Alma vivante, etc.) — ces choix sont des données d'entrée, pas des variables d'orchestration.
