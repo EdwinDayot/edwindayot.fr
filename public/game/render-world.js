@@ -146,12 +146,35 @@
             b = vertexIndex(i + 1, j),
             c = vertexIndex(i + 1, j + 1),
             d = vertexIndex(i, j + 1);
-          indices.push(a, b, c, a, c, d);
+          // Sens anti-horaire vu de +Y : les normales pointent vers le ciel.
+          // L’ordre (a,b,c / a,c,d) donnait des normales vers −Y, qui renversons
+          // le lambert (fill/soleil/hémisphérique) et noyaient les flancs de dôme.
+          indices.push(a, c, b, a, d, c);
         }
       const geo = new T.BufferGeometry();
       geo.setAttribute("position", new T.Float32BufferAttribute(positions, 3));
       geo.setIndex(indices);
       geo.computeVertexNormals();
+      // Verrou d’orientation : le sol est vu de dessus, ses normales doivent
+      // pointer vers +Y. Si le calcul retourne −Y (sens de spire inversé), on
+      // réoriente tout de suite pour que lumière, ombre et fill restent cohérents.
+      {
+        const nn = geo.attributes.normal;
+        let upCount = 0,
+          downCount = 0;
+        for (let v = 0; v < nn.count; v++) {
+          if (nn.getY(v) > 0.3) upCount++;
+          else if (nn.getY(v) < -0.3) downCount++;
+        }
+        if (downCount > upCount) {
+          for (let v = 0; v < nn.count * 3; v += 3) {
+            nn.setX(v, -nn.getX(v));
+            nn.setY(v, -nn.getY(v));
+            nn.setZ(v, -nn.getZ(v));
+          }
+          nn.needsUpdate = true;
+        }
+      }
       // Ombre du relief cuite en couleurs de sommet (indépendante du soleil) : les
       // pentes abruptes et les creux de base de colline sont assombris, les plateaux
       // restent clairs. C'est ce qui rend les 8 collines du terrain lisibles à tout
@@ -173,7 +196,7 @@
           cavity += Math.max(0, Terrain.terrainHeight(x + Math.cos(ang) * 2.2, z + Math.sin(ang) * 2.2) - y);
         }
         cavity = Math.min(1, (cavity / 8) * 0.6);
-        const shade = 1 - Math.min(0.45, slope * 0.28 + cavity * 0.35);
+        const shade = 1 - Math.min(0.5, slope * 0.45 + cavity * 0.4);
         form[v] = shade;
         colors[v * 3] = colors[v * 3 + 1] = colors[v * 3 + 2] = shade;
       }
@@ -204,7 +227,8 @@
           const d =
             nrm.getX(v) * sx + nrm.getY(v) * sy + nrm.getZ(v) * sz;
           const f = d > 0 ? d * d : 0;
-          const s = form[v] * (1 + (0.42 + 0.9 * f - 1) * weight);
+          const bias = f < 0.5 ? (0.5 - f) * 1.6 : (f - 0.5) * 0.15;
+          const s = form[v] * (1 + bias * weight);
           arr[v * 3] = arr[v * 3 + 1] = arr[v * 3 + 2] = s;
         }
         col.needsUpdate = true;
