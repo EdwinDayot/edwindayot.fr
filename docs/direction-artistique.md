@@ -34,12 +34,16 @@ Tons neutres additionnels déjà en service : lavande `0x9a83b5`, aster/violet n
 - **Squelette + points d'attache pour tout élément modulaire** (hybrides du pot, Rainelles) : un port/corps de base porte des points d'ancrage déclarés ; feuilles/fleurs/fruits ou éléments végétaux d'une Rainelle s'y attachent depuis une bibliothèque compatible, jamais fusionnés arbitrairement (design §14, epics C1.7 et l'apparence des Rainelles §5).
 - **Un cultivar = une signature visuelle réutilisée**, jamais recalculée par spécimen : deux spécimens du même cultivar partagent géométrie et matériau (déjà la règle pour les espèces existantes, à étendre aux cultivars).
 
+## Vérification : programmatique d'abord, jamais seulement visuelle
+
+`tests/garden-material-audit.cjs` (dans `npm run test:browser`) inspecte directement le graphe de scène Three.js — matériaux transparents non documentés, normales de maillages « au sol » retournées, sommets non finis — plutôt que de juger une image rendue. C'est délibéré : une relecture qui ne fait que regarder une capture s'est montrée peu fiable sur ce projet (un bug de normales a survécu à des dizaines de vérifications par capture pendant plusieurs jours ; le même script l'a détecté en une seconde une fois écrit — voir `execution-continue.md`). La liste blanche des matériaux volontairement transparents (`TRANSPARENT_ALLOWLIST` dans ce test) doit rester synchronisée avec les cas légitimes ci-dessus (verre de serre, halo de lanterne, survol de portée) ; tout nouveau cas légitime s'y ajoute avec sa raison, jamais en assouplissant la règle en silence.
+
 ## Ce que ce guide ne remplace pas
 
-Aucune règle ci-dessus ne garantit qu'un nouvel élément est *beau* — seulement qu'il ne détonne pas. Le jugement esthétique réel reste porté par :
-1. **La relecture multimodale** décrite dans `execution-continue.md` : avant de marquer fait un epic d'Artisan rendu, une passe relit réellement les captures Playwright produites (pas seulement le code) contre ce guide.
-2. **La galerie de suivi** : les captures des epics visuels sont publiées dans une page consultable à tout moment par l'utilisateur (voir `execution-continue.md`), pour qu'un vrai regard humain reste possible sans être requis pour avancer.
-3. **Ce document lui-même reste amendable.** Si l'utilisateur trouve un résultat raté en regardant la galerie, corriger ici (une règle plus précise, une teinte à bannir, une proportion à revoir) prévaut sur tout epic déjà livré — comme `game-design.md` pour le fond, ce fichier fait autorité sur la forme pour tous les déclenchements suivants.
+Aucune règle ci-dessus, ni l'audit programmatique, ne garantit qu'un nouvel élément est *beau* — seulement qu'il ne détonne pas et ne contient pas un défaut nommable. Le jugement esthétique réel reste porté par :
+1. **La relecture multimodale**, en complément seulement de l'audit programmatique (voir `execution-continue.md`) : utile pour la composition et les proportions relatives, jamais suffisante seule pour marquer un epic visuel fait.
+2. **La galerie de suivi** : les captures des epics visuels sont consultables à tout moment par l'utilisateur (voir `execution-continue.md`), pour qu'un vrai regard humain reste possible sans être requis pour avancer.
+3. **Ce document lui-même reste amendable.** Si l'utilisateur trouve un résultat raté en regardant la galerie, corriger ici (une règle plus précise, une teinte à bannir, une proportion à revoir, un nouveau critère programmatique à ajouter au test) prévaut sur tout epic déjà livré — comme `game-design.md` pour le fond, ce fichier fait autorité sur la forme pour tous les déclenchements suivants.
 
 ## Prototype visuel de référence
 
