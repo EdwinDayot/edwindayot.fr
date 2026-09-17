@@ -39,6 +39,20 @@ const TRANSPARENT_ALLOWLIST = [
 
     const audit = await p.evaluate(() => {
       const v = window.GardenApp.view;
+
+      // Epic C1.7 (docs/campagne-backlog.md): exercise the new hybrid rendering module through
+      // this exact live-page scene graph, so this audit — the documented "véritable gate", not
+      // a formality — actually inspects the new meshes/materials rather than only the game's
+      // pre-existing entities. Positioned far off the playable area; only the scene graph is
+      // inspected below, not a screenshot of this spot.
+      if (window.GardenGenetics && window.GardenBotanyHybrids) {
+        window.GardenGenetics.founders.forEach((f, i) => {
+          const specimen = window.GardenBotanyHybrids.buildSpecimenGroup({ id: f.id, traits: f.traits });
+          specimen.position.set(200 + i * 3, 0, 200);
+          v.scene.add(specimen);
+        });
+      }
+
       // Sample a few times of day: a defect that only shows under one lighting angle (the
       // terrain-normal bug was exactly this — it read fine at some sun angles) must not hide.
       const times = [50, 300, 600, 900, 1150];

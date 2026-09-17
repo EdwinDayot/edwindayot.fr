@@ -59,6 +59,11 @@
          GardenCultivars at script-execution time. C1.1-C1.3 had proven this purely in Node; wiring
          it into the live page is completed here, as a prerequisite for C1.4's notebook commands. -->
     <script src="/game/botany-genetics.js" defer></script>
+    <!-- Epic C1.7: modular rendering of hybrid cultivars, kept apart from botany-genetics.js
+         (data) the same way botany.js/garden-models*.js render the free garden's own species —
+         no dependency on GardenGenetics at load time, only THREE, so its only ordering
+         requirement is loading after /vendor/three.min.js (line 28). -->
+    <script src="/game/botany-hybrids.js" defer></script>
     <script src="/game/botany-pot.js" defer></script>
     <script src="/game/cultivars.js" defer></script>
     <script src="/garden-state-cmd-f.js" defer></script>

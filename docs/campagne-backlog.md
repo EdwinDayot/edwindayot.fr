@@ -60,7 +60,7 @@ Statut : fait (2026-09-17, voir docs/campagne.md et commit sur `maison-des-possi
 Dépend de : C1.2 (schéma d'attributs stable), C1.3 (au moins un cultivar réel à afficher)
 Critère de sortie : le port fournit un squelette à points d'attache ; feuilles/fleurs/fruits proviennent d'une bibliothèque compatible avec le port du cultivar ; une graine visuelle déterministe (dérivée de l'id du cultivar) fixe la distribution des organes et reste identique entre deux sessions ; deux spécimens du même cultivar partagent géométrie/matériau (pas de doublon coûteux en triangles). Les teintes et matériaux utilisés doivent venir de [direction-artistique.md](direction-artistique.md) (palette/matériaux déjà en usage) — pas de nouvelle couleur inventée hors de ces familles sans raison documentée. Avant de marquer l'epic fait : capturer une scène de rendu, la lire avec Read (image), et comparer explicitement au guide (voir « Relecture multimodale réelle » dans [execution-continue.md](execution-continue.md)) ; consigner le résultat de cette relecture dans l'entrée de campagne.md.
 Fichiers probables : `public/game/botany.js`, `public/garden-models.js`
-Statut : todo
+Statut : fait (2026-09-17, voir docs/campagne.md et commit sur `maison-des-possibles`). En pratique dans un nouveau `public/game/botany-hybrids.js` (pas `botany.js`/`garden-models.js` : catalogue de la flore fictive de Rivebrume, séparé du rendu du jardin libre pour la même raison que `botany-genetics.js` l'est de `data-species.js`).
 
 ### C1.8 — Prototype visuel de validation
 Dépend de : C1.7
