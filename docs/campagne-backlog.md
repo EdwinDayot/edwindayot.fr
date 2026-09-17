@@ -96,7 +96,7 @@ Statut : todo (créé le 2026-09-17, scission de C2.2 — voir sa propre entrée
 Dépend de : C1.3 (il faut un cultivar réel dans le pot), C2.2
 Critère de sortie : une nuit scénarisée où une grenouille tombe dans le pot pendant un essai produit, au matin, une Rainelle portant le feuillage du cultivar croisé cette nuit-là, sans perte du spécimen attendu (il reste aussi conservé normalement) ; la Rainelle a un prénom modifiable et un identifiant stable.
 Fichiers probables : nouveau `public/game/rainelles.js`
-Statut : todo
+Statut : fait (2026-09-17, voir docs/campagne.md et commit sur `maison-des-possibles`). Choisi plutôt que C2.2v (dépendances déclarées satisfaites — C1.3/C2.2 tous deux `fait` — mais son propre critère de sortie littéral suppose une scène « maison » de campagne qui n'existe pas encore, phase 3 : implémenter maintenant aurait exigé d'inventer d'un bloc un mode de jeu entier, comme pour C1.5/C4.3). En pratique, « nuit scénarisée » et « essai » sont traduits en une couche de règles pure, sans câbler aucun contenu narratif de chapitre 4 (Acte II, hors ordre — hors phase 4 non détaillée) : une commande générique `triggerFrogEncounter` arme une rencontre en attente, résolue par la prochaine vraie nuit de pot (`sleep`, `garden-state-cmd-f.js`) plutôt que par un événement scripté câblé à une scène. Toujours aucun rendu (pas de représentation 3D de la Rainelle), sur le même modèle « posé mais pas encore affiché » que C1.1/C1.6.
 
 ### C2.4 — Schéma du geste unique
 Dépend de : C2.3
@@ -183,3 +183,4 @@ Saisons, extensions de maison, catalogue décoratif, chaînes avancées, tactile
 ## Journal des décisions d'orchestration
 
 - 2026-09-17 — Démarrage. Branche `maison-des-possibles` créée depuis `main`. Choix de ne détailler que les phases 1 et 2 immédiatement, pour ne pas figer de décisions de contenu que ces deux phases doivent encore éclairer (voir principe « généraliser plutôt que spécialiser » dans `orchestration.md`).
+- 2026-09-17 — C2.2v (dépendances satisfaites : C2.2 fait) sauté au profit de C2.3 : son critère de sortie littéral suppose une scène « maison » de campagne et un point d'ancrage caméra que la phase 3 seule doit construire (déjà noté dans son propre statut « probablement à détailler avec le Cartographe »). L'implémenter maintenant aurait exigé d'inventer d'un bloc, sans passage par le Cartographe, un mode de jeu entier — même raisonnement que le report de C1.5 à C4.3. C2.3, elle, ne dépend que de C1.3/C2.2 (tous deux `fait`) et se réduit à une couche de règles pure (voir sa propre entrée).

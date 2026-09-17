@@ -339,6 +339,32 @@
         typeof s.campaignClock.paused !== "boolean")
     )
       throw Error("Horloge de campagne invalide.");
+    if (
+      s.rainelles !== undefined &&
+      (!Array.isArray(s.rainelles) ||
+        new Set(s.rainelles.map((r) => r?.id)).size !== s.rainelles.length ||
+        s.rainelles.some(
+          (r) =>
+            !r ||
+            !/^r\d+$/.test(r.id) ||
+            !s.cultivars?.some((c) => c.id === r.cultivarId) ||
+            typeof r.name !== "string",
+        ))
+    )
+      throw Error("Rainelle invalide.");
+    if (s.rainelleNextId !== undefined && !count(s.rainelleNextId))
+      throw Error("Rainelle invalide.");
+    if (
+      s.rainelles?.length &&
+      s.rainelleNextId <=
+        Math.max(...s.rainelles.map((r) => Number(r.id.slice(1))))
+    )
+      throw Error("Identifiants de rainelle invalides.");
+    if (
+      s.campaignFrogEncounterPending !== undefined &&
+      typeof s.campaignFrogEncounterPending !== "boolean"
+    )
+      throw Error("Rencontre de la grenouille invalide.");
     const result = clone(s);
     result.hotbar ??= [...D.defaultHotbar];
     result.quests ??= { active: [], completed: [] };
@@ -354,6 +380,9 @@
       gameSeconds: 0,
       paused: false,
     };
+    result.rainelles ??= [];
+    result.rainelleNextId ??= 1;
+    result.campaignFrogEncounterPending ??= false;
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };

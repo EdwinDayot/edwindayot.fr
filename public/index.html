@@ -44,6 +44,14 @@
     <script src="/game/data-roles.js" defer></script>
     <script src="/game/progression.js" defer></script>
     <script src="/game/quests.js" defer></script>
+    <!-- Pre-existing gap found and fixed while verifying epic C2.3 in the browser: since C2.2,
+         garden-state-validate.js/garden-state-lifecycle.js read root.GardenCampaignClock
+         unconditionally (Clock.DEFAULT_ACTIVE_SECONDS/Clock.DAY_SECONDS) but this script was
+         never added here, so every browser page load threw before this fix (confirmed by
+         reproducing the same TypeError on commit 2a410b6, unmodified, via `git stash`) — Node
+         tests never caught it because tests require() campaign-clock.js directly. Must load
+         before garden-state-validate.js/-lifecycle.js below. -->
+    <script src="/game/campaign-clock.js" defer></script>
     <script src="/garden-state-util.js" defer></script>
     <script src="/garden-state-migrate.js" defer></script>
     <script src="/garden-state-validate.js" defer></script>
@@ -66,9 +74,14 @@
     <script src="/game/botany-hybrids.js" defer></script>
     <script src="/game/botany-pot.js" defer></script>
     <script src="/game/cultivars.js" defer></script>
+    <!-- Epic C2.3: rainelles.js (pure schema) must load before garden-state-cmd-f.js/-i.js, which
+         read root.GardenRainelles at script-execution time, same ordering requirement as
+         botany-genetics.js/-pot.js/cultivars.js above. -->
+    <script src="/game/rainelles.js" defer></script>
     <script src="/garden-state-cmd-f.js" defer></script>
     <script src="/garden-state-cmd-g.js" defer></script>
     <script src="/garden-state-cmd-h.js" defer></script>
+    <script src="/garden-state-cmd-i.js" defer></script>
     <script src="/game/save.js" defer></script>
     <script src="/garden-models.js" defer></script>
     <script src="/garden-models-leaf.js" defer></script>

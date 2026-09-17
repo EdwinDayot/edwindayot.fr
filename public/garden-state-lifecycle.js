@@ -100,6 +100,14 @@
         gameSeconds: 0,
         paused: false,
       },
+      // Epic C2.3: the first Rainelle is born the night a scripted frog encounter (armed by the
+      // triggerFrogEncounter command, garden-state-cmd-i.js) resolves against an actual pot
+      // draw, in "sleep" (garden-state-cmd-f.js). rainelles stays its own array, not folded into
+      // s.entities, same "rules before rendering" posture as specimens/cultivars above — no
+      // world placement or automation exists for a Rainelle yet.
+      rainelles: [],
+      rainelleNextId: 1,
+      campaignFrogEncounterPending: false,
     };
   }
   function migrate(old, now = Date.now()) {
