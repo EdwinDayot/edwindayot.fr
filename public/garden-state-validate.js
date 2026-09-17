@@ -22,6 +22,10 @@
     typeof module !== "undefined"
       ? require("./game/campaign-clock.js")
       : root.GardenCampaignClock;
+  const Rainelles =
+    typeof module !== "undefined"
+      ? require("./game/rainelles.js")
+      : root.GardenRainelles;
   function validate(s) {
     s = migrateLandscape(s);
     if (
@@ -348,7 +352,18 @@
             !r ||
             !/^r\d+$/.test(r.id) ||
             !s.cultivars?.some((c) => c.id === r.cultivarId) ||
-            typeof r.name !== "string",
+            typeof r.name !== "string" ||
+            (r.geste !== undefined &&
+              r.geste !== null &&
+              (typeof r.geste !== "object" ||
+                !Rainelles.VERBS.includes(r.geste.verbe) ||
+                typeof r.geste.poste !== "string" ||
+                !r.geste.poste ||
+                typeof r.geste.source !== "string" ||
+                !r.geste.source ||
+                typeof r.geste.destination !== "string" ||
+                !r.geste.destination ||
+                typeof r.geste.condition !== "string")),
         ))
     )
       throw Error("Rainelle invalide.");

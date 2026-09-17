@@ -52,6 +52,13 @@
          tests never caught it because tests require() campaign-clock.js directly. Must load
          before garden-state-validate.js/-lifecycle.js below. -->
     <script src="/game/campaign-clock.js" defer></script>
+    <!-- Epic C2.4: garden-state-validate.js now also reads root.GardenRainelles (VERBS, to
+         validate a taught geste) at script-execution time, so rainelles.js (pure schema, no
+         dependency of its own) must load before it here too — the same class of ordering bug
+         found and fixed for campaign-clock.js above while verifying C2.3 in the browser, caught
+         this time before commit rather than after. Still also loaded before garden-state-cmd-f.js/
+         -i.js/-j.js further below, which read it again at their own execution time. -->
+    <script src="/game/rainelles.js" defer></script>
     <script src="/garden-state-util.js" defer></script>
     <script src="/garden-state-migrate.js" defer></script>
     <script src="/garden-state-validate.js" defer></script>
@@ -74,14 +81,15 @@
     <script src="/game/botany-hybrids.js" defer></script>
     <script src="/game/botany-pot.js" defer></script>
     <script src="/game/cultivars.js" defer></script>
-    <!-- Epic C2.3: rainelles.js (pure schema) must load before garden-state-cmd-f.js/-i.js, which
-         read root.GardenRainelles at script-execution time, same ordering requirement as
-         botany-genetics.js/-pot.js/cultivars.js above. -->
-    <script src="/game/rainelles.js" defer></script>
+    <!-- rainelles.js itself now loads much earlier (before garden-state-validate.js, see the
+         C2.4 comment above) since validate.js needs it too; it remains before garden-state-cmd-
+         f.js/-i.js/-j.js below, which also read root.GardenRainelles at their own execution
+         time, same ordering requirement as botany-genetics.js/-pot.js/cultivars.js above. -->
     <script src="/garden-state-cmd-f.js" defer></script>
     <script src="/garden-state-cmd-g.js" defer></script>
     <script src="/garden-state-cmd-h.js" defer></script>
     <script src="/garden-state-cmd-i.js" defer></script>
+    <script src="/garden-state-cmd-j.js" defer></script>
     <script src="/game/save.js" defer></script>
     <script src="/garden-models.js" defer></script>
     <script src="/garden-models-leaf.js" defer></script>

@@ -177,7 +177,7 @@
   }
   GardenState.commandSegs = [];
   if (typeof module !== "undefined")
-    for (const k of ["a", "b", "c", "d", "e", "f", "g", "h", "i"]) {
+    for (const k of ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"]) {
       const M = require("./garden-state-cmd-" + k + ".js");
       Object.assign(GardenState.prototype, M);
       GardenState.commandSegs.push(...Object.values(M));

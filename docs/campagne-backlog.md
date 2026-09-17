@@ -102,7 +102,7 @@ Statut : fait (2026-09-17, voir docs/campagne.md et commit sur `maison-des-possi
 Dépend de : C2.3
 Critère de sortie : une Rainelle mémorise au plus un `{verbe, poste/zone, source, destination, condition}` à la fois ; réenseigner remplace intégralement l'ancien geste (jamais un ajout) ; un test tente d'assigner un second geste simultané et vérifie le refus/remplacement explicite.
 Fichiers probables : `public/game/rainelles.js`, `public/game/automation.js` (réutiliser `job`/`buffer` plutôt que dupliquer)
-Statut : todo
+Statut : fait (2026-09-17, voir docs/campagne.md et commit sur `maison-des-possibles`). En pratique aucun changement à `automation.js` (l'exécution du geste, C2.6+, n'est pas dans le périmètre de cet epic) : le champ `geste` vit sur l'entrée `rainelles.js`, et la commande vit dans un nouveau `public/garden-state-cmd-j.js` (`teachGesture`), sur le même patron que `renameCultivar`/`renameRainelle`.
 
 ### C2.5 — Enseignement en quatre moments
 Dépend de : C2.4
@@ -184,3 +184,4 @@ Saisons, extensions de maison, catalogue décoratif, chaînes avancées, tactile
 
 - 2026-09-17 — Démarrage. Branche `maison-des-possibles` créée depuis `main`. Choix de ne détailler que les phases 1 et 2 immédiatement, pour ne pas figer de décisions de contenu que ces deux phases doivent encore éclairer (voir principe « généraliser plutôt que spécialiser » dans `orchestration.md`).
 - 2026-09-17 — C2.2v (dépendances satisfaites : C2.2 fait) sauté au profit de C2.3 : son critère de sortie littéral suppose une scène « maison » de campagne et un point d'ancrage caméra que la phase 3 seule doit construire (déjà noté dans son propre statut « probablement à détailler avec le Cartographe »). L'implémenter maintenant aurait exigé d'inventer d'un bloc, sans passage par le Cartographe, un mode de jeu entier — même raisonnement que le report de C1.5 à C4.3. C2.3, elle, ne dépend que de C1.3/C2.2 (tous deux `fait`) et se réduit à une couche de règles pure (voir sa propre entrée).
+- 2026-09-17 — C2.2v sauté une nouvelle fois au profit de C2.4, pour la même raison exacte que la fois précédente (scène « maison » de campagne toujours absente, chantier de la phase 3) : ce n'est pas un nouvel arbitrage, seulement la reconfirmation que rien n'a changé depuis. C2.4 (dépendance C2.3, `fait`) est un epic de schéma pur, sans dépendance narrative ni de rendu cachée.
