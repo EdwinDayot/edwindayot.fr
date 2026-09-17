@@ -53,3 +53,27 @@ Nouveau `tests/campaign-genetics.cjs` (12 tests), ajouté à `package.json` : ch
 ```
 
 Aucun test navigateur ni visuel requis : aucun fichier de rendu touché.
+
+## Vérification locale du 17 septembre 2026 — horloge quotidienne de campagne (epic C2.1)
+
+Premier epic de la phase 2 (Jardin d'imitation). Pose l'horloge de jeu propre à la campagne (design §3, « Horloge, repos et alimentation ») — une journée 7h-23h distincte du cycle solaire purement visuel de 1200 secondes déjà utilisé par le jardin libre (`public/game/lighting.js`, non modifié) et du rattrapage hors ligne du jardin libre (`public/game/save.js`, non modifié). Le passage de nuit lui-même (transition, résolution du pot, retour à la maison) reste hors périmètre : c'est l'epic C2.2 qui suit.
+
+- Nouveau `public/game/campaign-clock.js` : `CampaignClock` pure, sans dépendance DOM (sur le même principe que `lighting.js`, qui documente déjà cette contrainte dans son en-tête). `activeSeconds` (24 minutes réelles par défaut, nommé, réglable) fixe la vitesse de l'horloge ; `DAY_SECONDS` dérive de `DAY_START_HOUR`/`DAY_END_HOUR` (7h/23h).
+- `tick(nowWallMs)` avance l'horloge de jeu à partir du temps réel écoulé depuis le tick précédent. Trois cas : pause active → 0 seconde créditée ; écart réel supérieur à `SUSPEND_GAP_MS` (5 s, un onglet masqué/fermé) → 0 seconde créditée, l'écart est **jeté**, jamais rattrapé au tick suivant ; sinon → avance proportionnelle au taux courant, plafonnée à 23h.
+- `pause()`/`resume(nowWallMs)`/`isPaused()` : `resume` réarme seulement le point de référence, ne crédite jamais l'intervalle passé en pause.
+- `isEveningReminderTime()` (vrai entre 22h30 et 23h) et `isNightfall()` (vrai à 23h et au-delà) : fonctions pures, l'affichage réel du rappel viendra avec l'interface (epics ultérieurs).
+- Nouveau `tests/campaign-clock.cjs` (8 tests), ajouté à `package.json` : une journée complète s'écoule en ~24 minutes réelles à 1 seconde de tolérance près, ticks 1 s pendant `DEFAULT_ACTIVE_SECONDS` pas ; l'horloge ne dépasse jamais 23h même si on continue de la faire avancer ; un `activeSeconds` personnalisé change le taux proportionnellement ; une pause gèle l'horloge sur un grand écart réel puis une reprise ne crédite pas l'intervalle passé en pause ; un grand écart réel entre deux ticks (onglet masqué) est traité comme une suspension et jeté, avec reprise normale ensuite ; le seuil de suspension est testé pile à la limite (créditée) et juste au-dessus (jetée) ; le rappel de 22h30 ne se déclenche ni avant ni après 23h ; une horloge neuve démarre à 7h non figée, et son tout premier `tick()` ne fait qu'établir le point de référence (0 seconde créditée).
+
+**Résultat réellement exécuté** : `npm test` → 152 tests de règles/géométrie passent (144 existants + 8 nouveaux, zéro régression), plus les vérifications HTML/site existantes.
+
+```
+ℹ tests 152
+ℹ suites 0
+ℹ pass 152
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+```
+
+Aucun test navigateur ni visuel requis : aucun fichier de rendu touché ; `campaign-clock.js` n'est pas encore chargé par `index.html`, il n'est utilisé que par ses tests Node pour l'instant (le câblage à l'interface et au rendu viendra avec les epics qui introduisent les écrans concernés).

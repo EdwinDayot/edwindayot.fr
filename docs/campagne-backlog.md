@@ -78,7 +78,7 @@ Porte de sortie (design §15) : *un joueur enseigne un geste sans guide externe 
 Dépend de : rien
 Critère de sortie : une journée de jeu va de 7h à 23h en ~24 minutes actives (réglable) ; dialogues/inventaire/construction/carnet/apprentissage mettent le temps en pause ; masquer/fermer l'onglet suspend la partie ; un rappel discret apparaît à 22h30 ; un test vérifie qu'une session pausée puis reprise n'a pas avancé l'horloge de simulation pendant la pause.
 Fichiers probables : nouveau `public/game/clock.js`, `public/game/lighting.js` (déjà porteur du cycle visuel, à distinguer explicitement de cette horloge de jeu)
-Statut : todo
+Statut : fait (2026-09-17, voir docs/campagne.md et commit sur `maison-des-possibles`). En pratique `public/game/campaign-clock.js` (pas `clock.js` : nommé pour rendre explicite qu'il s'agit de l'horloge de campagne, distincte de toute horloge future du jardin libre).
 
 ### C2.2 — Passage de nuit atomique
 Dépend de : C2.1
