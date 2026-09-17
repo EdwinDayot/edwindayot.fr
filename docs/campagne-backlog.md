@@ -1,0 +1,179 @@
+# Backlog de la campagne — file d'epics
+
+Source de vérité sur l'avancement. Voir [orchestration.md](orchestration.md) pour le processus, [game-design.md](game-design.md) pour la conception. Chaque epic a la taille d'une session d'agent, sur le modèle de ceux déjà livrés dans [garden.md](garden.md).
+
+## Gabarit d'un epic
+
+```
+### C<phase>.<n> — <titre court>
+Dépend de : <epics requis, ou « rien »>
+Critère de sortie : <ce qu'un test/parcours doit prouver, formulé comme un fait observable>
+Fichiers probables : <pointeurs>
+Statut : todo | en cours | bloqué (raison) | fait (date, lien commit)
+```
+
+Seules les deux phases immédiatement exécutables (1 et 2) sont détaillées jusqu'au dernier epic. Les phases 3 à 7 gardent un contour de plan de réalisation (repris de la section 15 du design) ; le Cartographe les détaille epic par epic seulement en approchant leur tour, pour ne pas figer des décisions que les phases précédentes doivent encore éclairer.
+
+---
+
+## Phase 1 — Laboratoire botanique
+
+Porte de sortie (design §15) : *le joueur reconnaît des caractères parentaux, cible un besoin et retrouve exactement son cultivar après rechargement.*
+
+### C1.1 — Schéma cultivar/spécimen
+Dépend de : rien
+Critère de sortie : le modèle de sauvegarde distingue espèce fondatrice (déjà `D.species` existant), cultivar (id stable, nom, `parentIds`, traits figés) et spécimen (référence à un cultivar + emplacement + stade) ; une sauvegarde v3 existante charge sans cultivar (liste vide) et sans erreur ; un test vérifie qu'un cultivar créé puis rechargé garde exactement les mêmes traits et le même id.
+Fichiers probables : `public/garden-state.js`, `public/garden-state-migrate.js`, nouveau `public/game/data-cultivars.js`
+Statut : todo
+
+### C1.2 — Grammaire des six premiers attributs
+Dépend de : C1.1
+Critère de sortie : chaque espèce fondatrice porte des valeurs sur les six axes retenus pour le premier prototype (port, feuilles, fleurs, palette, humidité préférée, fonction remarquable) ; une table de compatibilité déclare quelles paires d'espèces peuvent être croisées ; un test énumère toutes les paires déclarées compatibles et vérifie qu'aucune ne produit une combinaison invalide (ex. fonction sans support valide, cf. §4 « règles de compatibilité »).
+Fichiers probables : `public/game/data-species.js`, nouveau `public/game/botany-genetics.js`
+Statut : todo
+
+### C1.3 — Le pot : croisement, héritage par locus, résolution au réveil
+Dépend de : C1.2, C2.1 (l'horloge quotidienne doit exister pour qu'« une nuit » ait un sens)
+Critère de sortie : poser deux graines compatibles dans le pot et dormir produit un cultivar dont chaque locus discret vient bien de l'un des deux parents à probabilité égale (vérifié statistiquement sur un grand nombre de tirages, seed fixée pour la reproductibilité du test) ; le résultat est fixé et sauvegardé à la confirmation de l'essai — recharger la partie ne le tire pas une seconde fois ; une seule paire par nuit au départ.
+Fichiers probables : `public/garden-state-cmd-*.js` (nouveau segment), `public/game/botany-genetics.js`
+Statut : todo
+
+### C1.4 — Carnet de botanique
+Dépend de : C1.3
+Critère de sortie : après un réveil, l'interface montre filiation et différences par rapport aux parents ; le joueur peut nommer, conserver, mettre en réserve, donner ou composter le résultat ; la première conservation enregistre une graine mère de sécurité, récupérable gratuitement et sans valeur de revente dans la boîte de semences de la maison ; le carnet garde la découverte même si l'exemplaire est ensuite composté.
+Fichiers probables : `public/game/hud-panel.js`, nouveau panneau, `public/game/data-cultivars.js`
+Statut : todo
+
+### C1.5 — Épingler un caractère
+Dépend de : C1.4
+Critère de sortie : après le chapitre de botanique correspondant (voir C4.3), le joueur peut épingler un trait déjà observé chez un parent ; l'essai suivant garantit ce trait, les autres loci restent variables ; un test vérifie que 100 tirages avec un trait épinglé le conservent toujours et que les autres loci varient.
+Fichiers probables : `public/game/botany-genetics.js`
+Statut : todo
+
+### C1.6 — Multiplication fidèle
+Dépend de : C1.1
+Critère de sortie : multiplier un cultivar (bouture ou graine issue d'un spécimen déjà obtenu) crée un nouveau spécimen du même cultivar sans relancer aucun tirage ; un test compare les traits du spécimen source et du spécimen multiplié — identiques trait à trait.
+Fichiers probables : `public/garden-state-cmd-*.js`
+Statut : todo
+
+### C1.7 — Représentation modulaire des hybrides (rendu)
+Dépend de : C1.2 (schéma d'attributs stable), C1.3 (au moins un cultivar réel à afficher)
+Critère de sortie : le port fournit un squelette à points d'attache ; feuilles/fleurs/fruits proviennent d'une bibliothèque compatible avec le port du cultivar ; une graine visuelle déterministe (dérivée de l'id du cultivar) fixe la distribution des organes et reste identique entre deux sessions ; deux spécimens du même cultivar partagent géométrie/matériau (pas de doublon coûteux en triangles).
+Fichiers probables : `public/game/botany.js`, `public/garden-models.js`
+Statut : todo
+
+### C1.8 — Prototype visuel de validation
+Dépend de : C1.7
+Critère de sortie : six plantes fondatrices affichées à trois stades, croisements entre familles compatibles affichés côte à côte avec leurs parents ; capture Playwright vérifiant absence de pénétration de maillage grossière et cohérence d'échelle ; c'est la porte de sortie de la phase entière (design §15, ligne « ne pas produire les centaines de meubles avant que cette grammaire soit convaincante »).
+Fichiers probables : nouveau `tests/campaign-botany-visual.cjs`
+Statut : todo
+
+---
+
+## Phase 2 — Jardin d'imitation
+
+Porte de sortie (design §15) : *un joueur enseigne un geste sans guide externe ; une chaîne fonctionne, sature proprement puis redémarre.*
+
+### C2.1 — Horloge quotidienne
+Dépend de : rien
+Critère de sortie : une journée de jeu va de 7h à 23h en ~24 minutes actives (réglable) ; dialogues/inventaire/construction/carnet/apprentissage mettent le temps en pause ; masquer/fermer l'onglet suspend la partie ; un rappel discret apparaît à 22h30 ; un test vérifie qu'une session pausée puis reprise n'a pas avancé l'horloge de simulation pendant la pause.
+Fichiers probables : nouveau `public/game/clock.js`, `public/game/lighting.js` (déjà porteur du cycle visuel, à distinguer explicitement de cette horloge de jeu)
+Statut : todo
+
+### C2.2 — Passage de nuit atomique
+Dépend de : C2.1
+Critère de sortie : à 23h, l'action atomique en cours se termine, tout placement non validé est annulé sans coût, une transition ramène à la maison ; le jeu propose de confirmer le pot avant la transition ; le bilan de nuit est appliqué une seule fois, y compris après un rechargement en plein milieu de la résolution (test de non-double-crédit, dans l'esprit de `garden-living.cjs` existant) ; dormir plus tôt est autorisé et ne simule ni travail ni vente sur les heures sautées.
+Fichiers probables : `public/game/save.js`, `public/garden-state.js`
+Statut : todo
+
+### C2.3 — Apparition de la première Rainelle
+Dépend de : C1.3 (il faut un cultivar réel dans le pot), C2.2
+Critère de sortie : une nuit scénarisée où une grenouille tombe dans le pot pendant un essai produit, au matin, une Rainelle portant le feuillage du cultivar croisé cette nuit-là, sans perte du spécimen attendu (il reste aussi conservé normalement) ; la Rainelle a un prénom modifiable et un identifiant stable.
+Fichiers probables : nouveau `public/game/rainelles.js`
+Statut : todo
+
+### C2.4 — Schéma du geste unique
+Dépend de : C2.3
+Critère de sortie : une Rainelle mémorise au plus un `{verbe, poste/zone, source, destination, condition}` à la fois ; réenseigner remplace intégralement l'ancien geste (jamais un ajout) ; un test tente d'assigner un second geste simultané et vérifie le refus/remplacement explicite.
+Fichiers probables : `public/game/rainelles.js`, `public/game/automation.js` (réutiliser `job`/`buffer` plutôt que dupliquer)
+Statut : todo
+
+### C2.5 — Enseignement en quatre moments
+Dépend de : C2.4
+Critère de sortie : « Regarde-moi » suspend le temps ; une démonstration réelle ou assistée au poste est capturée ; le jeu propose une phrase de geste modifiable par le joueur ; un essai montre la trajectoire prévue avant confirmation ; démontrer une fois permet d'enseigner ensuite le même geste à une autre Rainelle par une répétition courte, sans refaire tout le tutoriel.
+Fichiers probables : `public/game/hud-panel.js`, `public/game/rainelles.js`
+Statut : todo
+
+### C2.6 — Gestes Arroser et Récolter
+Dépend de : C2.5
+Critère de sortie : une Rainelle enseignée à arroser remplit son arrosoir à la borne du poste puis humidifie les plantes de la zone sans intervention ; une Rainelle enseignée à récolter dépose les productions mûres dans le panier adjacent ; les deux réutilisent les primitives génériques `job`/`buffer` déjà présentes dans `automation.js` plutôt que d'en créer de nouvelles.
+Fichiers probables : `public/game/automation.js`, `public/game/rainelles.js`
+Statut : todo
+
+### C2.7 — Geste Transporter
+Dépend de : C2.6
+Critère de sortie : une Rainelle transporteuse déplace les productions d'un panier A vers un panier B selon un filtre de ressource, avec un seul trajet actif à la fois ; enchaîner arrosage → récolte → transport sans intervention manuelle fait circuler une ressource de bout en bout dans un test.
+Fichiers probables : `public/game/rainelles.js`
+Statut : todo
+
+### C2.8 — Réservations et états de blocage
+Dépend de : C2.6
+Critère de sortie : une ressource et un emplacement de sortie sont réservés avant le départ d'une Rainelle, empêchant deux Rainelles de prendre la même cible ; si la cible disparaît, la réservation se libère et l'objet déjà porté rejoint un bac de secours identifié ; les sept états (au travail/stock atteint/source vide/sortie pleine/passage bloqué/poste manquant/repos) sont exposés avec une phrase d'action, sur le modèle des diagnostics déjà existants dans `irrigation-status.js`.
+Fichiers probables : nouveau `public/game/rainelles-status.js`
+Statut : todo
+
+### C2.9 — Mode d'observation
+Dépend de : C2.8
+Critère de sortie : une vue dédiée montre chemins, transferts et cadence par journée ; elle permet de suivre un objet du plant au présentoir et de lancer un cycle pas à pas, sans modifier la simulation en cours d'observation.
+Fichiers probables : `public/game/hud-world.js`
+Statut : todo
+
+### C2.10 — Refus de multiplication, réenseignement gratuit
+Dépend de : C2.4
+Critère de sortie : aucune commande ne permet à une Rainelle de multiplier une autre Rainelle ni elle-même ; le refus est un événement explicite (pas un silence), montré dès la première tentative ; réenseigner un geste ne coûte rien et remplace proprement l'ancien (déjà couvert en partie par C2.4, ce epic ajoute le côté narratif du refus).
+Fichiers probables : `public/game/rainelles.js`
+Statut : todo
+
+### C2.11 — Chaîne de validation « fraises de la cuisine »
+Dépend de : C2.7, C2.8, C2.10
+Critère de sortie : la chaîne complète décrite en §5 du design (eau → arroseuse → fraisiers → récolteuse → panier → transporteuse → réserve de cuisine) fonctionne sans intervention manuelle sur une durée de test représentant plusieurs jours simulés, sature proprement quand la réserve est pleine, puis redémarre seule quand elle se vide. C'est la porte de sortie de la phase.
+Fichiers probables : nouveau `tests/campaign-rainelles-chain.cjs`
+Statut : todo
+
+---
+
+## Phase 3 — Tranche verticale
+
+Porte de sortie (design §15) : *habiter, croiser, organiser, rencontrer fonctionnent ensemble en une courte partie sauvegardable.*
+
+Assemble les phases 1 et 2 avec : maison refuge minimale (réparation lit/table/réchaud), une serre, un coin de village, deux habitants, deux Rainelles, trois nuits jouées, une première quête d'outil. Ne pas détailler epic par epic avant que la phase 2 soit close — la forme exacte de la maison et des quêtes dépend de ce que les phases 1 et 2 auront réellement livré.
+
+## Phase 4 — Première version jouable (actes I à III)
+
+Porte de sortie : *l'arc « retour puis ouverture au village » se conclut sans dépendre de contenu annoncé mais absent.*
+
+Chapitres 1 à 9 du design (§10). Comprend notamment l'epic **C4.3 — chapitre 3, première hybridation et épinglage montré par Iris**, dont dépend C1.5 ci-dessus : à détailler en ouvrant cette phase.
+
+## Phase 5 — Prototype du retournement
+
+Porte de sortie : *les joueurs comprennent les effets des veilleuses/prélèvements/repos ; le scénario distingue une partie attentive d'une partie intensive.*
+
+Design §11 : mémoire factuelle bornée, trois leviers d'intensification, une scène de culpabilité et sa réparation. À expérimenter tôt avec peu de contenu (design §15, dernier paragraphe de la table) — ne pas attendre la phase 6 pour la tester.
+
+## Phase 6 — Campagne complète (actes IV à VI)
+
+Porte de sortie : *tous les parcours narratifs concluent sans imposer l'exploitation ni inventer une faute.*
+
+Chapitres 10 à 18, autres lieux, personnages restants, enjeux de disponibilité, épilogues à trois orientations.
+
+## Phase 7 — Profondeur et finition
+
+Porte de sortie : *ajouts validés sur parties réelles ; confort, accès et performances tenus sur les appareils de référence.*
+
+Saisons, extensions de maison, catalogue décoratif, chaînes avancées, tactile, optimisation, histoires secondaires (§10 fin).
+
+---
+
+## Journal des décisions d'orchestration
+
+- 2026-09-17 — Démarrage. Branche `maison-des-possibles` créée depuis `main`. Choix de ne détailler que les phases 1 et 2 immédiatement, pour ne pas figer de décisions de contenu que ces deux phases doivent encore éclairer (voir principe « généraliser plutôt que spécialiser » dans `orchestration.md`).
