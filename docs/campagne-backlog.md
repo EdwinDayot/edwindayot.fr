@@ -30,7 +30,7 @@ Statut : fait (2026-09-17, voir docs/campagne.md et commit sur `maison-des-possi
 Dépend de : C1.1
 Critère de sortie : chaque espèce fondatrice porte des valeurs sur les six axes retenus pour le premier prototype (port, feuilles, fleurs, palette, humidité préférée, fonction remarquable) ; une table de compatibilité déclare quelles paires d'espèces peuvent être croisées ; un test énumère toutes les paires déclarées compatibles et vérifie qu'aucune ne produit une combinaison invalide (ex. fonction sans support valide, cf. §4 « règles de compatibilité »).
 Fichiers probables : `public/game/data-species.js`, nouveau `public/game/botany-genetics.js`
-Statut : todo
+Statut : fait (2026-09-17, voir docs/campagne.md et commit sur `maison-des-possibles`). Écart volontaire, justifié dans le changelog : n'étend pas `data-species.js` (catalogue réel du jardin libre, sans rapport avec la flore fictive de Rivebrume) — `botany-genetics.js` porte son propre catalogue des huit espèces fondatrices du design §4.
 
 ### C1.3 — Le pot : croisement, héritage par locus, résolution au réveil
 Dépend de : C1.2, C2.1 (l'horloge quotidienne doit exister pour qu'« une nuit » ait un sens)
