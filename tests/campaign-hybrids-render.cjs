@@ -159,3 +159,65 @@ test("a real hybrid trait set (not just a founder) also builds and stays determi
   assert.deepEqual(serializeOrgans(a), serializeOrgans(b));
   assert.ok(allFinite(a));
 });
+
+// Epic C1.8 (docs/campagne-backlog.md) — growth stages. Default (no stage argument) must stay
+// byte-identical to C1.7's own output, since none of the tests above ever pass one.
+test("omitting the stage argument reproduces C1.7's exact mature output (backward compatible default)", () => {
+  const founder = Genetics.founders.find((f) => f.traits.fleurs && f.traits.feuilles);
+  const noArg = Hybrids.buildSpecimenGroup({ id: founder.id, traits: founder.traits });
+  const explicitMature = Hybrids.buildSpecimenGroup({ id: founder.id, traits: founder.traits }, Hybrids.MATURE_STAGE);
+  assert.deepEqual(serializeOrgans(noArg), serializeOrgans(explicitMature));
+  assert.equal(noArg.scale.x, 1);
+  assert.equal(noArg.userData.stage, Hybrids.MATURE_STAGE);
+});
+
+test("an unknown stage is refused explicitly, not silently clamped", () => {
+  const founder = Genetics.founders[0];
+  assert.throws(() => Hybrids.buildSpecimenGroup({ id: founder.id, traits: founder.traits }, 99), /unknown stage/);
+  assert.throws(() => Hybrids.buildSpecimenGroup({ id: founder.id, traits: founder.traits }, -1), /unknown stage/);
+});
+
+test("each of the three stages scales the group up strictly monotonically toward maturity", () => {
+  const founder = Genetics.founders[0];
+  const scales = [];
+  for (let stage = 0; stage < Hybrids.STAGE_COUNT; stage++) {
+    const g = Hybrids.buildSpecimenGroup({ id: founder.id, traits: founder.traits }, stage);
+    scales.push(g.scale.x);
+  }
+  assert.equal(scales.length, 3, "prototype requires exactly three stages");
+  for (let i = 1; i < scales.length; i++) assert.ok(scales[i] > scales[i - 1], `stage ${i} not larger than stage ${i - 1}`);
+  assert.equal(scales[scales.length - 1], 1, "mature stage must be full scale (unchanged from C1.7)");
+});
+
+test("no founder blooms before the mature stage; every flowering founder blooms at maturity", () => {
+  for (const f of Genetics.founders) {
+    for (let stage = 0; stage < Hybrids.MATURE_STAGE; stage++) {
+      const g = Hybrids.buildSpecimenGroup({ id: f.id, traits: f.traits }, stage);
+      assert.equal(g.userData.organs.filter((o) => o.kind === "flower").length, 0, `${f.id} stage ${stage} should not bloom yet`);
+    }
+    const mature = Hybrids.buildSpecimenGroup({ id: f.id, traits: f.traits }, Hybrids.MATURE_STAGE);
+    const flowerCount = mature.userData.organs.filter((o) => o.kind === "flower").length;
+    if (f.traits.fleurs) assert.ok(flowerCount > 0, `${f.id} should bloom at maturity`);
+  }
+});
+
+test("the youngest stage has a visibly sparser canopy than maturity (fewer leaf organs)", () => {
+  for (const f of Genetics.founders.filter((f) => f.traits.feuilles)) {
+    const seedling = Hybrids.buildSpecimenGroup({ id: f.id, traits: f.traits }, 0);
+    const mature = Hybrids.buildSpecimenGroup({ id: f.id, traits: f.traits }, Hybrids.MATURE_STAGE);
+    const seedlingLeaves = seedling.userData.organs.filter((o) => o.kind === "leaf").length;
+    const matureLeaves = mature.userData.organs.filter((o) => o.kind === "leaf").length;
+    assert.ok(seedlingLeaves < matureLeaves, `${f.id}: seedling (${seedlingLeaves}) not sparser than mature (${matureLeaves})`);
+  }
+});
+
+test("all three stages stay deterministic and free of non-finite vertices for every founder", () => {
+  for (const f of Genetics.founders) {
+    for (let stage = 0; stage < Hybrids.STAGE_COUNT; stage++) {
+      const a = Hybrids.buildSpecimenGroup({ id: f.id, traits: f.traits }, stage);
+      const b = Hybrids.buildSpecimenGroup({ id: f.id, traits: f.traits }, stage);
+      assert.deepEqual(serializeOrgans(a), serializeOrgans(b), `${f.id} stage ${stage} not deterministic`);
+      assert.ok(allFinite(a), `${f.id} stage ${stage}: non-finite vertex position found`);
+    }
+  }
+});

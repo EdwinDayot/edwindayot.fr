@@ -17,6 +17,14 @@ const TRANSPARENT_ALLOWLIST = [
 (async () => {
   const browser = await chromium.launch({
     headless: true,
+    // This environment's PLAYWRIGHT_BROWSERS_PATH only carries a Chromium revision that
+    // predates the one playwright@1.63.0 (package-lock.json) expects for its default headless
+    // shell; the pre-installed /opt/pw-browsers/chromium binary is the documented fallback for
+    // this exact situation (see the session's own environment notes), so it is preferred when
+    // present rather than left to Playwright's revision resolution.
+    executablePath: require("node:fs").existsSync("/opt/pw-browsers/chromium")
+      ? "/opt/pw-browsers/chromium"
+      : undefined,
     args:
       process.platform === "darwin"
         ? ["--use-angle=" + (process.env.GARDEN_ANGLE || "metal")]

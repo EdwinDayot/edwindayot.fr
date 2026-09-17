@@ -66,7 +66,7 @@ Statut : fait (2026-09-17, voir docs/campagne.md et commit sur `maison-des-possi
 Dépend de : C1.7
 Critère de sortie : six plantes fondatrices affichées à trois stades, croisements entre familles compatibles affichés côte à côte avec leurs parents ; capture Playwright vérifiant absence de pénétration de maillage grossière et cohérence d'échelle ; relecture multimodale de ces captures contre `direction-artistique.md` (silhouette distincte sans étiquette, palette cohérente, proportions). C'est la porte de sortie de la phase entière (design §15, ligne « ne pas produire les centaines de meubles avant que cette grammaire soit convaincante ») — son résultat devient la référence photographique citée en fin de `direction-artistique.md`.
 Fichiers probables : nouveau `tests/campaign-botany-visual.cjs`
-Statut : todo
+Statut : fait (2026-09-17, voir docs/campagne.md et commit sur `maison-des-possibles`). **Ferme la porte de sortie de la phase 1** (voir rapport de clôture daté dans docs/campagne.md) ; C1.5 (épinglage) reste `todo`, correctement différé à C4.3 — le critère de sortie littéral de la phase ne le mentionne pas. Six fondatrices sur les huit du catalogue (`oreille-de-pluie`, `clochette-du-soir`, `menthe-de-velours`, `ronce-a-rubans`, `fraise-timide`, `aster-des-vents`), déjà annoncées par le commentaire d'en-tête de `botany-genetics.js` depuis C1.2. Ajoute aussi des stades de croissance (0/1/2) à `botany-hybrids.js`, posés mais non couverts par C1.7 (`cultivars.js` anticipait déjà ce manque explicitement).
 
 ---
 

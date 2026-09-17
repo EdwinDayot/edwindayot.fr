@@ -17,7 +17,16 @@
    recomputed per specimen — "un cultivar = une signature visuelle réutilisée" (direction-
    artistique.md). No canvas/texture dependency anywhere in this file: colors only, so it loads
    and runs identically in a plain Node vm sandbox against public/vendor/three.min.js (see
-   tests/campaign-hybrids-render.cjs) without stubbing `document`, unlike garden-models-leaf.js. */
+   tests/campaign-hybrids-render.cjs) without stubbing `document`, unlike garden-models-leaf.js.
+
+   Epic C1.8 (docs/campagne-backlog.md) adds growth stages: `stage` is an optional second
+   argument to buildSpecimenGroup, 0..STAGE_COUNT-1, matching the integer already stored on a
+   persisted specimen (public/game/cultivars.js: "stage 0 is a freshly planted cutting/seedling
+   ... later epics (C1.7/C1.8) attach a rendered form per stage"). Default stays the last stage
+   (mature) so every existing call site/test written against C1.7 -- none of which pass a stage
+   -- is byte-for-byte unaffected: same organs, same attach points, group.scale left at 1.
+   Younger stages scale the whole group down (STAGE_SCALE) and thin the canopy (sparser leaves,
+   no flowers before maturity) rather than inventing a second geometry set per stage. */
 (function (root) {
   const T = root.THREE;
   if (!T) return;
@@ -209,7 +218,12 @@
           // Shallow bowl: catches and holds water (Oreille-de-pluie, retenir_eau).
           return new T.SphereGeometry(0.13, 10, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2);
         case "fine":
-          return new T.ConeGeometry(0.032, 0.3, 6);
+          // Widened from the original 0.032 (C1.7) to 0.055 during C1.8's own multimodal review:
+          // at that radius the founders using this shape (clochette-du-soir, aster-des-vents —
+          // both tige-dressée) read as an almost bare stem at silhouette distance, exactly the
+          // limitation C1.7's changelog flagged and asked C1.8 to check. Still narrower than
+          // "ronde" (0.1) — a thin leaf, not a redesign of the shape.
+          return new T.ConeGeometry(0.055, 0.3, 6);
         case "ronde":
           return new T.SphereGeometry(0.1, 10, 8);
         case "palmee":
@@ -259,7 +273,10 @@
           // Open cone pointing down, like a bell.
           return new T.ConeGeometry(0.07, 0.11, 8, 1, true);
         case "etoile":
-          return new T.ConeGeometry(0.025, 0.1, 5);
+          // Same C1.8 widening as the "fine" leaf above and for the same reason: a lone
+          // (non-groupée) étoile flower, e.g. on fraise-timide, was nearly invisible at
+          // silhouette distance. Still narrower than "cloche" (0.07).
+          return new T.ConeGeometry(0.045, 0.1, 5);
         case "epi":
           return new T.SphereGeometry(0.035, 8, 6);
         default:
@@ -292,13 +309,23 @@
     return group;
   }
 
+  // Growth stages (epic C1.8): a uniform scale applied to the whole finished group, plus a
+  // thinner canopy at the two younger stages. Index STAGE_COUNT-1 ("mature") is the default and
+  // reproduces C1.7's output exactly (scale 1, full leaves, flowers if the cultivar has any).
+  const STAGE_SCALE = [0.38, 0.68, 1];
+  const STAGE_COUNT = STAGE_SCALE.length;
+  const MATURE_STAGE = STAGE_COUNT - 1;
+
   // Builds one specimen's Group for a cultivar-shaped object ({id, traits}), matching the trait
-  // shape produced by botany-genetics.js founders / botany-pot.js draws / cultivars.js. Two
-  // calls with the same id place identical organs (deterministic seed) but return distinct
-  // Group instances, sharing the underlying geometry/material objects.
-  function buildSpecimenGroup(cultivar) {
+  // shape produced by botany-genetics.js founders / botany-pot.js draws / cultivars.js, at the
+  // given growth stage (0..STAGE_COUNT-1, defaults to mature). Two calls with the same id AND
+  // stage place identical organs (deterministic seed) but return distinct Group instances,
+  // sharing the underlying geometry/material objects.
+  function buildSpecimenGroup(cultivar, stage = MATURE_STAGE) {
     const { id, traits } = cultivar;
     if (!id) throw new Error("cultivar id required");
+    const scaleFactor = STAGE_SCALE[stage];
+    if (scaleFactor == null) throw new Error(`unknown stage: ${stage}`);
     const rng = mulberry32(seedFromId(id));
 
     const leafMat = organMaterial(traits.palette.dominante1, 0.46);
@@ -309,8 +336,11 @@
     group.add(structure);
     const organs = [];
 
+    // Youngest stage: only every other attach point carries a leaf, for a visibly sparser
+    // seedling canopy rather than a scaled-down copy of the mature plant.
     if (traits.feuilles) {
       attachPoints.forEach((ap, i) => {
+        if (stage === 0 && i % 2 === 1) return;
         const azimuth = i * GOLDEN_ANGLE + (rng() - 0.5) * 0.6;
         const tilt = 0.9 + (rng() - 0.5) * 0.4;
         const organ = buildLeafOrgan(traits.feuilles, leafMat, azimuth, tilt, rng);
@@ -320,7 +350,10 @@
       });
     }
 
-    if (traits.fleurs) {
+    // Flowers only at maturity: a young plant that hasn't bloomed yet, per design §3's growth
+    // vocabulary (seed/sprout/foliage bands already used by render-frame.js for the free
+    // garden) — never a smaller flower, always simply absent before MATURE_STAGE.
+    if (traits.fleurs && stage === MATURE_STAGE) {
       const accentMat = organMaterial(
         traits.palette.accent || traits.palette.dominante1,
         0.3,
@@ -338,7 +371,8 @@
       });
     }
 
-    group.userData = { cultivarId: id, organs, attachPoints };
+    group.scale.setScalar(scaleFactor);
+    group.userData = { cultivarId: id, organs, attachPoints, stage };
     return group;
   }
 
@@ -348,6 +382,8 @@
     seedFromId,
     mulberry32,
     PORT_PROFILES,
+    STAGE_COUNT,
+    MATURE_STAGE,
     buildSpecimenGroup,
   };
   if (typeof module !== "undefined") module.exports = api;
