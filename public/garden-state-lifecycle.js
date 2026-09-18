@@ -10,6 +10,10 @@
     typeof module !== "undefined"
       ? require("./game/campaign-clock.js")
       : root.GardenCampaignClock;
+  const House =
+    typeof module !== "undefined"
+      ? require("./game/campaign-house.js")
+      : root.GardenCampaignHouse;
   function fresh(now) {
     return {
       version: 3,
@@ -131,6 +135,10 @@
         zoneNextId: 1,
         panierNextId: 1,
       },
+      // Epic C3.1: the refuge house's six named spaces (design §6), delabre/locked by default
+      // except the reception room (locked: false, still delabre — see campaign-house.js's own
+      // header comment for why unlocked and repaired are kept distinct).
+      campaignHouse: House.freshHouse(),
     };
   }
   function migrate(old, now = Date.now()) {

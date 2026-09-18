@@ -62,6 +62,9 @@
     <!-- Epic C2.6a: campaign-stations.js's registry is read by garden-state-validate.js just
          below, same reason rainelles.js/campaign-clock.js load before it. -->
     <script src="/game/campaign-stations.js" defer></script>
+    <!-- Epic C3.1: campaign-house.js's SPACES/freshHouse are read by garden-state-lifecycle.js/
+         garden-state-validate.js just below, same reason as campaign-stations.js above. -->
+    <script src="/game/campaign-house.js" defer></script>
     <!-- Moved here from much further below (epic C2.6c): cultivars.js has no dependency of its
          own (pure schema, like rainelles.js/campaign-stations.js above), but garden-state-
          validate.js has read root.GardenCultivars since C2.6b without this script ever loading
@@ -118,6 +121,7 @@
     <script src="/garden-state-cmd-i.js" defer></script>
     <script src="/garden-state-cmd-j.js" defer></script>
     <script src="/garden-state-cmd-k.js" defer></script>
+    <script src="/garden-state-cmd-l.js" defer></script>
     <script src="/game/save.js" defer></script>
     <script src="/garden-models.js" defer></script>
     <script src="/garden-models-leaf.js" defer></script>

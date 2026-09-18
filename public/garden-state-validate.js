@@ -34,6 +34,10 @@
     typeof module !== "undefined"
       ? require("./game/cultivars.js")
       : root.GardenCultivars;
+  const House =
+    typeof module !== "undefined"
+      ? require("./game/campaign-house.js")
+      : root.GardenCampaignHouse;
   // Epic C2.6c: only read here for its CYCLE_SECONDS bound on a persisted rainelle.job.remaining
   // (see campaign-automation.js's own header comment on that constant) — never for validate()'s
   // own control flow, so this stays a pure sibling of the Cultivars/Rainelles/Stations reads
@@ -514,6 +518,25 @@
           throw Error("Identifiants de station invalides.");
       }
     }
+    // Epic C3.1: when present, campaignHouse must already carry all six named spaces (no
+    // partial-object migration here — the whole registry is introduced by this epic, so an
+    // older save simply lacks the field entirely and gets House.freshHouse() below).
+    if (
+      s.campaignHouse !== undefined &&
+      (typeof s.campaignHouse !== "object" ||
+        s.campaignHouse === null ||
+        typeof s.campaignHouse.spaces !== "object" ||
+        s.campaignHouse.spaces === null ||
+        House.SPACE_IDS.some((id) => {
+          const space = s.campaignHouse.spaces[id];
+          return (
+            !space ||
+            !["delabre", "repare"].includes(space.status) ||
+            typeof space.locked !== "boolean"
+          );
+        }))
+    )
+      throw Error("Maison refuge invalide.");
     const result = clone(s);
     result.hotbar ??= [...D.defaultHotbar];
     result.quests ??= { active: [], completed: [] };
@@ -568,6 +591,7 @@
         ...p,
       }),
     );
+    result.campaignHouse ??= House.freshHouse();
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };
