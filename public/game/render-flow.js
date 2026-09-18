@@ -93,7 +93,7 @@
           m = this.zoneModels[z.id];
         m.gate.visible = !open && z.id !== 0;
         m.group.children[0].material.color.setHex(
-          open ? [0xaabd8c, 0x91ab80, 0xc4c591, 0xbec0a1][z.id] : 0xa4b29a,
+          open ? D.zoneGroundColors[z.id] : 0xa4b29a,
         );
       }
       for (const r of s.resources) {

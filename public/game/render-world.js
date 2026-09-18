@@ -267,7 +267,7 @@
         this.scene.add(group);
         const ground = new T.Mesh(
           this.groundGeometry(z.polygon),
-          M.mat([0xaabd8c, 0x91ab80, 0xc4c591, 0xbec0a1][z.id], { vertexColors: true }),
+          M.mat(D.zoneGroundColors[z.id], { vertexColors: true }),
         );
         // Le relief est lisible par deux couches : l'ombre cuite en couleurs de
         // sommet (voir groundGeometry) est l'indicateur permanent ; l'auto-ombre

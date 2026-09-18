@@ -55,7 +55,11 @@
         },
       ],
       links: [],
-      unlocked: [0],
+      // Zone 4 ("Le coin de village", Épic C3.5) is always unlocked like
+      // zone0: it has no cost/rep gate of its own (data-world.js), and it
+      // only borders zone0, so a locked-by-default zone4 would be an
+      // unreachable island whenever zone1/2/3 are still locked.
+      unlocked: [0, 4],
       discovered: ["pilea", "monstera", "calathea"],
       reputation: 0,
       trades: 0,

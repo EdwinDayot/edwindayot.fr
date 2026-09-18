@@ -21,7 +21,7 @@ const url = process.env.GARDEN_URL || "http://127.0.0.1:4174/";
     // Dedicated rendering fixture: freeze simulation and sway to isolate distance/zoom from growth.
     const result = await p.evaluate(() => {
       const g = new GardenRules.GardenState();
-      g.s.unlocked = [0, 1, 2, 3];
+      g.s.unlocked = GardenData.zones.map((z) => z.id);
       g.s.entities = GardenData.species.map((sp, i) => ({
         id: "e" + (i + 1),
         type: "pot",

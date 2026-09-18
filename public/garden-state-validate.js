@@ -147,7 +147,7 @@
         "Réseau invalide : substances incompatibles reliées ensemble.",
       );
     for (const [key, allowed] of [
-      ["unlocked", [0, 1, 2, 3]],
+      ["unlocked", [0, 1, 2, 3, 4]],
       ["discovered", D.species.map((p) => p.id)],
       ["plans", Object.keys(D.recipes)],
       ["botanyRewards", [3, 6, 9, 12]],

@@ -156,9 +156,13 @@ test("Épic 4.1: placement is still rejected once past the polygon's real contou
   const g = new GardenState(null, 1000);
   g.s.inventory.clay = 2;
   g.s.inventory.wood = 1;
-  // Far past the north bulge: outside the whole map, not just the old rectangle.
+  // Far past every zone, including zone4 (Épic C3.5, north of zone0): outside
+  // the whole map, not just the old rectangle. (-6, 23) used to be this point
+  // before zone4 claimed it — it's now inside zone4 and no longer a useful
+  // "outside everything" example.
   assert.equal(
-    g.command({ type: "place", item: "pot", fabricate: true, x: -6, z: 23 }).ok,
+    g.command({ type: "place", item: "pot", fabricate: true, x: 100, z: 100 })
+      .ok,
     false,
   );
   // Just past zone0's shared west border (x=-16): must resolve as zone1

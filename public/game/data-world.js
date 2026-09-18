@@ -80,7 +80,38 @@
       cost: { coins: 45, wood: 8, stone: 8 },
       rep: 8,
     },
+    // Épic C3.5: a fifth zone, directly north of la pépinière, sharing its
+    // exact north edge (same three points as zone0's own polygon there) so
+    // the border has neither gap nor overlap, on the same "shared edges stay
+    // straight, only the outer edge bulges" convention as the four zones
+    // above. Always unlocked (cost: {}), like zone0: a locked-by-default
+    // zone would fail the existing "every visitor is reachable from the
+    // portal on a fresh save" test (tests/garden-construction.cjs), since
+    // reaching it would require crossing a still-locked zone1/2/3 first —
+    // this zone borders only zone0, the one zone always open from the start.
+    {
+      id: 4,
+      name: "Le coin de village",
+      bounds: [-16, 4, 22, 34],
+      polygon: [
+        [-16, 19],
+        [-6, 22],
+        [4, 19],
+        [4, 34],
+        [-6, 38],
+        [-16, 34],
+      ],
+      light: "ombre",
+      humidity: 1,
+      gate: [-6, 23],
+      cost: {},
+      rep: 0,
+    },
   ];
+  // One ground tint per zone, indexed by z.id. Shared between render-world.js
+  // (buildZones) and render-flow.js (open/locked recoloring) so a future zone
+  // only needs one new entry here, not two literals kept in lockstep.
+  const zoneGroundColors = [0xaabd8c, 0x91ab80, 0xc4c591, 0xbec0a1, 0x9dbbac];
   const mining = {
     wood: {
       tool: "axe",
@@ -151,11 +182,20 @@
     wateringMoisture: 45,
   };
   P.zones = zones;
+  P.zoneGroundColors = zoneGroundColors;
   P.mining = mining;
   P.tools = tools;
   P.labels = labels;
   P.itemName = itemName;
   P.balance = balance;
   if (typeof module !== "undefined")
-    module.exports = { zones, mining, tools, labels, itemName, balance };
+    module.exports = {
+      zones,
+      zoneGroundColors,
+      mining,
+      tools,
+      labels,
+      itemName,
+      balance,
+    };
 })(globalThis);
