@@ -33,6 +33,17 @@
     panier: { collection: "paniers", prefix: "pn", counter: "panierNextId" },
   };
 
+  // Epic C2.8 (design §5, "Conditions, réservations et lecture des blocages" : "le réglage
+  // avancé d'un panier définit un minimum et un maximum"). No command sets these yet (no UI to
+  // drive one, same "posed, not wired" gap as buffer at C2.6c) — every panier starts at this
+  // pair of defaults. DEFAULT_PANIER_CAPACITY reuses the free garden's own collector reserve
+  // (D.recipes.collector.capacity = 24, garden-structure.md's "réserve de 24 productions") as
+  // the closest existing precedent for "how much a produce-holding container can hold" rather
+  // than inventing an unrelated number; DEFAULT_PANIER_MIN is 0 (no protected floor by default —
+  // a panier only protects a reserve once someone deliberately raises its minimum).
+  const DEFAULT_PANIER_CAPACITY = 24;
+  const DEFAULT_PANIER_MIN = 0;
+
   // Epic C2.6c: a panier additionally carries a `buffer` (item id -> qty), the same shape as
   // automation.js's `e.buffer` (design §5's "récolter... dépose dans un panier"). Only paniers
   // get it — a borne/zone never holds produce — set at creation here rather than defaulted
@@ -42,9 +53,20 @@
     const def = KINDS[kind];
     if (!def) throw Error(`Type de station inconnu : "${kind}".`);
     const station = { id: `${def.prefix}${registry[def.counter]++}`, x, z };
-    if (kind === "panier") station.buffer = {};
+    if (kind === "panier") {
+      station.buffer = {};
+      station.capacity = DEFAULT_PANIER_CAPACITY;
+      station.min = DEFAULT_PANIER_MIN;
+    }
     registry[def.collection].push(station);
     return station;
+  }
+
+  // Total items currently held by a panier, across every resource key — the single number both
+  // the capacity ceiling and the min floor are compared against (design §5 names both as whole-
+  // panier settings, not per-resource ones).
+  function panierTotal(panier) {
+    return Object.values(panier.buffer).reduce((n, qty) => n + qty, 0);
   }
 
   // Pure lookup, never a silent `undefined`: an unknown id always comes back as an explicit
@@ -57,7 +79,14 @@
     return { ok: false, error: `Identifiant de station inconnu : "${id}".` };
   }
 
-  const api = { KINDS, registerStation, resolveStation };
+  const api = {
+    KINDS,
+    DEFAULT_PANIER_CAPACITY,
+    DEFAULT_PANIER_MIN,
+    registerStation,
+    resolveStation,
+    panierTotal,
+  };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenCampaignStations = api;
 })(globalThis);

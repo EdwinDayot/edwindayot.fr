@@ -109,18 +109,31 @@
   // the free garden's `${product}:${species}` item ids, D.species[].product), so the cultivar
   // itself is the closest stable identity a panier can tally against; a later epic that adds a
   // real product concept can re-key this without touching the buffer shape itself.
+  //
+  // Epic C2.8 (design §5, "un emplacement de sortie [est] réservé avant le départ" / "sortie
+  // pleine"): once `panier.capacity` is reached, further specimens simply stay readyToProduce —
+  // never harvested, never lost — until room frees up (a later transporter run, or the player).
+  // This is the whole reservation this epic needs for récolter: `s.rainelles` is ticked
+  // strictly in array order (tickRainelle's own caller, garden-state.js's tick()), so two
+  // récolteuses sharing a zone/panier in the very same tick can never both count the same unit
+  // of headroom — the first to run already updated `panier.buffer` before the second reads it.
   function tickRecolter(rainelle, s) {
     const geste = rainelle.geste;
     const zone = resolveKind(s, geste.poste, "zone");
     const panier = resolveKind(s, geste.destination, "panier");
     if (!zone || !panier) return;
     if (!advanceCycle(rainelle)) return;
+    // Tracked incrementally rather than re-summing Stations.panierTotal(panier) on every
+    // specimen: same result, without an O(buffer keys) reduce per specimen visited this cycle.
+    let total = Stations.panierTotal(panier);
     for (const specimen of s.specimens) {
       if (!Cultivars.isMature(specimen) || !specimen.readyToProduce) continue;
       if (C.distance(zone, specimen) > ZONE_WORK_RANGE) continue;
+      if (total >= panier.capacity) break;
       panier.buffer[specimen.cultivarId] =
         (panier.buffer[specimen.cultivarId] || 0) + 1;
       Cultivars.setReadyToProduce(specimen, false);
+      total++;
     }
   }
 
@@ -141,6 +154,23 @@
   // "transporter" names only a source panier and a destination panier), so
   // validateGestureFields's blanket "poste ne peut pas être vide" is a schema-wide rule this verb
   // simply has nothing to do with, not a field this tick behaviour forgot to use.
+  // Epic C2.8 (design §5, "un emplacement de sortie [est] réservé avant le départ" and "stock
+  // sous le seuil" as a condition equipment can expose): a single trajet now respects two limits
+  // at once, both counted against `Stations.panierTotal` (whole-panier, not per-resource — see
+  // that function's own comment) —
+  //   - the destination's `capacity`: never deliver past it ("sortie pleine").
+  //   - the source's `min`: never drain it below its protected floor ("stock cible atteint" —
+  //     design's own example is a présentoir whose seuil "évite de vider la réserve
+  //     alimentaire"). DEFAULT_PANIER_MIN is 0, so this is a no-op until some future command
+  //     raises a panier's min above zero.
+  // `budget` is the largest amount this trajet may move in total this cycle, combining both
+  // limits; each filtered key is moved up to what's left of that shared budget, then the budget
+  // shrinks — so a trajet that would blow either limit moves only as much as it safely can
+  // ("un blocage arrête proprement la production, sans détruire le stock", design §5) rather
+  // than moving everything and overshooting, or moving nothing at all when a partial move is
+  // safe. Reservation-by-construction: exactly like tickRecolter above, s.rainelles ticks in
+  // array order, so two transporteuses racing for the same headroom in one tick never double-
+  // count it — the first to run has already updated both paniers' buffers.
   function tickTransporter(rainelle, s) {
     const geste = rainelle.geste;
     const from = resolveKind(s, geste.source, "panier");
@@ -148,11 +178,23 @@
     if (!from || !to || from === to) return;
     if (!advanceCycle(rainelle)) return;
     const keys = geste.condition ? [geste.condition] : Object.keys(from.buffer);
+    const roomAtDestination = Math.max(
+      0,
+      to.capacity - Stations.panierTotal(to),
+    );
+    const takeableFromSource = Math.max(
+      0,
+      Stations.panierTotal(from) - from.min,
+    );
+    let budget = Math.min(roomAtDestination, takeableFromSource);
     for (const key of keys) {
-      const qty = from.buffer[key] || 0;
+      if (budget <= 0) break;
+      const qty = Math.min(from.buffer[key] || 0, budget);
       if (qty <= 0) continue;
       to.buffer[key] = (to.buffer[key] || 0) + qty;
-      delete from.buffer[key];
+      from.buffer[key] -= qty;
+      if (from.buffer[key] <= 0) delete from.buffer[key];
+      budget -= qty;
     }
   }
 

@@ -412,6 +412,199 @@ test("chain: arroser then recolter then transporter carries a real resource end 
   assert.equal(cuisine.buffer[cultivarId], 1);
 });
 
+// Epic C2.8 (design §5, "Conditions, réservations et lecture des blocages"): panier.capacity/
+// min are now enforced before campaign-automation.js mutates any buffer — see that file's own
+// header comment on tickRecolter/tickTransporter for why this is the whole "reservation" this
+// epic needs (s.rainelles ticks strictly in array order, so two Rainelles sharing a target in
+// the very same tick can never both count the same unit of headroom).
+
+test("recolter: a full destination panier stops harvesting cleanly — nothing lost, specimen stays ready", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+  });
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  panier.capacity = 1;
+  const a = Cultivars.createSpecimen(g.s, {
+    cultivarId,
+    x: 0,
+    z: 0,
+    stage: Cultivars.MATURE_STAGE,
+  });
+  const b = Cultivars.createSpecimen(g.s, {
+    cultivarId,
+    x: 0,
+    z: 1,
+    stage: Cultivars.MATURE_STAGE,
+  });
+  teach(rainelle, {
+    verbe: "recolter",
+    poste: zone.id,
+    source: "peu-importe",
+    destination: panier.id,
+  });
+  g.step(CYCLE);
+  // Both a/b become ready on the readiness pass, but the panier can only ever hold one.
+  assert.equal(panier.buffer[cultivarId], 1);
+  assert.equal(Stations.panierTotal(panier), 1);
+  const stillReady = [a, b].filter((sp) => sp.readyToProduce);
+  assert.equal(stillReady.length, 1, "the specimen that didn't fit stays ready, never lost");
+});
+
+test("recolter: two récolteuses sharing a zone and a nearly-full panier never overshoot capacity in the same tick", () => {
+  const g = new GardenState(null, 1000);
+  const first = bornRainelle(g);
+  const cultivarId = first.cultivarId;
+  const second = Rainelles.createRainelle(g.s, { cultivarId, name: "Deuxième" });
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+  });
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  panier.capacity = 1;
+  Cultivars.createSpecimen(g.s, {
+    cultivarId,
+    x: 0,
+    z: 0,
+    stage: Cultivars.MATURE_STAGE,
+  });
+  Cultivars.createSpecimen(g.s, {
+    cultivarId,
+    x: 0,
+    z: 1,
+    stage: Cultivars.MATURE_STAGE,
+  });
+  teach(first, {
+    verbe: "recolter",
+    poste: zone.id,
+    source: "peu-importe",
+    destination: panier.id,
+  });
+  teach(second, {
+    verbe: "recolter",
+    poste: zone.id,
+    source: "peu-importe",
+    destination: panier.id,
+  });
+  g.step(CYCLE);
+  assert.equal(Stations.panierTotal(panier), 1);
+});
+
+test("transporter: a full destination blocks the trajet entirely, leaving the source untouched", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const from = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  const to = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  from.buffer[cultivarId] = 3;
+  to.buffer.other = to.capacity; // destination already full (default capacity 24)
+  teach(rainelle, {
+    verbe: "transporter",
+    poste: "peu-importe",
+    source: from.id,
+    destination: to.id,
+    condition: cultivarId,
+  });
+  g.step(CYCLE);
+  assert.equal(from.buffer[cultivarId], 3);
+  assert.equal(to.buffer[cultivarId], undefined);
+});
+
+test("transporter: a partially-full destination moves only as much as fits, splitting the trajet safely", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const from = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  const to = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  from.buffer[cultivarId] = 5;
+  to.buffer.other = 22; // capacity 24 (default) minus 22 already there = room for 2
+  teach(rainelle, {
+    verbe: "transporter",
+    poste: "peu-importe",
+    source: from.id,
+    destination: to.id,
+    condition: cultivarId,
+  });
+  g.step(CYCLE);
+  assert.equal(from.buffer[cultivarId], 3);
+  assert.equal(to.buffer[cultivarId], 2);
+  assert.equal(Stations.panierTotal(to), 24);
+});
+
+test("transporter: a protected source min never gets drained below its floor", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const from = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  const to = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  from.buffer[cultivarId] = 5;
+  from.min = 2;
+  teach(rainelle, {
+    verbe: "transporter",
+    poste: "peu-importe",
+    source: from.id,
+    destination: to.id,
+    condition: cultivarId,
+  });
+  g.step(CYCLE);
+  assert.equal(from.buffer[cultivarId], 2);
+  assert.equal(to.buffer[cultivarId], 3);
+  assert.equal(Stations.panierTotal(from), 2);
+});
+
+test("transporter: a source already at or below its min moves nothing, blocking cleanly", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const from = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  const to = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  from.buffer[cultivarId] = 2;
+  from.min = 2;
+  teach(rainelle, {
+    verbe: "transporter",
+    poste: "peu-importe",
+    source: from.id,
+    destination: to.id,
+    condition: cultivarId,
+  });
+  g.step(CYCLE);
+  assert.equal(from.buffer[cultivarId], 2);
+  assert.equal(to.buffer[cultivarId], undefined);
+});
+
 test("the three remaining out-of-scope verbs (replanter/preparer/trier) never crash and never start a job", () => {
   for (const verbe of ["replanter", "preparer", "trier"]) {
     const g = new GardenState(null, 1000);

@@ -37,7 +37,15 @@ test("registerStation assigns a stable, kind-prefixed id and appends to the righ
   assert.deepEqual(zone, { id: "z1", x: 3, z: 4 });
   // Epic C2.6c: a panier also carries an empty buffer at creation (design §5's "récolter...
   // dépose dans un panier"; see campaign-stations.js's own comment on registerStation).
-  assert.deepEqual(panier, { id: "pn1", x: 5, z: 6, buffer: {} });
+  // Epic C2.8: capacity/min too (design §5's "réglage avancé... minimum et maximum").
+  assert.deepEqual(panier, {
+    id: "pn1",
+    x: 5,
+    z: 6,
+    buffer: {},
+    capacity: Stations.DEFAULT_PANIER_CAPACITY,
+    min: Stations.DEFAULT_PANIER_MIN,
+  });
   assert.deepEqual(registry.bornes, [borne]);
   assert.deepEqual(registry.zones, [zone]);
   assert.deepEqual(registry.paniers, [panier]);
@@ -194,6 +202,60 @@ test("validate rejects a malformed registry: bad id prefix, duplicate id, non-fi
   staleCounter.campaignStations.paniers.push({ id: "pn5", x: 0, z: 0 });
   staleCounter.campaignStations.panierNextId = 5;
   assert.throws(() => validate(staleCounter));
+});
+
+test("validate rejects a panier with a non-positive capacity, or a min outside [0, capacity]", () => {
+  const base = () => {
+    const g = new GardenState(null, 1000);
+    Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+    return g.serialize();
+  };
+
+  const zeroCapacity = base();
+  zeroCapacity.campaignStations.paniers[0].capacity = 0;
+  assert.throws(() => validate(zeroCapacity), /Registre de stations invalide/);
+
+  const negativeCapacity = base();
+  negativeCapacity.campaignStations.paniers[0].capacity = -5;
+  assert.throws(() => validate(negativeCapacity), /Registre de stations invalide/);
+
+  const negativeMin = base();
+  negativeMin.campaignStations.paniers[0].min = -1;
+  assert.throws(() => validate(negativeMin), /Registre de stations invalide/);
+
+  const minAboveCapacity = base();
+  minAboveCapacity.campaignStations.paniers[0].capacity = 10;
+  minAboveCapacity.campaignStations.paniers[0].min = 11;
+  assert.throws(() => validate(minAboveCapacity), /Registre de stations invalide/);
+
+  // min === capacity is legal (a panier that must always stay exactly full to keep its floor).
+  const minEqualsCapacity = base();
+  minEqualsCapacity.campaignStations.paniers[0].capacity = 10;
+  minEqualsCapacity.campaignStations.paniers[0].min = 10;
+  assert.doesNotThrow(() => validate(minEqualsCapacity));
+});
+
+test("a pre-C2.8 panier without capacity/min migrates to the same defaults registerStation now sets", () => {
+  const g = new GardenState(null, 1000);
+  Stations.registerStation(g.s.campaignStations, "panier", { x: 1, z: 1 });
+  const saved = g.serialize();
+  delete saved.campaignStations.paniers[0].capacity;
+  delete saved.campaignStations.paniers[0].min;
+  const migrated = validate(saved);
+  assert.equal(
+    migrated.campaignStations.paniers[0].capacity,
+    Stations.DEFAULT_PANIER_CAPACITY,
+  );
+  assert.equal(
+    migrated.campaignStations.paniers[0].min,
+    Stations.DEFAULT_PANIER_MIN,
+  );
+});
+
+test("panierTotal sums every resource key in a panier's buffer", () => {
+  const panier = { buffer: { a: 3, b: 5 } };
+  assert.equal(Stations.panierTotal(panier), 8);
+  assert.equal(Stations.panierTotal({ buffer: {} }), 0);
 });
 
 test("teachGesture/demonstrateGesture behave identically whether campaignStations is empty or populated — unchanged by this epic", () => {

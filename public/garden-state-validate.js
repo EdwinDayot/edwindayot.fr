@@ -489,6 +489,21 @@
           )
         )
           throw Error("Registre de stations invalide.");
+        // Epic C2.8: capacity/min are optional so a pre-epic panier still loads (defaulted just
+        // below, same posture as buffer at C2.6c); when present, both must be finite, capacity
+        // strictly positive (a zero-capacity panier could never receive anything, a degenerate
+        // state no command can express) and min within [0, capacity] (a floor above the ceiling
+        // could never be satisfied).
+        if (
+          kind === "panier" &&
+          list.some(
+            (st) =>
+              (st.capacity !== undefined && !finite(st.capacity, 1, Infinity)) ||
+              (st.min !== undefined &&
+                !finite(st.min, 0, st.capacity ?? Infinity)),
+          )
+        )
+          throw Error("Registre de stations invalide.");
         if (!count(s.campaignStations[counter]))
           throw Error("Registre de stations invalide.");
         if (
@@ -541,10 +556,17 @@
       zoneNextId: 1,
       panierNextId: 1,
     };
-    // Epic C2.6c: buffer migrates per panier, same reasoning — a pre-epic (C2.6a) panier only
-    // lacks this one field; bornes/zones never had one to begin with.
+    // Epic C2.6c/C2.8: buffer/capacity/min migrate per panier, same reasoning — a pre-epic
+    // panier only lacks these fields; bornes/zones never had any of them to begin with.
+    // DEFAULT_PANIER_CAPACITY/MIN mirror exactly what registerStation itself now sets on a
+    // freshly created panier, so a migrated pre-epic panier and a brand-new one start identical.
     result.campaignStations.paniers = (result.campaignStations.paniers ?? []).map(
-      (p) => ({ buffer: {}, ...p }),
+      (p) => ({
+        buffer: {},
+        capacity: Stations.DEFAULT_PANIER_CAPACITY,
+        min: Stations.DEFAULT_PANIER_MIN,
+        ...p,
+      }),
     );
     return result;
   }
