@@ -18,6 +18,11 @@ const RANGE = CampaignAutomation.ZONE_WORK_RANGE;
 // Only the scripted frog encounter (C2.3) can create a Rainelle — and its own cultivar — through
 // commands. Same fixture already used by tests/campaign-teaching.cjs/-gestures.cjs.
 function bornRainelle(g) {
+  // Epic C4.4: triggerFrogEncounter now refuses until a cultivar already exists ("après les
+  // apprentissages nécessaires", design §10 chapitre 4) — this unrelated warm-up cross satisfies
+  // that real precondition before the scripted encounter itself.
+  g.command({ type: "sowPot", a: "ronce-a-rubans", b: "fraise-timide" });
+  g.command({ type: "sleep" });
   g.command({ type: "triggerFrogEncounter" });
   g.command({ type: "sowPot", a: "ronce-a-rubans", b: "fraise-timide" });
   g.command({ type: "sleep" });

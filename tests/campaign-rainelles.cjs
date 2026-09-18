@@ -7,6 +7,20 @@ const { GardenState, validate } = require("./garden-rules-helpers.cjs");
 // quête perdue"), and a Rainelle carrying that same cultivar's foliage is additionally created,
 // with a stable id and a modifiable name. No rendering/automation yet — this is the rules layer
 // only, same posture as C1.1/C1.6 before their own rendering epics.
+//
+// Epic C4.4 (design §10, chapitre 4, "après les apprentissages nécessaires") gates
+// triggerFrogEncounter on a cultivar already existing — see tests/campaign-chapter4.cjs for that
+// guard's own dedicated tests. Every fixture below that arms the encounter therefore resolves one
+// unrelated warm-up cross first, exactly as a real playthrough now must (the botany chapters,
+// already `fait`, come before this one) — a real, mechanical precondition, not a test-only
+// shortcut, so cultivars.length is 2 (not 1) once the frog's own cultivar resolves.
+function warmUpCultivar(g) {
+  assert.equal(
+    g.command({ type: "sowPot", a: "ronce-a-rubans", b: "fraise-timide" }).ok,
+    true,
+  );
+  assert.equal(g.command({ type: "sleep" }).ok, true);
+}
 
 test("A fresh save starts with no Rainelle and no pending encounter", () => {
   const g = new GardenState(null, 1000);
@@ -17,6 +31,7 @@ test("A fresh save starts with no Rainelle and no pending encounter", () => {
 
 test("triggerFrogEncounter arms the pending flag; a second attempt is refused explicitly", () => {
   const g = new GardenState(null, 1000);
+  warmUpCultivar(g);
   const r1 = g.command({ type: "triggerFrogEncounter" });
   assert.equal(r1.ok, true);
   assert.equal(g.s.campaignFrogEncounterPending, true);
@@ -27,6 +42,7 @@ test("triggerFrogEncounter arms the pending flag; a second attempt is refused ex
 
 test("A scripted night with a real trial creates the cultivar exactly as usual, plus a Rainelle carrying its foliage", () => {
   const g = new GardenState(null, 1000);
+  warmUpCultivar(g);
   assert.equal(g.command({ type: "triggerFrogEncounter" }).ok, true);
   assert.equal(
     g.command({ type: "sowPot", a: "ronce-a-rubans", b: "fraise-timide" }).ok,
@@ -34,19 +50,20 @@ test("A scripted night with a real trial creates the cultivar exactly as usual, 
   );
   const r = g.command({ type: "sleep" });
   assert.equal(r.ok, true);
-  assert.equal(g.s.cultivars.length, 1, "the pot resolution itself is unaffected");
+  assert.equal(g.s.cultivars.length, 2, "the pot resolution itself is unaffected (warm-up + this night's)");
   assert.equal(g.s.rainelles.length, 1);
   assert.equal(g.s.rainelles[0].id, "r1");
   assert.equal(
     g.s.rainelles[0].cultivarId,
-    g.s.cultivars[0].id,
-    "the Rainelle carries the foliage of the cultivar crossed that same night",
+    g.s.cultivars[1].id,
+    "the Rainelle carries the foliage of the cultivar crossed that same night, not the warm-up one",
   );
   assert.equal(g.s.campaignFrogEncounterPending, false, "consumed once resolved");
 });
 
 test("An armed encounter on an empty night (nothing sown) carries over, never lost, never duplicated", () => {
   const g = new GardenState(null, 1000);
+  warmUpCultivar(g);
   assert.equal(g.command({ type: "triggerFrogEncounter" }).ok, true);
   assert.equal(g.command({ type: "sleep" }).ok, true, "an empty night still resolves normally");
   assert.equal(g.s.rainelles.length, 0, "no trial happened, so no Rainelle yet");
@@ -63,6 +80,7 @@ test("An armed encounter on an empty night (nothing sown) carries over, never lo
 
 test("Only ever the first Rainelle this way: triggerFrogEncounter refuses once one already exists", () => {
   const g = new GardenState(null, 1000);
+  warmUpCultivar(g);
   assert.equal(g.command({ type: "triggerFrogEncounter" }).ok, true);
   assert.equal(
     g.command({ type: "sowPot", a: "ronce-a-rubans", b: "fraise-timide" }).ok,
@@ -78,6 +96,7 @@ test("Only ever the first Rainelle this way: triggerFrogEncounter refuses once o
 
 test("renameRainelle persists a real name and rejects an unknown id or an empty name", () => {
   const g = new GardenState(null, 1000);
+  warmUpCultivar(g);
   g.command({ type: "triggerFrogEncounter" });
   g.command({ type: "sowPot", a: "ronce-a-rubans", b: "fraise-timide" });
   g.command({ type: "sleep" });
@@ -97,6 +116,7 @@ test("renameRainelle persists a real name and rejects an unknown id or an empty 
 
 test("A real JSON reload keeps the Rainelle's id, cultivarId and name identical", () => {
   const g = new GardenState(null, 1000);
+  warmUpCultivar(g);
   g.command({ type: "triggerFrogEncounter" });
   g.command({ type: "sowPot", a: "ronce-a-rubans", b: "fraise-timide" });
   g.command({ type: "sleep" });
@@ -134,10 +154,11 @@ test("A v3 save without rainelles/rainelleNextId/campaignFrogEncounterPending mi
 
 test("Malformed rainelles entries are rejected", () => {
   const g = new GardenState(null, 1000);
+  warmUpCultivar(g);
   g.command({ type: "triggerFrogEncounter" });
   g.command({ type: "sowPot", a: "ronce-a-rubans", b: "fraise-timide" });
   g.command({ type: "sleep" });
-  const cultivarId = g.s.cultivars[0].id;
+  const cultivarId = g.s.rainelles[0].cultivarId;
   const bad = [
     [{ id: "notR1", cultivarId, name: "" }],
     [{ id: "r1", cultivarId: "c999", name: "" }],
@@ -155,6 +176,7 @@ test("Malformed rainelles entries are rejected", () => {
 
 test("A rainelleNextId collision is rejected, a correction accepted", () => {
   const g = new GardenState(null, 1000);
+  warmUpCultivar(g);
   g.command({ type: "triggerFrogEncounter" });
   g.command({ type: "sowPot", a: "ronce-a-rubans", b: "fraise-timide" });
   g.command({ type: "sleep" });

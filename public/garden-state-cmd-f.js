@@ -23,6 +23,10 @@
     typeof module !== "undefined"
       ? require("./game/rainelles.js")
       : root.GardenRainelles;
+  const Narrative =
+    typeof module !== "undefined"
+      ? require("./game/data-narrative.js")
+      : root.GardenNarrative;
   const M = {
     commandSegF(c, ctx, st) {
       const { s, fail } = st;
@@ -81,6 +85,14 @@
         if (frogCultivarId) {
           Rainelles.createRainelle(s, { cultivarId: frogCultivarId, name: "" });
           s.campaignFrogEncounterPending = false;
+          // Epic C4.4: the "traces mouillées" text (design §10, chapitre 4) only ever fires here,
+          // the exact night the encounter actually resolves into a real Rainelle — never at
+          // triggerFrogEncounter (arming), never on a night that only carries the flag over.
+          const revealed = Narrative.pendingReveal(
+            s.campaignFlags,
+            "frogEncounterResolved",
+          );
+          if (revealed) s.campaignFlags.push(revealed.id);
         }
         // Epic C3.4: every bourgeon harvestBud already deposited resolves here, exactly once,
         // the same "posed, then resolved at the next sleep" pattern as campaignPot.pending just

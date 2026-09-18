@@ -42,6 +42,19 @@
       title: "Iris et l’épinglage",
       text: "Un caractère déjà vu peut être fixé, pas seulement observé — regarde où la ressemblance ne bouge pas.",
     },
+    // Epic C4.4 (design §10, chapitre 4) : révélée quand la rencontre scénarisée avec la
+    // grenouille se résout réellement (garden-state-cmd-f.js, "sleep" — le même soir que le
+    // croisement qui donne son feuillage à la Rainelle), jamais à l'armement (triggerFrogEncounter)
+    // ni sur une nuit où l'essai n'a rien résolu. Le design décrit la scène en prose ("Au matin, le
+    // joueur suit des traces mouillées jusqu'à un arrosoir déplacé.") sans la citer entre
+    // guillemets comme la note de C4.3 — reformulation fidèle à la même image, même écart
+    // documenté que "iris-epinglage" (C4.3) quand aucune citation exacte n'existe.
+    "traces-mouillees": {
+      id: "traces-mouillees",
+      trigger: "frogEncounterResolved",
+      title: "Traces mouillées",
+      text: "Au matin, des traces mouillées mènent jusqu’à un arrosoir déplacé.",
+    },
   };
 
   function findByTrigger(signal) {
