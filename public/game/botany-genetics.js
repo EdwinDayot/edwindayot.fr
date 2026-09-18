@@ -179,6 +179,10 @@
     traitCombinationValid,
     crossCompatible,
     enumerateReachableTraitSets,
+    // Epic C1.5 (pinning a trait): exposes the same fixed six-axis order used internally above
+    // and by botany-pot.js, so a pin can be validated against real axis names without a second,
+    // possibly-diverging list.
+    AXES,
   };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenGenetics = api;

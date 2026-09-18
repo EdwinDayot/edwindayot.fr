@@ -48,7 +48,7 @@ Statut : fait (2026-09-17, voir docs/campagne.md et commit sur `maison-des-possi
 Dépend de : C1.4
 Critère de sortie : après le chapitre de botanique correspondant (voir C4.3), le joueur peut épingler un trait déjà observé chez un parent ; l'essai suivant garantit ce trait, les autres loci restent variables ; un test vérifie que 100 tirages avec un trait épinglé le conservent toujours et que les autres loci varient.
 Fichiers probables : `public/game/botany-genetics.js`
-Statut : todo (sauté ce déclenchement au profit de C1.6 : sa dépendance réelle inclut C4.3 — « Iris montre comment épingler un caractère déjà vu », design l.383 — qui vit en phase 4, pas encore détaillée ; implémenter le déverrouillage maintenant aurait forcé à inventer un contenu narratif hors ordre, ce que `orchestration.md` interdit explicitement pour les dépendances d'implémentation, pas seulement narratives)
+Statut : fait (2026-09-18, voir docs/campagne.md et commit sur `maison-des-possibles`). En pratique dans un nouveau `public/game/botany-pot.js` (`resolvePotDraw` gagne un quatrième paramètre optionnel `pin`) + nouveau `public/garden-state-cmd-o.js` (commande `pinTrait`, gate `s.campaignFlags.includes("iris-epinglage")`, révélé par `meetIris`/C4.3 — sa dépendance réelle, désormais satisfaite) + extension additive de `sowPot` (`garden-state-cmd-f.js`) qui consomme et attache `s.campaignPin` à la paire posée, jamais `botany-genetics.js` lui-même (qui gagne seulement l'export `AXES`, déjà interne, pour que la validation et le tirage partagent la même liste plutôt que d'en dupliquer une seconde).
 
 ### C1.6 — Multiplication fidèle
 Dépend de : C1.1

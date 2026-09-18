@@ -38,6 +38,12 @@
     typeof module !== "undefined"
       ? require("./game/campaign-house.js")
       : root.GardenCampaignHouse;
+  // Epic C1.5: read here to validate a pinned trait (AXES/founders), both on s.campaignPin
+  // itself and on an optional pin attached to a pending campaignPot entry below.
+  const Genetics =
+    typeof module !== "undefined"
+      ? require("./game/botany-genetics.js")
+      : root.GardenGenetics;
   // Epic C2.6c: only read here for its CYCLE_SECONDS bound on a persisted rainelle.job.remaining
   // (see campaign-automation.js's own header comment on that constant) — never for validate()'s
   // own control flow, so this stays a pure sibling of the Cultivars/Rainelles/Stations reads
@@ -303,6 +309,17 @@
         Math.max(...s.cultivars.map((c) => Number(c.id.slice(1))))
     )
       throw Error("Identifiants de cultivar invalides.");
+    // Epic C1.5: a pending pair may carry an optional pin, {axis, speciesId}, consumed from
+    // s.campaignPin by sowPot (garden-state-cmd-f.js) — same validity rule as s.campaignPin
+    // itself below, plus the constraint sowPot already enforces at the moment it attaches one
+    // (speciesId must actually be one of that pair's own a/b).
+    const validPendingPin = (p) =>
+      p.pin === undefined ||
+      (typeof p.pin === "object" &&
+        p.pin !== null &&
+        Genetics.AXES.includes(p.pin.axis) &&
+        Genetics.founders.some((f) => f.id === p.pin.speciesId) &&
+        (p.pin.speciesId === p.a || p.pin.speciesId === p.b));
     if (
       s.campaignPot !== undefined &&
       (typeof s.campaignPot !== "object" ||
@@ -312,10 +329,23 @@
         !Array.isArray(s.campaignPot.pending) ||
         s.campaignPot.pending.length > s.campaignPot.capacity ||
         s.campaignPot.pending.some(
-          (p) => !p || typeof p.a !== "string" || typeof p.b !== "string",
+          (p) =>
+            !p ||
+            typeof p.a !== "string" ||
+            typeof p.b !== "string" ||
+            !validPendingPin(p),
         ))
     )
       throw Error("Pot invalide.");
+    // Epic C1.5: the single trait pinned for the next sowPot, or none.
+    if (
+      s.campaignPin !== undefined &&
+      s.campaignPin !== null &&
+      (typeof s.campaignPin !== "object" ||
+        !Genetics.AXES.includes(s.campaignPin.axis) ||
+        !Genetics.founders.some((f) => f.id === s.campaignPin.speciesId))
+    )
+      throw Error("Épingle invalide.");
     if (
       s.campaignSeedBox !== undefined &&
       (typeof s.campaignSeedBox !== "object" ||
@@ -679,6 +709,8 @@
     result.campaignHouse.furnitureMarks ??= null;
     result.campaignTools ??= [];
     result.campaignFlags ??= [];
+    // Epic C1.5: a pre-epic save simply has no pin awaiting its next sowPot.
+    result.campaignPin ??= null;
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };

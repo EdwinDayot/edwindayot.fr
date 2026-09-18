@@ -166,6 +166,9 @@
       // list of strings, same shape as campaignTools just above but a distinct namespace (never
       // merged with it: a tool id and a text id answer different questions).
       campaignFlags: [],
+      // Epic C1.5: the single pinned trait awaiting its next sowPot, or none. Consumed (attached
+      // to the pending pair, then cleared) by sowPot itself — see garden-state-cmd-f.js/-o.js.
+      campaignPin: null,
     };
   }
   function migrate(old, now = Date.now()) {

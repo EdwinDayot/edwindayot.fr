@@ -94,6 +94,14 @@
          loaded here anyway, right after its last dependency, to avoid the exact class of missing-
          script bug documented above for campaign-clock.js/rainelles.js/cultivars.js. -->
     <script src="/game/rainelles-status.js" defer></script>
+    <!-- Epic C1.5: moved here from much further below (its previous position after garden-
+         state-cmd-e.js): garden-state-validate.js now also reads root.GardenGenetics (AXES,
+         founders, to validate a pinned trait) at script-execution time, the same ordering fix
+         already applied to campaign-clock.js/rainelles.js/campaign-stations.js/campaign-house.js/
+         cultivars.js above. No dependency of its own (pure catalog). Still also loaded before
+         botany-pot.js/garden-state-cmd-f.js/-o.js further below, which read it again at their own
+         execution time. -->
+    <script src="/game/botany-genetics.js" defer></script>
     <script src="/garden-state-util.js" defer></script>
     <script src="/garden-state-migrate.js" defer></script>
     <script src="/garden-state-validate.js" defer></script>
@@ -104,12 +112,12 @@
     <script src="/garden-state-cmd-c.js" defer></script>
     <script src="/garden-state-cmd-d.js" defer></script>
     <script src="/garden-state-cmd-e.js" defer></script>
-    <!-- Campaign layer (docs/campagne-backlog.md phase 1). botany-genetics/botany-pot must load
-         before garden-state-cmd-f.js, which reads root.GardenGenetics/GardenPot/GardenCultivars
-         at script-execution time (cultivars.js itself now loads much earlier, see the C2.6c
-         comment above). C1.1-C1.3 had proven this purely in Node; wiring it into the live page is
-         completed here, as a prerequisite for C1.4's notebook commands. -->
-    <script src="/game/botany-genetics.js" defer></script>
+    <!-- Campaign layer (docs/campagne-backlog.md phase 1). botany-pot must load before garden-
+         state-cmd-f.js, which reads root.GardenGenetics/GardenPot/GardenCultivars at script-
+         execution time (cultivars.js itself now loads much earlier, see the C2.6c comment above;
+         botany-genetics.js itself now loads much earlier too, see the C1.5 comment above). C1.1-
+         C1.3 had proven this purely in Node; wiring it into the live page is completed here, as a
+         prerequisite for C1.4's notebook commands. -->
     <!-- Epic C1.7: modular rendering of hybrid cultivars, kept apart from botany-genetics.js
          (data) the same way botany.js/garden-models*.js render the free garden's own species —
          no dependency on GardenGenetics at load time, only THREE, so its only ordering
@@ -135,6 +143,9 @@
     <!-- Epic C4.1: garden-state-cmd-n.js reads root.GardenCampaignHouse/root.GardenNarrative at
          its own execution time, both loaded much earlier above. -->
     <script src="/garden-state-cmd-n.js" defer></script>
+    <!-- Epic C1.5: garden-state-cmd-o.js reads root.GardenGenetics at its own execution time,
+         loaded much earlier above (see the C1.5 comment there). -->
+    <script src="/garden-state-cmd-o.js" defer></script>
     <script src="/game/save.js" defer></script>
     <script src="/garden-models.js" defer></script>
     <script src="/garden-models-leaf.js" defer></script>
