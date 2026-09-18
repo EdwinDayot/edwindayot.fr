@@ -27,7 +27,19 @@
    drift between the two entry points. defaultPhrase/plannedTrajectory are pure, verb-agnostic
    text/data generators standing in for "le jeu propose une phrase... un essai montre la
    trajectoire" — proven here as data, never rendered (no campaign HUD/world hookup exists yet to
-   display them against, same gap C2.2 left for C2.2v). */
+   display them against, same gap C2.2 left for C2.2v).
+
+   Epic C2.10 ("Refus de multiplication, réenseignement gratuit", design §5 « Multiplication et vie
+   propre ») makes the exclusion of `multiplier` from VERBS an explicit, narrated refusal instead of
+   the same generic "Geste inconnu." any other invalid verb string gets — design's own words, "cette
+   limite est montrée dès les premières tentatives : elles protègent leur bourgeon, puis reprennent
+   tranquillement leur activité", is a distinct in-fiction beat, not an unhandled-input error. Since
+   validateGestureFields is already the single gate shared by teachGesture (C2.4) and
+   demonstrateGesture (C2.5), special-casing it here covers both entry points by construction —
+   there is no third path that assigns a verb to a `geste`. The rest of this epic's criterion
+   ("réenseigner ne coûte rien") was already true by construction since C2.4 (teachGesture/
+   confirmTeaching never touch `s.economy` or `s.credits`) and is covered by a regression check in
+   tests/campaign-refusal.cjs rather than a code change here. */
 (function (root) {
   // The design's gesture table (§5) lists seven rows, but "Multiplier une plante" never applies
   // to a Rainelle (see header comment above) — six verbs remain teachable by this mechanism.
@@ -58,7 +70,13 @@
   // generated phrase exceed garden-state-validate.js's own 240-character cap on
   // campaignTeaching.draft.phrase, making the very next save unloadable.
   const FIELD_MAX_LENGTH = 40;
+  // Design §5 (« Multiplication et vie propre ») : ce refus est une scène, pas une erreur de
+  // saisie — distinct du "Geste inconnu." générique renvoyé pour tout autre verbe absent de
+  // VERBS, pour que teachGesture/demonstrateGesture puissent l'afficher tel quel au joueur.
+  const MULTIPLY_REFUSAL =
+    "Elle protège son bourgeon : ce geste ne s'apprend jamais à une Rainelle.";
   function validateGestureFields({ verbe, poste, source, destination, condition }) {
+    if (verbe === "multiplier") return MULTIPLY_REFUSAL;
     if (!VERBS.includes(verbe)) return "Geste inconnu.";
     const p = typeof poste === "string" ? poste.trim() : "";
     const src = typeof source === "string" ? source.trim() : "";
@@ -139,6 +157,7 @@
   const api = {
     createRainelle,
     VERBS,
+    MULTIPLY_REFUSAL,
     validateGestureFields,
     normalizeGesture,
     applyGesture,
