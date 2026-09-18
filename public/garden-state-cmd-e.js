@@ -6,6 +6,10 @@
     typeof module !== "undefined"
       ? require("./game/quests.js")
       : root.GardenQuests;
+  const Narrative =
+    typeof module !== "undefined"
+      ? require("./game/data-narrative.js")
+      : root.GardenNarrative;
   const M = {
     commandSegE(c, ctx, st) {
       const { s, fail } = st;
@@ -51,7 +55,17 @@
             if (s.campaignHouse.spaces[spaceId])
               s.campaignHouse.spaces[spaceId].locked = false;
           if (reward.reputation) s.reputation += reward.reputation;
-          st.message = `${quest.title} · terminée.`;
+          // Épic C4.3 (design §10, chapitre 2/3) : déverrouiller la serre révèle la note du pot
+          // qu'elle contient, via le mécanisme générique de C4.1 — un signal fixe (le
+          // déverrouillage réel de "serre"), jamais re-dérivé ici.
+          let revealed = null;
+          if ((reward.unlockHouseSpace || []).includes("serre")) {
+            revealed = Narrative.pendingReveal(s.campaignFlags, "serreUnlocked");
+            if (revealed) s.campaignFlags.push(revealed.id);
+          }
+          st.message = revealed
+            ? `${quest.title} · terminée. Nouvelle page dans le carnet.`
+            : `${quest.title} · terminée.`;
         } else return fail("Action de quête inconnue.");
       }
       return null;

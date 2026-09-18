@@ -24,6 +24,24 @@
       title: "Lettre d’Alma",
       text: "Tu peux déplacer les meubles. Même ceux dont tu crois te souvenir exactement.",
     },
+    // Epic C4.3 (design §10, chapitre 3) : révélée quand la serre est déverrouillée (le
+    // déverrouillage de C4.2, "serre" dans reward.unlockHouseSpace, est le seul signal qui la
+    // fait apparaître — voir garden-state-cmd-e.js).
+    "serre-note-pot": {
+      id: "serre-note-pot",
+      trigger: "serreUnlocked",
+      title: "Note dans la serre",
+      text: "Deux graines. Une nuit. Regarder avant de décider.",
+    },
+    // Epic C4.3 : révélée par la commande meetIris (garden-state-cmd-n.js). Devient la condition
+    // nécessaire et suffisante dont dépend C1.5 ("après le chapitre de botanique correspondant") —
+    // C1.5 elle-même reste non implémentée par cet epic.
+    "iris-epinglage": {
+      id: "iris-epinglage",
+      trigger: "irisPinningShown",
+      title: "Iris et l’épinglage",
+      text: "Un caractère déjà vu peut être fixé, pas seulement observé — regarde où la ressemblance ne bouge pas.",
+    },
   };
 
   function findByTrigger(signal) {

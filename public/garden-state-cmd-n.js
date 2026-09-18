@@ -33,6 +33,20 @@
         st.message = revealed
           ? `Marques de l’armoire : ${c.choice}. Nouvelle page dans le carnet.`
           : `Marques de l’armoire : ${c.choice}.`;
+      } else if (c.type === "meetIris") {
+        // Epic C4.3 (design §10, chapitre 3) : Iris (déjà un visiteur réel du jardin libre,
+        // data-buildings.js, role "botanist" — même principe que "noe" pour C4.2, aucune seconde
+        // entrée inventée) montre comment épingler un caractère déjà vu. Pas encore câblée à une
+        // interaction du monde 3D (même limite honnête que chooseFurnitureTreatment/
+        // repairHouseSpace posées avant leur habillage) : une commande réelle et testée,
+        // idempotente, jamais un échec — se rencontrer une seconde fois ne re-déclenche
+        // simplement pas la révélation déjà vue.
+        st.taken = true;
+        const revealed = Narrative.pendingReveal(s.campaignFlags, "irisPinningShown");
+        if (revealed) s.campaignFlags.push(revealed.id);
+        st.message = revealed
+          ? "Iris montre comment épingler un caractère déjà vu. Nouvelle page dans le carnet."
+          : "Iris te salue à nouveau.";
       }
       return null;
     },
