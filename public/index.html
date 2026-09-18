@@ -65,6 +65,12 @@
     <!-- Epic C3.1: campaign-house.js's SPACES/freshHouse are read by garden-state-lifecycle.js/
          garden-state-validate.js just below, same reason as campaign-stations.js above. -->
     <script src="/game/campaign-house.js" defer></script>
+    <!-- Epic C4.1: data-narrative.js's TEXTS/pendingReveal are read by garden-state-cmd-n.js and
+         hud-panel.js (both much further below); no dependency of its own (pure catalog, like
+         campaign-house.js/campaign-stations.js above), loaded here anyway to avoid the exact
+         class of missing-script ordering bug documented above for campaign-clock.js/rainelles.js/
+         cultivars.js. -->
+    <script src="/game/data-narrative.js" defer></script>
     <!-- Moved here from much further below (epic C2.6c): cultivars.js has no dependency of its
          own (pure schema, like rainelles.js/campaign-stations.js above), but garden-state-
          validate.js has read root.GardenCultivars since C2.6b without this script ever loading
@@ -126,6 +132,9 @@
          at its own execution time, same ordering requirement as every other rainelle command
          segment above. -->
     <script src="/garden-state-cmd-m.js" defer></script>
+    <!-- Epic C4.1: garden-state-cmd-n.js reads root.GardenCampaignHouse/root.GardenNarrative at
+         its own execution time, both loaded much earlier above. -->
+    <script src="/garden-state-cmd-n.js" defer></script>
     <script src="/game/save.js" defer></script>
     <script src="/garden-models.js" defer></script>
     <script src="/garden-models-leaf.js" defer></script>

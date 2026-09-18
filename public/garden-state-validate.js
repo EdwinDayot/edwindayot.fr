@@ -564,6 +564,10 @@
     // Epic C3.1: when present, campaignHouse must already carry all six named spaces (no
     // partial-object migration here — the whole registry is introduced by this epic, so an
     // older save simply lacks the field entirely and gets House.freshHouse() below).
+    // Epic C4.1 adds furnitureMarks to the same object: unlike the six spaces, a save from
+    // before this epic already has a well-formed campaignHouse but simply lacks this one field
+    // (undefined is accepted here, defaulted to null below), same two-level migration already
+    // used for campaignStations.habitats further down.
     if (
       s.campaignHouse !== undefined &&
       (typeof s.campaignHouse !== "object" ||
@@ -577,7 +581,10 @@
             !["delabre", "repare"].includes(space.status) ||
             typeof space.locked !== "boolean"
           );
-        }))
+        }) ||
+        (s.campaignHouse.furnitureMarks !== undefined &&
+          s.campaignHouse.furnitureMarks !== null &&
+          !House.FURNITURE_TREATMENTS.includes(s.campaignHouse.furnitureMarks)))
     )
       throw Error("Maison refuge invalide.");
     // Epic C3.6: when present, campaignTools must be a flat list of unique string ids — no shape
@@ -589,6 +596,16 @@
         new Set(s.campaignTools).size !== s.campaignTools.length)
     )
       throw Error("Outils de campagne invalides.");
+    // Epic C4.1: campaignFlags is a flat, unique list of already-revealed narrative text ids —
+    // same shape check as campaignTools just above, a distinct field/namespace (a tool id and a
+    // text id are never compared against each other).
+    if (
+      s.campaignFlags !== undefined &&
+      (!Array.isArray(s.campaignFlags) ||
+        s.campaignFlags.some((f) => typeof f !== "string") ||
+        new Set(s.campaignFlags).size !== s.campaignFlags.length)
+    )
+      throw Error("Indicateurs narratifs invalides.");
     const result = clone(s);
     result.hotbar ??= [...D.defaultHotbar];
     result.quests ??= { active: [], completed: [] };
@@ -656,7 +673,12 @@
       }),
     );
     result.campaignHouse ??= House.freshHouse();
+    // Epic C4.1: a pre-epic save has campaignHouse but no furnitureMarks at all (the object
+    // above only fires when campaignHouse itself is entirely missing) — defaulted here too, same
+    // two-level migration already used for campaignStations.habitats above.
+    result.campaignHouse.furnitureMarks ??= null;
     result.campaignTools ??= [];
+    result.campaignFlags ??= [];
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };

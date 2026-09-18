@@ -34,11 +34,20 @@
   };
   const SPACE_IDS = Object.keys(SPACES);
 
+  // Epic C4.1 (design chapitre 1, "La clé sous le pot vide"): the armoire's rediscovered
+  // marques de taille get exactly one of these three treatments, ever — see
+  // garden-state-cmd-n.js's chooseFurnitureTreatment for the one-shot mutation, mirrored here
+  // (not redefined there) the same way SPACE_IDS is shared rather than duplicated.
+  const FURNITURE_TREATMENTS = ["conserve", "encadre", "repeint"];
+
   function freshHouse() {
     const spaces = {};
     for (const id of SPACE_IDS)
       spaces[id] = { status: "delabre", locked: id !== "accueil" };
-    return { spaces };
+    // furnitureMarks: null until chooseFurnitureTreatment sets it once (never reset afterwards)
+    // — a top-level campaignHouse field, not a seventh "space", since it has no repair cost/lock
+    // of its own.
+    return { spaces, furnitureMarks: null };
   }
 
   // Pure precondition check, no mutation — repairHouseSpace (garden-state-cmd-l.js) still calls
@@ -53,7 +62,7 @@
     return { ok: true };
   }
 
-  const api = { SPACES, SPACE_IDS, freshHouse, canRepair };
+  const api = { SPACES, SPACE_IDS, FURNITURE_TREATMENTS, freshHouse, canRepair };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenCampaignHouse = api;
 })(globalThis);

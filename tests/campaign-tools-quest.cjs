@@ -7,10 +7,14 @@ const { GardenState, D, validate } = require("./garden-rules-helpers.cjs");
 // — un outil nommé rejoint s.campaignTools seulement à la complétion réelle, jamais à
 // l'acceptation. "bois-pour-l-hiver" (data-quests.js) est la quête de départ réelle, npcId
 // villageois-1 (Épic C3.5), objectif deliver déjà supporté par quests.js.
+//
+// Épic C4.1 a depuis fait démarrer campaignTools avec "outil-de-fortune" dès fresh() (design §10,
+// chapitre 1) : les assertions ci-dessous partent donc de ce seul outil de départ plutôt que d'un
+// sac vide, jamais réévalué ni retiré par une commande de quête.
 
-test("a fresh campaign save starts with no campaign tools", () => {
+test("a fresh campaign save starts with only the makeshift tool, no quest reward yet", () => {
   const g = new GardenState(null, 1000);
-  assert.deepEqual(g.s.campaignTools, []);
+  assert.deepEqual(g.s.campaignTools, ["outil-de-fortune"]);
 });
 
 test("a tool reward is granted only on completion, never on acceptance", () => {
@@ -22,7 +26,7 @@ test("a tool reward is granted only on completion, never on acceptance", () => {
   );
   assert.deepEqual(
     g.s.campaignTools,
-    [],
+    ["outil-de-fortune"],
     "accepting the quest must not grant the tool yet",
   );
   g.s.inventory.wood = D.quests["bois-pour-l-hiver"].objective.quantity;
@@ -34,7 +38,7 @@ test("a tool reward is granted only on completion, never on acceptance", () => {
     }).ok,
     true,
   );
-  assert.deepEqual(g.s.campaignTools, ["hachette"]);
+  assert.deepEqual(g.s.campaignTools, ["outil-de-fortune", "hachette"]);
 });
 
 test("completing before the objective is met is rejected and grants nothing", () => {
@@ -47,7 +51,7 @@ test("completing before the objective is met is rejected and grants nothing", ()
     questId: "bois-pour-l-hiver",
   });
   assert.equal(r.ok, false);
-  assert.deepEqual(g.s.campaignTools, []);
+  assert.deepEqual(g.s.campaignTools, ["outil-de-fortune"]);
 });
 
 test("a synthetic tools reward never duplicates an already-granted tool", () => {

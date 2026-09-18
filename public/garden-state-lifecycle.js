@@ -158,7 +158,14 @@
       // a plain list of string ids — no mechanical effect yet (no campaign construction gesture
       // consumes a tool as a prerequisite today), same "posed, not wired" gap already documented
       // at specimens/rainelles/campaignStations above.
-      campaignTools: [],
+      // Epic C4.1 (design §10, chapitre 1): a fresh campaign starts with the makeshift tool
+      // already in hand ("un outil de fortune déjà en possession du joueur") — reuses this same
+      // sack rather than a new equipment slot, so it is seeded here instead of left empty.
+      campaignTools: ["outil-de-fortune"],
+      // Epic C4.1: ids of narrative texts already revealed (data-narrative.js), a flat unique
+      // list of strings, same shape as campaignTools just above but a distinct namespace (never
+      // merged with it: a tool id and a text id answer different questions).
+      campaignFlags: [],
     };
   }
   function migrate(old, now = Date.now()) {

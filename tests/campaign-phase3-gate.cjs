@@ -123,12 +123,16 @@ test("phase 3 gate — habiter, croiser, organiser, rencontrer ensemble sur troi
     g.command({ type: "quest", action: "accept", questId: "bois-pour-l-hiver" }).ok,
     true,
   );
-  assert.deepEqual(g.s.campaignTools, [], "l'outil n'est jamais accordé à l'acceptation");
+  assert.deepEqual(
+    g.s.campaignTools,
+    ["outil-de-fortune"],
+    "l'outil de quête n'est jamais accordé à l'acceptation (l'outil de fortune de C4.1 est déjà présent dès fresh())",
+  );
   assert.equal(
     g.command({ type: "quest", action: "complete", questId: "bois-pour-l-hiver" }).ok,
     true,
   );
-  assert.deepEqual(g.s.campaignTools, ["hachette"]);
+  assert.deepEqual(g.s.campaignTools, ["outil-de-fortune", "hachette"]);
 
   // --- Organiser, sans intervention : plusieurs cycles de simulation, aucune commande
   // supplémentaire — la chaîne dépose une production dans le panier et l'arrosage maintient
@@ -163,7 +167,7 @@ test("phase 3 gate — habiter, croiser, organiser, rencontrer ensemble sur troi
   );
   assert.deepEqual(
     reloaded.s.campaignTools,
-    ["hachette"],
+    ["outil-de-fortune", "hachette"],
     "l'outil de la quête n'est jamais accordé une deuxième fois",
   );
   assert.equal(
