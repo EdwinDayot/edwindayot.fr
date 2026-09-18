@@ -580,6 +580,15 @@
         }))
     )
       throw Error("Maison refuge invalide.");
+    // Epic C3.6: when present, campaignTools must be a flat list of unique string ids — no shape
+    // beyond that (unlike cultivars/rainelles, a tool carries no other persisted data yet).
+    if (
+      s.campaignTools !== undefined &&
+      (!Array.isArray(s.campaignTools) ||
+        s.campaignTools.some((t) => typeof t !== "string") ||
+        new Set(s.campaignTools).size !== s.campaignTools.length)
+    )
+      throw Error("Outils de campagne invalides.");
     const result = clone(s);
     result.hotbar ??= [...D.defaultHotbar];
     result.quests ??= { active: [], completed: [] };
@@ -647,6 +656,7 @@
       }),
     );
     result.campaignHouse ??= House.freshHouse();
+    result.campaignTools ??= [];
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };

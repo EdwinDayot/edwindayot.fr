@@ -39,6 +39,10 @@
             s.inventory.coins = (s.inventory.coins || 0) + reward.coins;
           for (const plan of reward.plans || [])
             if (!s.plans.includes(plan)) s.plans.push(plan);
+          // Épic C3.6: additive extension of the reward schema, same shape as reward.plans just
+          // above — a named tool joins s.campaignTools only at completion, never at acceptance.
+          for (const tool of reward.tools || [])
+            if (!s.campaignTools.includes(tool)) s.campaignTools.push(tool);
           if (reward.reputation) s.reputation += reward.reputation;
           st.message = `${quest.title} · terminée.`;
         } else return fail("Action de quête inconnue.");

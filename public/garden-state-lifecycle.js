@@ -154,6 +154,11 @@
       // except the reception room (locked: false, still delabre — see campaign-house.js's own
       // header comment for why unlocked and repaired are kept distinct).
       campaignHouse: House.freshHouse(),
+      // Epic C3.6: named tools granted by quest completion (reward.tools, garden-state-cmd-e.js),
+      // a plain list of string ids — no mechanical effect yet (no campaign construction gesture
+      // consumes a tool as a prerequisite today), same "posed, not wired" gap already documented
+      // at specimens/rainelles/campaignStations above.
+      campaignTools: [],
     };
   }
   function migrate(old, now = Date.now()) {

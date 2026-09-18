@@ -28,6 +28,19 @@
       reward: { coins: 20, reputation: 1 },
       requires: ["first-harvest"],
     },
+    // Épic C3.6: the campaign's first tool quest (design §15 phase 3, "première quête d'outil").
+    // npcId points at villageois-1 (data-buildings.js, Épic C3.5), whose existing flavour line
+    // ("range le bois pour l'hiver") is reused rather than invented — no Acte I-III identity
+    // assigned yet (see the phase 3 header note in campagne-backlog.md), same posture as C3.5
+    // itself. quantity/coins are sized against the same yardstick already used by C3.1's house
+    // costs (D.balance.resourceYield, 3 per gathering hit, and the campaign's starting 2 wood).
+    "bois-pour-l-hiver": {
+      npcId: "villageois-1",
+      title: "Du bois pour l'hiver",
+      objective: { type: "deliver", item: "wood", quantity: 4 },
+      reward: { tools: ["hachette"] },
+      requires: [],
+    },
   };
   P.quests = quests;
   if (typeof module !== "undefined") module.exports = { quests };
