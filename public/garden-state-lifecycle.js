@@ -108,6 +108,17 @@
       rainelles: [],
       rainelleNextId: 1,
       campaignFrogEncounterPending: false,
+      // Epic C2.5: null outside a lesson. While a lesson runs, {rainelleId, step, draft} —
+      // step "watching" (just after "Regarde-moi", clock paused, no draft yet) or "reviewing"
+      // (a demonstration was captured; draft holds {verbe, poste, source, destination,
+      // condition, phrase, trajectory} pending confirmTeaching/cancelTeaching). See
+      // garden-state-cmd-k.js.
+      campaignTeaching: null,
+      // Epic C2.5: the last gesture a lesson actually confirmed (verbe/poste/source/destination/
+      // condition only, no phrase/trajectory — those are draft-only, not part of what a Rainelle
+      // remembers). null until the very first confirmTeaching. Reapplied as-is by
+      // teachGestureQuick, design §5's "courte répétition... sans refaire tout le tutoriel".
+      campaignLastDemonstration: null,
     };
   }
   function migrate(old, now = Date.now()) {

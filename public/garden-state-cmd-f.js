@@ -76,6 +76,12 @@
         s.campaignDay += 1;
         s.campaignClock.gameSeconds = 0;
         s.campaignClock.paused = false;
+        // Epic C2.5: an in-progress, unconfirmed lesson is exactly the kind of "placement non
+        // validé" design §3 says nightfall cancels without cost — never carried into the next
+        // day, and never left stranding the clock paused or blocking every future beginTeaching
+        // (found by /code-review before this epic's own commit: sleep used to leave a stale
+        // campaignTeaching in place while still unpausing the clock underneath it).
+        s.campaignTeaching = null;
         st.message = "Une nouvelle nuit commence.";
       }
       return null;

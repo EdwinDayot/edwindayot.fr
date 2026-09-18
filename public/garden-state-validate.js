@@ -380,6 +380,48 @@
       typeof s.campaignFrogEncounterPending !== "boolean"
     )
       throw Error("Rencontre de la grenouille invalide.");
+    // A gesture-shaped object (verbe/poste/source/destination/condition), the same fields
+    // rainelle.geste already validates above — shared here so campaignTeaching's draft and
+    // campaignLastDemonstration can't silently drift from what a Rainelle is actually allowed
+    // to remember.
+    const validGesteFields = (g) =>
+      g &&
+      typeof g === "object" &&
+      Rainelles.VERBS.includes(g.verbe) &&
+      typeof g.poste === "string" &&
+      g.poste &&
+      typeof g.source === "string" &&
+      g.source &&
+      typeof g.destination === "string" &&
+      g.destination &&
+      typeof g.condition === "string";
+    if (
+      s.campaignTeaching !== undefined &&
+      s.campaignTeaching !== null &&
+      (typeof s.campaignTeaching !== "object" ||
+        !s.rainelles?.some((r) => r.id === s.campaignTeaching.rainelleId) ||
+        !["watching", "reviewing"].includes(s.campaignTeaching.step) ||
+        (s.campaignTeaching.step === "watching" &&
+          s.campaignTeaching.draft !== null) ||
+        (s.campaignTeaching.step === "reviewing" &&
+          (!validGesteFields(s.campaignTeaching.draft) ||
+            typeof s.campaignTeaching.draft.phrase !== "string" ||
+            !s.campaignTeaching.draft.phrase ||
+            s.campaignTeaching.draft.phrase.length > 240 ||
+            !Array.isArray(s.campaignTeaching.draft.trajectory) ||
+            s.campaignTeaching.draft.trajectory.length < 1 ||
+            s.campaignTeaching.draft.trajectory.length > 3 ||
+            s.campaignTeaching.draft.trajectory.some(
+              (step) => typeof step !== "string" || !step,
+            ))))
+    )
+      throw Error("Leçon en cours invalide.");
+    if (
+      s.campaignLastDemonstration !== undefined &&
+      s.campaignLastDemonstration !== null &&
+      !validGesteFields(s.campaignLastDemonstration)
+    )
+      throw Error("Dernière démonstration invalide.");
     const result = clone(s);
     result.hotbar ??= [...D.defaultHotbar];
     result.quests ??= { active: [], completed: [] };
@@ -398,6 +440,8 @@
     result.rainelles ??= [];
     result.rainelleNextId ??= 1;
     result.campaignFrogEncounterPending ??= false;
+    result.campaignTeaching ??= null;
+    result.campaignLastDemonstration ??= null;
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };

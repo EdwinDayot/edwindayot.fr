@@ -15,29 +15,12 @@
         st.taken = true;
         const rainelle = s.rainelles.find((r) => r.id === c.id);
         if (!rainelle) return fail("Rainelle inconnue.");
-        if (!Rainelles.VERBS.includes(c.verbe))
-          return fail("Geste inconnu.");
-        const poste = typeof c.poste === "string" ? c.poste.trim() : "";
-        const source = typeof c.source === "string" ? c.source.trim() : "";
-        const destination =
-          typeof c.destination === "string" ? c.destination.trim() : "";
-        const condition =
-          typeof c.condition === "string" ? c.condition.trim() : "";
-        if (!poste) return fail("Le poste ou la zone ne peut pas être vide.");
-        if (!source) return fail("La source ne peut pas être vide.");
-        if (!destination)
-          return fail("La destination ne peut pas être vide.");
-        // Wholesale replacement, never a merge onto the previous gesture: this is the literal
-        // proof that "réenseigner remplace intégralement l'ancien geste (jamais un ajout)".
-        const hadGesture = !!rainelle.geste;
-        rainelle.geste = {
-          verbe: c.verbe,
-          poste,
-          source,
-          destination,
-          condition,
-        };
-        st.message = hadGesture
+        // Shared with garden-state-cmd-k.js (epic C2.5's confirmTeaching/teachGestureQuick) so
+        // the "wholesale replacement, never a merge" rule and field validation can never drift
+        // between the one-shot path here and the four-moment flow there.
+        const r = Rainelles.applyGesture(rainelle, c);
+        if (!r.ok) return fail(r.error);
+        st.message = r.hadGesture
           ? `Ancien geste remplacé : ${c.verbe}.`
           : `Geste appris : ${c.verbe}.`;
       }
