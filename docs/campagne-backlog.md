@@ -120,19 +120,37 @@ Statut : todo (créé le 2026-09-18, scission de C2.5 — voir sa propre entrée
 Dépend de : C2.5
 Critère de sortie : une Rainelle enseignée à arroser remplit son arrosoir à la borne du poste puis humidifie les plantes de la zone sans intervention ; une Rainelle enseignée à récolter dépose les productions mûres dans le panier adjacent ; les deux réutilisent les primitives génériques `job`/`buffer` déjà présentes dans `automation.js` plutôt que d'en créer de nouvelles.
 Fichiers probables : `public/game/automation.js`, `public/game/rainelles.js`
-Statut : todo
+Statut : todo (reformulé par le Cartographe le 2026-09-18 en trois epics plus petits, C2.6a/C2.6b/C2.6c ci-dessous, plutôt que tenté tel quel — voir le journal des décisions : son critère littéral suppose trois mécaniques encore inexistantes à la fois — bornes/paniers, humidité de zone, maturité de spécimen — ce qu'`orchestration.md` interdit pour un seul epic (« jamais une refonte simultanée de plusieurs systèmes »). Conservé ici pour mémoire ; ne plus choisir cet epic directement, choisir C2.6a/b/c à sa place.)
+
+### C2.6a — Registre des bornes d'eau, zones de culture et paniers de campagne
+Dépend de : C2.4
+Critère de sortie : la sauvegarde de campagne déclare un registre de bornes d'eau, de zones de culture et de paniers de campagne, chacun avec un id stable et une position ; une fonction pure permet de résoudre les identifiants `poste`/`source`/`destination` déjà acceptés en texte libre par `teachGesture`/`demonstrateGesture` (C2.4/C2.5) contre ce registre (id connu → entrée trouvée ; id inconnu → échec explicite, jamais un `undefined` silencieux) ; une sauvegarde existante sans ce registre migre vers un registre vide sans erreur ; aucune commande de geste existante ne change de comportement (les identifiants restent acceptés tels quels, la résolution est une fonction séparée, pas encore appelée par `teachGesture`/`demonstrateGesture`).
+Fichiers probables : nouveau `public/game/campaign-stations.js`, `public/garden-state-lifecycle.js`, `public/garden-state-validate.js`
+Statut : todo (créé le 2026-09-18, premier tiers de la reformulation de C2.6)
+
+### C2.6b — Humidité et maturité des spécimens de campagne
+Dépend de : C1.6
+Critère de sortie : un spécimen de cultivar (`s.specimens`, C1.6) porte une humidité qui décroît avec le temps de simulation (`s.elapsed`, jamais l'horloge murale — même principe que le dopage `boostUntil` du jardin libre) et un état de maturité dérivé de son stade de croissance (C1.8) ; un test vérifie la décroissance déterministe de l'humidité sur une durée simulée donnée et qu'un spécimen immature ne peut pas être marqué prêt à produire ; une sauvegarde existante sans ces champs migre vers des valeurs par défaut sans erreur.
+Fichiers probables : `public/game/cultivars.js`, `public/garden-state-lifecycle.js`, `public/garden-state-validate.js`
+Statut : todo (créé le 2026-09-18, deuxième tiers de la reformulation de C2.6)
+
+### C2.6c — Gestes Arroser et Récolter, branchés sur le registre et les spécimens
+Dépend de : C2.6a, C2.6b, C2.5
+Critère de sortie : identique au critère littéral de C2.6 ci-dessus (une Rainelle enseignée à arroser remplit son arrosoir à la borne du poste puis humidifie les plantes de la zone sans intervention ; une Rainelle enseignée à récolter dépose les productions mûres dans le panier adjacent ; les deux réutilisent les primitives génériques `job`/`buffer` déjà présentes dans `automation.js`), désormais réalisable sans inventer de sous-système supplémentaire puisque bornes/zones/paniers (C2.6a) et humidité/maturité de spécimen (C2.6b) existent déjà.
+Fichiers probables : `public/game/automation.js`, `public/game/rainelles.js`
+Statut : todo (créé le 2026-09-18, troisième tiers de la reformulation de C2.6)
 
 ### C2.7 — Geste Transporter
-Dépend de : C2.6
+Dépend de : C2.6c
 Critère de sortie : une Rainelle transporteuse déplace les productions d'un panier A vers un panier B selon un filtre de ressource, avec un seul trajet actif à la fois ; enchaîner arrosage → récolte → transport sans intervention manuelle fait circuler une ressource de bout en bout dans un test.
 Fichiers probables : `public/game/rainelles.js`
-Statut : todo
+Statut : todo (dépendance mise à jour le 2026-09-18 : C2.6 → C2.6c, voir reformulation ci-dessus)
 
 ### C2.8 — Réservations et états de blocage
-Dépend de : C2.6
+Dépend de : C2.6c
 Critère de sortie : une ressource et un emplacement de sortie sont réservés avant le départ d'une Rainelle, empêchant deux Rainelles de prendre la même cible ; si la cible disparaît, la réservation se libère et l'objet déjà porté rejoint un bac de secours identifié ; les sept états (au travail/stock atteint/source vide/sortie pleine/passage bloqué/poste manquant/repos) sont exposés avec une phrase d'action, sur le modèle des diagnostics déjà existants dans `irrigation-status.js`.
 Fichiers probables : nouveau `public/game/rainelles-status.js`
-Statut : todo
+Statut : todo (dépendance mise à jour le 2026-09-18 : C2.6 → C2.6c, voir reformulation ci-dessus)
 
 ### C2.9 — Mode d'observation
 Dépend de : C2.8
@@ -193,3 +211,4 @@ Saisons, extensions de maison, catalogue décoratif, chaînes avancées, tactile
 - 2026-09-17 — C2.2v sauté une nouvelle fois au profit de C2.4, pour la même raison exacte que la fois précédente (scène « maison » de campagne toujours absente, chantier de la phase 3) : ce n'est pas un nouvel arbitrage, seulement la reconfirmation que rien n'a changé depuis. C2.4 (dépendance C2.3, `fait`) est un epic de schéma pur, sans dépendance narrative ni de rendu cachée.
 - 2026-09-18 — C2.2v sauté une troisième fois, toujours pour la même raison (aucune scène « maison » de campagne construite, chantier de la phase 3). C2.5 (dépendance C2.4, `fait`) était le seul autre epic `todo` de la phase disponible ; implémenté avec le même écart « scope réduit à la couche moteur » que C2.2, la scission de son volet interface devenant le nouvel epic C2.5v (todo, dépend de C2.5) plutôt qu'une réduction silencieuse du critère de sortie.
 - 2026-09-18 — C2.6 (« Gestes Arroser et Récolter », dépendance C2.5, `fait`) sauté au profit de C2.10, malgré une dépendance satisfaite : son critère de sortie littéral exige qu'une Rainelle « remplisse son arrosoir à la borne du poste » et « humidifie les plantes de la zone »/« dépose dans le panier adjacent » sans intervention — or aucune de ces trois choses n'existe encore comme donnée à ce stade (`poste`/`source`/`destination` restent des identifiants de chaîne opaques depuis C2.4, sans registre de bornes/zones/paniers ; les spécimens de cultivars (`s.specimens`, C1.6) n'ont ni humidité ni production/maturité — ce sont des mécaniques entièrement nouvelles à inventer, pas une extension d'un système existant). Implémenter C2.6 tel quel aurait exigé de construire d'un bloc, sans passage par le Cartographe, au moins trois sous-systèmes de simulation à la fois (bornes d'eau, humidité de zone, maturité/production) — exactement ce qu'interdit `orchestration.md` (« un epic ajoute une capacité vérifiable en une session, jamais une refonte simultanée de plusieurs systèmes »). C2.10 (dépendance C2.4, `fait` également) est en comparaison un epic de schéma pur, borné à une seule règle déjà quasi entièrement vraie par construction (l'exclusion de `multiplier` de `VERBS` existe depuis C2.4) : le bon candidat pour ce déclenchement. C2.6 reste `todo` ; sa reformulation par un futur passage du Cartographe (probablement en deux epics — un registre minimal de bornes/zones/paniers, puis le branchement du tick automation dessus) est laissée à un déclenchement ultérieur plutôt que devinée ici.
+- 2026-09-18 — Déclenchement automatisé (routine cloud horaire). Anti-hallucination : dernier epic `fait` du backlog était C2.10, commit `3cc89c9` — `git show --stat 3cc89c9` confirme le commit réel (5 fichiers, correspond exactement à l'entrée de `campagne.md`) ; `npm ci && npm test` relancés indépendamment → 266/266, identique au rapport existant. Aucun bandeau de pause en tête de ce fichier. Aucune anomalie, `docs/campagne-anomalies.md` toujours absent. **Rôle Cartographe endossé** (pas d'implémentation ce déclenchement) : les trois seuls epics `todo` de phase 1/2 à dépendances satisfaites étaient C2.2v, C2.5v (tous deux bloqués depuis plusieurs déclenchements par l'absence de scène « maison » de campagne, chantier de la phase 3 — aucun changement depuis la dernière fois) et C2.6, dont la reformulation par le Cartographe était explicitement laissée en suspens par l'entrée précédente de ce journal. Reformulé C2.6 en trois epics plus petits, chacun de la taille d'une session, au lieu de forcer un epic qui aurait mélangé trois sous-systèmes à la fois : **C2.6a** (registre de bornes d'eau/zones/paniers, pur schéma + fonction de résolution, sans brancher encore les commandes de geste dessus), **C2.6b** (humidité et maturité des spécimens, extension de `s.specimens` posée par C1.6, sur le modèle de l'horloge de simulation `s.elapsed` déjà utilisée par le dopage engrais du jardin libre), **C2.6c** (le critère littéral originel de C2.6, désormais réalisable sans invention simultanée puisque C2.6a/b lui fournissent leurs briques). Dépendances de C2.7/C2.8 mises à jour de C2.6 vers C2.6c en conséquence. C2.6 original conservé dans le fichier pour mémoire (todo, avec renvoi vers la reformulation), jamais à choisir directement désormais. Aucun code ni test modifié ce déclenchement — travail de planification seul, comme prescrit par `orchestration.md`/`execution-continue.md` pour ce cas.
