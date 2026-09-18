@@ -228,8 +228,192 @@ test("recolter: a mature, ready specimen outside the zone's range is never harve
   assert.deepEqual(panier.buffer, {});
 });
 
-test("the four out-of-scope verbs (transporter/replanter/preparer/trier) never crash and never start a job", () => {
-  for (const verbe of ["transporter", "replanter", "preparer", "trier"]) {
+test("transporter: moves a filtered resource from the source panier's buffer to the destination panier's, one trajet at a time", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const from = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  const to = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  from.buffer[cultivarId] = 3;
+  teach(rainelle, {
+    verbe: "transporter",
+    poste: "peu-importe",
+    source: from.id,
+    destination: to.id,
+    condition: cultivarId,
+  });
+  g.step(CYCLE - 1);
+  assert.equal(from.buffer[cultivarId], 3);
+  assert.equal(to.buffer[cultivarId], undefined);
+  g.step(1);
+  assert.equal(from.buffer[cultivarId], undefined);
+  assert.equal(to.buffer[cultivarId], 3);
+});
+
+test("transporter: an empty condition (no filter taught) moves every resource currently in the source panier", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const from = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  const to = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  from.buffer.a1 = 2;
+  from.buffer.a2 = 5;
+  teach(rainelle, {
+    verbe: "transporter",
+    poste: "peu-importe",
+    source: from.id,
+    destination: to.id,
+  });
+  g.step(CYCLE);
+  assert.deepEqual(from.buffer, {});
+  assert.deepEqual(to.buffer, { a1: 2, a2: 5 });
+});
+
+test("transporter: a panier taught as both source and destination is a degenerate no-op, never a job", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  panier.buffer[cultivarId] = 4;
+  teach(rainelle, {
+    verbe: "transporter",
+    poste: "peu-importe",
+    source: panier.id,
+    destination: panier.id,
+    condition: cultivarId,
+  });
+  g.step(CYCLE * 2);
+  assert.equal(rainelle.job, null);
+  assert.equal(panier.buffer[cultivarId], 4);
+});
+
+test("transporter: an unknown source/destination id, or one of the wrong kind, leaves the Rainelle inactive without throwing", () => {
+  const g = new GardenState(null, 1000);
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+  });
+
+  const unknownDest = bornRainelle(g);
+  teach(unknownDest, {
+    verbe: "transporter",
+    poste: "peu-importe",
+    source: panier.id,
+    destination: "pn999",
+  });
+  assert.doesNotThrow(() => g.step(CYCLE * 2));
+  assert.equal(unknownDest.job, null);
+
+  const g2 = new GardenState(null, 1000);
+  const panier2 = Stations.registerStation(g2.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  const zone2 = Stations.registerStation(g2.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+  });
+  const wrongKind = bornRainelle(g2);
+  // destination points at a zone, not a panier: wrong kind, same as an unresolved id.
+  teach(wrongKind, {
+    verbe: "transporter",
+    poste: "peu-importe",
+    source: panier2.id,
+    destination: zone2.id,
+  });
+  assert.doesNotThrow(() => g2.step(CYCLE * 2));
+  assert.equal(wrongKind.job, null);
+});
+
+test("chain: arroser then recolter then transporter carries a real resource end to end without any manual command", () => {
+  const g = new GardenState(null, 1000);
+  // Only the scripted encounter (C2.3) can create a Rainelle through a command, and design §5
+  // caps it at the very first one ("La première Rainelle est déjà née.") — a second/third
+  // Rainelle for this chain is created directly, exactly like tests/campaign-teaching.cjs's own
+  // secondRainelle() helper, which never touches or bypasses that one-encounter cap either.
+  const waterer = bornRainelle(g);
+  const cultivarId = waterer.cultivarId;
+  const harvester = Rainelles.createRainelle(g.s, { cultivarId, name: "Récolteuse" });
+  const transporter = Rainelles.createRainelle(g.s, { cultivarId, name: "Transporteuse" });
+
+  const borne = Stations.registerStation(g.s.campaignStations, "borne", {
+    x: 0,
+    z: 0,
+  });
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+  });
+  const localPanier = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  const cuisine = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  const specimen = Cultivars.createSpecimen(g.s, {
+    cultivarId,
+    x: 0,
+    z: 0,
+    stage: Cultivars.MATURE_STAGE,
+  });
+  g.step(3 * 3600 + 100);
+  assert.ok(Cultivars.specimenMoisture(specimen, g.s.elapsed) < 1);
+
+  teach(waterer, {
+    verbe: "arroser",
+    poste: zone.id,
+    source: borne.id,
+    destination: "peu-importe",
+  });
+  teach(harvester, {
+    verbe: "recolter",
+    poste: zone.id,
+    source: "peu-importe",
+    destination: localPanier.id,
+  });
+  teach(transporter, {
+    verbe: "transporter",
+    poste: "peu-importe",
+    source: localPanier.id,
+    destination: cuisine.id,
+    condition: cultivarId,
+  });
+
+  // No command other than the passage of time from here on. One cycle is enough: harvester and
+  // transporter are taught (and so start their own countdown) at the same tick, so both complete
+  // together — the harvest lands in localPanier and is carried out to cuisine within that same
+  // tick (see campaign-automation.js's tickRainelle: s.rainelles are ticked in order, harvester
+  // before transporter). A second/third cycle would harvest the same specimen again (the
+  // documented unbounded-regeneration limit from C2.6c, unrelated to what this test proves).
+  g.step(CYCLE);
+
+  assert.ok(Cultivars.specimenMoisture(specimen, g.s.elapsed) > 95);
+  assert.deepEqual(localPanier.buffer, {});
+  assert.equal(cuisine.buffer[cultivarId], 1);
+});
+
+test("the three remaining out-of-scope verbs (replanter/preparer/trier) never crash and never start a job", () => {
+  for (const verbe of ["replanter", "preparer", "trier"]) {
     const g = new GardenState(null, 1000);
     const rainelle = bornRainelle(g);
     const zone = Stations.registerStation(g.s.campaignStations, "zone", {

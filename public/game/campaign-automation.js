@@ -20,13 +20,13 @@
    reimplemented against a different data space rather than imported, since automation.js's own
    functions read `D.recipes[e.type]` and would need an unrelated recipe entry to mean anything.
 
-   Verb scope: only "arroser" and "recolter" are implemented, matching this epic's exit criterion
-   literally. The other four verbs a Rainelle can be taught (transporter/replanter/preparer/trier,
-   design §5's own table) are validated as teachable since C2.4 but deliberately do nothing here —
-   C2.7 (transporter) and later epics are where each gets its own tick behaviour. A taught-but-
-   unimplemented verb is a silent no-op, not an error: teaching it already succeeded (C2.4/C2.5),
-   so a Rainelle just standing idle is the correct, honest state until its epic lands — the
-   readable "blocage" state a player would actually see is C2.8's job, not this one's.
+   Verb scope: "arroser"/"recolter" (C2.6c) and now "transporter" (C2.7) are implemented. The
+   two remaining verbs a Rainelle can be taught (replanter/preparer/trier, design §5's own
+   table) are validated as teachable since C2.4 but deliberately do nothing here — later epics
+   are where each gets its own tick behaviour. A taught-but-unimplemented verb is a silent
+   no-op, not an error: teaching it already succeeded (C2.4/C2.5), so a Rainelle just standing
+   idle is the correct, honest state until its epic lands — the readable "blocage" state a
+   player would actually see is C2.8's job, not this one's.
 
    Failure posture: an invalid poste/source/destination (unknown id, or an id that resolves to
    the wrong kind of station — e.g. a `recolter`'s poste pointing at a panier instead of a zone)
@@ -124,6 +124,38 @@
     }
   }
 
+  // "Transporter" (design §5, « Panier A » → « Panier B », limite « un trajet et un filtre de
+  // ressource actifs »). Both limits are already true by construction, not by anything added
+  // here: a geste is a single {verbe, poste, source, destination, condition} record (C2.4), so a
+  // Rainelle taught "transporter" only ever has the one source/destination pair and the one
+  // `condition` filter it was last taught — exactly the same way "un petit rayon de travail" for
+  // arroser needed no extra code beyond reading `geste.poste`. `condition` (optional on every
+  // verb since C2.4/rainelles.js's validateGestureFields) doubles as the resource filter the
+  // design table calls for: a non-empty condition moves only that one cultivar id, an empty one
+  // (a Rainelle taught with the field left blank) moves everything currently in the source
+  // panier's buffer — still a single trajet, just an unfiltered one, never a second route.
+  // Transporting into the same panier the Rainelle reads from is a degenerate, meaningless
+  // configuration (moving a bucket into itself), so it is treated the same as an unresolved
+  // station: no job ever starts. `geste.poste` is not read here: rainelles.js's own
+  // PHRASE_BUILDERS.transporter already ignores it for the same verb (design §5's row for
+  // "transporter" names only a source panier and a destination panier), so
+  // validateGestureFields's blanket "poste ne peut pas être vide" is a schema-wide rule this verb
+  // simply has nothing to do with, not a field this tick behaviour forgot to use.
+  function tickTransporter(rainelle, s) {
+    const geste = rainelle.geste;
+    const from = resolveKind(s, geste.source, "panier");
+    const to = resolveKind(s, geste.destination, "panier");
+    if (!from || !to || from === to) return;
+    if (!advanceCycle(rainelle)) return;
+    const keys = geste.condition ? [geste.condition] : Object.keys(from.buffer);
+    for (const key of keys) {
+      const qty = from.buffer[key] || 0;
+      if (qty <= 0) continue;
+      to.buffer[key] = (to.buffer[key] || 0) + qty;
+      delete from.buffer[key];
+    }
+  }
+
   // One Rainelle, one tick. A null geste, or a verb this file doesn't implement yet (see header
   // comment), is a no-op — never an exception, never a silent mutation of `job`.
   function tickRainelle(rainelle, s) {
@@ -131,6 +163,7 @@
     if (!geste) return;
     if (geste.verbe === "arroser") tickArroser(rainelle, s);
     else if (geste.verbe === "recolter") tickRecolter(rainelle, s);
+    else if (geste.verbe === "transporter") tickTransporter(rainelle, s);
   }
 
   // The smallest additive mechanism that gives "recolter" anything to ever collect: nothing else
