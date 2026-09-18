@@ -44,6 +44,47 @@
     <script src="/game/data-roles.js" defer></script>
     <script src="/game/progression.js" defer></script>
     <script src="/game/quests.js" defer></script>
+    <!-- Pre-existing gap found and fixed while verifying epic C2.3 in the browser: since C2.2,
+         garden-state-validate.js/garden-state-lifecycle.js read root.GardenCampaignClock
+         unconditionally (Clock.DEFAULT_ACTIVE_SECONDS/Clock.DAY_SECONDS) but this script was
+         never added here, so every browser page load threw before this fix (confirmed by
+         reproducing the same TypeError on commit 2a410b6, unmodified, via `git stash`) — Node
+         tests never caught it because tests require() campaign-clock.js directly. Must load
+         before garden-state-validate.js/-lifecycle.js below. -->
+    <script src="/game/campaign-clock.js" defer></script>
+    <!-- Epic C2.4: garden-state-validate.js now also reads root.GardenRainelles (VERBS, to
+         validate a taught geste) at script-execution time, so rainelles.js (pure schema, no
+         dependency of its own) must load before it here too — the same class of ordering bug
+         found and fixed for campaign-clock.js above while verifying C2.3 in the browser, caught
+         this time before commit rather than after. Still also loaded before garden-state-cmd-f.js/
+         -i.js/-j.js further below, which read it again at their own execution time. -->
+    <script src="/game/rainelles.js" defer></script>
+    <!-- Epic C2.6a: campaign-stations.js's registry is read by garden-state-validate.js just
+         below, same reason rainelles.js/campaign-clock.js load before it. -->
+    <script src="/game/campaign-stations.js" defer></script>
+    <!-- Moved here from much further below (epic C2.6c): cultivars.js has no dependency of its
+         own (pure schema, like rainelles.js/campaign-stations.js above), but garden-state-
+         validate.js has read root.GardenCultivars since C2.6b without this script ever loading
+         before it — a latent version of the exact ordering bug C2.4/C2.6a's own comments
+         describe, undetected until now because no save had ever set a specimen's readyToProduce
+         to true before this epic's tick actually does. Found and fixed while verifying this
+         epic's browser scenario (a Playwright run that teaches "récolter" and lets a specimen
+         mature threw exactly this TypeError before this move). Node tests never caught it either:
+         require() resolves cultivars.js correctly regardless of require-call order, only a
+         browser's deferred <script> order can. -->
+    <script src="/game/cultivars.js" defer></script>
+    <!-- Epic C2.6c: campaign-automation.js reads root.GardenConstruction (line 38 above),
+         root.GardenCampaignStations and root.GardenCultivars (both just above) at its own
+         script-execution time, and is itself read the same way by garden-state-validate.js
+         (CYCLE_SECONDS) and garden-state.js (tickRainelle/updateSpecimenReadiness) below — so it
+         must load after its three dependencies and before both. -->
+    <script src="/game/campaign-automation.js" defer></script>
+    <!-- Epic C2.8: pure diagnostics over rainelles.js/campaign-stations.js/cultivars.js/
+         campaign-automation.js, none of which read it back (no HUD wired to it yet, same
+         "posed, not wired" gap already left for rainelles.js's own phrase/trajectory helpers) —
+         loaded here anyway, right after its last dependency, to avoid the exact class of missing-
+         script bug documented above for campaign-clock.js/rainelles.js/cultivars.js. -->
+    <script src="/game/rainelles-status.js" defer></script>
     <script src="/garden-state-util.js" defer></script>
     <script src="/garden-state-migrate.js" defer></script>
     <script src="/garden-state-validate.js" defer></script>
@@ -54,10 +95,11 @@
     <script src="/garden-state-cmd-c.js" defer></script>
     <script src="/garden-state-cmd-d.js" defer></script>
     <script src="/garden-state-cmd-e.js" defer></script>
-    <!-- Campaign layer (docs/campagne-backlog.md phase 1). botany-genetics/botany-pot/cultivars
-         must load before garden-state-cmd-f.js, which reads root.GardenGenetics/GardenPot/
-         GardenCultivars at script-execution time. C1.1-C1.3 had proven this purely in Node; wiring
-         it into the live page is completed here, as a prerequisite for C1.4's notebook commands. -->
+    <!-- Campaign layer (docs/campagne-backlog.md phase 1). botany-genetics/botany-pot must load
+         before garden-state-cmd-f.js, which reads root.GardenGenetics/GardenPot/GardenCultivars
+         at script-execution time (cultivars.js itself now loads much earlier, see the C2.6c
+         comment above). C1.1-C1.3 had proven this purely in Node; wiring it into the live page is
+         completed here, as a prerequisite for C1.4's notebook commands. -->
     <script src="/game/botany-genetics.js" defer></script>
     <!-- Epic C1.7: modular rendering of hybrid cultivars, kept apart from botany-genetics.js
          (data) the same way botany.js/garden-models*.js render the free garden's own species —
@@ -65,10 +107,17 @@
          requirement is loading after /vendor/three.min.js (line 28). -->
     <script src="/game/botany-hybrids.js" defer></script>
     <script src="/game/botany-pot.js" defer></script>
-    <script src="/game/cultivars.js" defer></script>
+    <!-- rainelles.js/cultivars.js themselves now load much earlier (before garden-state-
+         validate.js, see the C2.4/C2.6c comments above) since validate.js needs both too; they
+         remain before garden-state-cmd-f.js/-i.js/-j.js below, which also read root.GardenRainelles/
+         root.GardenCultivars at their own execution time, same ordering requirement as
+         botany-genetics.js/-pot.js above. -->
     <script src="/garden-state-cmd-f.js" defer></script>
     <script src="/garden-state-cmd-g.js" defer></script>
     <script src="/garden-state-cmd-h.js" defer></script>
+    <script src="/garden-state-cmd-i.js" defer></script>
+    <script src="/garden-state-cmd-j.js" defer></script>
+    <script src="/garden-state-cmd-k.js" defer></script>
     <script src="/game/save.js" defer></script>
     <script src="/garden-models.js" defer></script>
     <script src="/garden-models-leaf.js" defer></script>

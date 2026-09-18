@@ -6,6 +6,10 @@
     typeof module !== "undefined"
       ? require("./garden-state-util.js")
       : root.GardenStateParts.util;
+  const Clock =
+    typeof module !== "undefined"
+      ? require("./game/campaign-clock.js")
+      : root.GardenCampaignClock;
   function fresh(now) {
     return {
       version: 3,
@@ -81,6 +85,52 @@
       // already used by cultivars/campaignPot.
       specimens: [],
       specimenNextId: 1,
+      // Epic C2.2: the campaign's own daily count, distinct from s.elapsed (the free-garden's
+      // simulation tick count, untouched here). Incremented exactly once per "sleep" command,
+      // regardless of the hour reached beforehand ("dormir plus tôt", design §3).
+      campaignDay: 1,
+      // Plain, JSON-serialisable mirror of a fresh game/game/campaign-clock.js CampaignClock
+      // (activeSeconds/gameSeconds/paused only — never the class instance itself, nor its
+      // transient `_lastWall`, which is not meaningful across a save/reload and is re-armed by
+      // whatever wall-clock ticking wires this to the browser in a later epic, same "rules
+      // before rendering" posture as campaignPot/specimens above). "sleep" resets gameSeconds to
+      // 0 and paused to false: a new day always starts unpaused at 7h.
+      campaignClock: {
+        activeSeconds: Clock.DEFAULT_ACTIVE_SECONDS,
+        gameSeconds: 0,
+        paused: false,
+      },
+      // Epic C2.3: the first Rainelle is born the night a scripted frog encounter (armed by the
+      // triggerFrogEncounter command, garden-state-cmd-i.js) resolves against an actual pot
+      // draw, in "sleep" (garden-state-cmd-f.js). rainelles stays its own array, not folded into
+      // s.entities, same "rules before rendering" posture as specimens/cultivars above — no
+      // world placement or automation exists for a Rainelle yet.
+      rainelles: [],
+      rainelleNextId: 1,
+      campaignFrogEncounterPending: false,
+      // Epic C2.5: null outside a lesson. While a lesson runs, {rainelleId, step, draft} —
+      // step "watching" (just after "Regarde-moi", clock paused, no draft yet) or "reviewing"
+      // (a demonstration was captured; draft holds {verbe, poste, source, destination,
+      // condition, phrase, trajectory} pending confirmTeaching/cancelTeaching). See
+      // garden-state-cmd-k.js.
+      campaignTeaching: null,
+      // Epic C2.5: the last gesture a lesson actually confirmed (verbe/poste/source/destination/
+      // condition only, no phrase/trajectory — those are draft-only, not part of what a Rainelle
+      // remembers). null until the very first confirmTeaching. Reapplied as-is by
+      // teachGestureQuick, design §5's "courte répétition... sans refaire tout le tutoriel".
+      campaignLastDemonstration: null,
+      // Epic C2.6a: registry of water bornes/culture zones/paniers a gesture's poste/source/
+      // destination can eventually resolve against (see campaign-stations.js's own header
+      // comment). Empty on a fresh save — no command places a station yet, same "posed, not
+      // wired" gap as specimens/rainelles at their own introduction.
+      campaignStations: {
+        bornes: [],
+        zones: [],
+        paniers: [],
+        borneNextId: 1,
+        zoneNextId: 1,
+        panierNextId: 1,
+      },
     };
   }
   function migrate(old, now = Date.now()) {

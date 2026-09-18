@@ -18,6 +18,30 @@
     typeof module !== "undefined"
       ? require("./garden-state-migrate.js")
       : { migrateLandscape: root.GardenStateParts.migrateLandscape };
+  const Clock =
+    typeof module !== "undefined"
+      ? require("./game/campaign-clock.js")
+      : root.GardenCampaignClock;
+  const Rainelles =
+    typeof module !== "undefined"
+      ? require("./game/rainelles.js")
+      : root.GardenRainelles;
+  const Stations =
+    typeof module !== "undefined"
+      ? require("./game/campaign-stations.js")
+      : root.GardenCampaignStations;
+  const Cultivars =
+    typeof module !== "undefined"
+      ? require("./game/cultivars.js")
+      : root.GardenCultivars;
+  // Epic C2.6c: only read here for its CYCLE_SECONDS bound on a persisted rainelle.job.remaining
+  // (see campaign-automation.js's own header comment on that constant) — never for validate()'s
+  // own control flow, so this stays a pure sibling of the Cultivars/Rainelles/Stations reads
+  // above rather than a real dependency on tick behaviour.
+  const CampaignAutomation =
+    typeof module !== "undefined"
+      ? require("./game/campaign-automation.js")
+      : root.GardenCampaignAutomation;
   function validate(s) {
     s = migrateLandscape(s);
     if (
@@ -309,7 +333,12 @@
             !s.cultivars?.some((c) => c.id === sp.cultivarId) ||
             !finite(sp.x, -64, 64) ||
             !finite(sp.z, -64, 64) ||
-            !count(sp.stage),
+            !count(sp.stage) ||
+            (sp.moistureAt !== undefined &&
+              !finite(sp.moistureAt, 0, Number.MAX_SAFE_INTEGER)) ||
+            (sp.readyToProduce !== undefined &&
+              typeof sp.readyToProduce !== "boolean") ||
+            (sp.readyToProduce === true && !Cultivars.isMature(sp)),
         ))
     )
       throw Error("Spécimen invalide.");
@@ -321,6 +350,170 @@
         Math.max(...s.specimens.map((sp) => Number(sp.id.slice(2))))
     )
       throw Error("Identifiants de spécimen invalides.");
+    if (
+      s.campaignDay !== undefined &&
+      (!count(s.campaignDay) || s.campaignDay < 1)
+    )
+      throw Error("Jour de campagne invalide.");
+    if (
+      s.campaignClock !== undefined &&
+      (typeof s.campaignClock !== "object" ||
+        s.campaignClock === null ||
+        !finite(s.campaignClock.activeSeconds, 1, Number.MAX_SAFE_INTEGER) ||
+        !finite(s.campaignClock.gameSeconds, 0, Clock.DAY_SECONDS) ||
+        typeof s.campaignClock.paused !== "boolean")
+    )
+      throw Error("Horloge de campagne invalide.");
+    if (
+      s.rainelles !== undefined &&
+      (!Array.isArray(s.rainelles) ||
+        new Set(s.rainelles.map((r) => r?.id)).size !== s.rainelles.length ||
+        s.rainelles.some(
+          (r) =>
+            !r ||
+            !/^r\d+$/.test(r.id) ||
+            !s.cultivars?.some((c) => c.id === r.cultivarId) ||
+            typeof r.name !== "string" ||
+            (r.geste !== undefined &&
+              r.geste !== null &&
+              (typeof r.geste !== "object" ||
+                !Rainelles.VERBS.includes(r.geste.verbe) ||
+                typeof r.geste.poste !== "string" ||
+                !r.geste.poste ||
+                typeof r.geste.source !== "string" ||
+                !r.geste.source ||
+                typeof r.geste.destination !== "string" ||
+                !r.geste.destination ||
+                typeof r.geste.condition !== "string")) ||
+            // Epic C2.6c: job is optional (a pre-epic save, or a Rainelle whose gesture never
+            // reached a valid station, has none) but well-formed when present — the same
+            // countdown shape as automation.js's own e.job.
+            (r.job !== undefined &&
+              r.job !== null &&
+              (typeof r.job !== "object" ||
+                !finite(r.job.remaining, 0, CampaignAutomation.CYCLE_SECONDS))),
+        ))
+    )
+      throw Error("Rainelle invalide.");
+    if (s.rainelleNextId !== undefined && !count(s.rainelleNextId))
+      throw Error("Rainelle invalide.");
+    if (
+      s.rainelles?.length &&
+      s.rainelleNextId <=
+        Math.max(...s.rainelles.map((r) => Number(r.id.slice(1))))
+    )
+      throw Error("Identifiants de rainelle invalides.");
+    if (
+      s.campaignFrogEncounterPending !== undefined &&
+      typeof s.campaignFrogEncounterPending !== "boolean"
+    )
+      throw Error("Rencontre de la grenouille invalide.");
+    // A gesture-shaped object (verbe/poste/source/destination/condition), the same fields
+    // rainelle.geste already validates above — shared here so campaignTeaching's draft and
+    // campaignLastDemonstration can't silently drift from what a Rainelle is actually allowed
+    // to remember.
+    const validGesteFields = (g) =>
+      g &&
+      typeof g === "object" &&
+      Rainelles.VERBS.includes(g.verbe) &&
+      typeof g.poste === "string" &&
+      g.poste &&
+      typeof g.source === "string" &&
+      g.source &&
+      typeof g.destination === "string" &&
+      g.destination &&
+      typeof g.condition === "string";
+    if (
+      s.campaignTeaching !== undefined &&
+      s.campaignTeaching !== null &&
+      (typeof s.campaignTeaching !== "object" ||
+        !s.rainelles?.some((r) => r.id === s.campaignTeaching.rainelleId) ||
+        !["watching", "reviewing"].includes(s.campaignTeaching.step) ||
+        (s.campaignTeaching.step === "watching" &&
+          s.campaignTeaching.draft !== null) ||
+        (s.campaignTeaching.step === "reviewing" &&
+          (!validGesteFields(s.campaignTeaching.draft) ||
+            typeof s.campaignTeaching.draft.phrase !== "string" ||
+            !s.campaignTeaching.draft.phrase ||
+            s.campaignTeaching.draft.phrase.length > 240 ||
+            !Array.isArray(s.campaignTeaching.draft.trajectory) ||
+            s.campaignTeaching.draft.trajectory.length < 1 ||
+            s.campaignTeaching.draft.trajectory.length > 3 ||
+            s.campaignTeaching.draft.trajectory.some(
+              (step) => typeof step !== "string" || !step,
+            ))))
+    )
+      throw Error("Leçon en cours invalide.");
+    if (
+      s.campaignLastDemonstration !== undefined &&
+      s.campaignLastDemonstration !== null &&
+      !validGesteFields(s.campaignLastDemonstration)
+    )
+      throw Error("Dernière démonstration invalide.");
+    if (s.campaignStations !== undefined) {
+      if (typeof s.campaignStations !== "object" || s.campaignStations === null)
+        throw Error("Registre de stations invalide.");
+      // No cross-collection uniqueness check needed: distinct prefixes (b/z/pn) already make a
+      // borne/zone/panier id disjoint by construction, so per-collection uniqueness suffices.
+      for (const kind of Object.keys(Stations.KINDS)) {
+        const { collection, prefix, counter } = Stations.KINDS[kind];
+        const list = s.campaignStations[collection];
+        if (
+          !Array.isArray(list) ||
+          new Set(list.map((st) => st?.id)).size !== list.length ||
+          list.some(
+            (st) =>
+              !st ||
+              !new RegExp(`^${prefix}\\d+$`).test(st.id) ||
+              !finite(st.x, -64, 64) ||
+              !finite(st.z, -64, 64),
+          )
+        )
+          throw Error("Registre de stations invalide.");
+        // Epic C2.6c: only a panier carries a buffer (item id -> qty, same shape as
+        // automation.js's own e.buffer); optional so a pre-epic panier still loads, well-formed
+        // when present. cultivarId is used as the buffer's key (see campaign-automation.js's own
+        // tickRecolter comment) so a valid key is any known cultivar, not knownItem() — a
+        // campaign cultivar was never an inventory item to begin with.
+        if (
+          kind === "panier" &&
+          list.some(
+            (st) =>
+              st.buffer !== undefined &&
+              (typeof st.buffer !== "object" ||
+                st.buffer === null ||
+                Object.entries(st.buffer).some(
+                  ([cultivarId, qty]) =>
+                    !s.cultivars?.some((c) => c.id === cultivarId) || !count(qty),
+                )),
+          )
+        )
+          throw Error("Registre de stations invalide.");
+        // Epic C2.8: capacity/min are optional so a pre-epic panier still loads (defaulted just
+        // below, same posture as buffer at C2.6c); when present, both must be finite, capacity
+        // strictly positive (a zero-capacity panier could never receive anything, a degenerate
+        // state no command can express) and min within [0, capacity] (a floor above the ceiling
+        // could never be satisfied).
+        if (
+          kind === "panier" &&
+          list.some(
+            (st) =>
+              (st.capacity !== undefined && !finite(st.capacity, 1, Infinity)) ||
+              (st.min !== undefined &&
+                !finite(st.min, 0, st.capacity ?? Infinity)),
+          )
+        )
+          throw Error("Registre de stations invalide.");
+        if (!count(s.campaignStations[counter]))
+          throw Error("Registre de stations invalide.");
+        if (
+          list.length &&
+          s.campaignStations[counter] <=
+            Math.max(...list.map((st) => Number(st.id.slice(prefix.length))))
+        )
+          throw Error("Identifiants de station invalides.");
+      }
+    }
     const result = clone(s);
     result.hotbar ??= [...D.defaultHotbar];
     result.quests ??= { active: [], completed: [] };
@@ -328,8 +521,53 @@
     result.cultivarNextId ??= 1;
     result.campaignPot ??= { capacity: 1, pending: [] };
     result.campaignSeedBox ??= { seeded: false, cultivarId: null, retrievals: 0 };
-    result.specimens ??= [];
+    // Epic C2.6b: moistureAt/readyToProduce migrate per specimen, not just the array as a whole
+    // — a pre-epic specimen only lacks these two fields, defaulted here rather than left
+    // undefined so specimenMoisture/setReadyToProduce always see a well-formed specimen.
+    // moistureAt defaults to "fully moist as of right now" (the save's own s.elapsed) rather
+    // than 0, so a specimen from before this epic doesn't retroactively look bone dry.
+    result.specimens = (result.specimens ?? []).map((sp) => ({
+      moistureAt: s.elapsed ?? 0,
+      readyToProduce: false,
+      ...sp,
+    }));
     result.specimenNextId ??= 1;
+    result.campaignDay ??= 1;
+    result.campaignClock ??= {
+      activeSeconds: Clock.DEFAULT_ACTIVE_SECONDS,
+      gameSeconds: 0,
+      paused: false,
+    };
+    // Epic C2.6c: job migrates per rainelle, same reasoning as specimens' moistureAt/
+    // readyToProduce just above — a pre-epic rainelle only lacks this one field.
+    result.rainelles = (result.rainelles ?? []).map((r) => ({
+      job: null,
+      ...r,
+    }));
+    result.rainelleNextId ??= 1;
+    result.campaignFrogEncounterPending ??= false;
+    result.campaignTeaching ??= null;
+    result.campaignLastDemonstration ??= null;
+    result.campaignStations ??= {
+      bornes: [],
+      zones: [],
+      paniers: [],
+      borneNextId: 1,
+      zoneNextId: 1,
+      panierNextId: 1,
+    };
+    // Epic C2.6c/C2.8: buffer/capacity/min migrate per panier, same reasoning — a pre-epic
+    // panier only lacks these fields; bornes/zones never had any of them to begin with.
+    // DEFAULT_PANIER_CAPACITY/MIN mirror exactly what registerStation itself now sets on a
+    // freshly created panier, so a migrated pre-epic panier and a brand-new one start identical.
+    result.campaignStations.paniers = (result.campaignStations.paniers ?? []).map(
+      (p) => ({
+        buffer: {},
+        capacity: Stations.DEFAULT_PANIER_CAPACITY,
+        min: Stations.DEFAULT_PANIER_MIN,
+        ...p,
+      }),
+    );
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };

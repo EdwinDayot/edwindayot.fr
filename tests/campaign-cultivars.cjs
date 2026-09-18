@@ -40,7 +40,15 @@ test("A second cultivar gets a distinct, incrementing id", () => {
 test("createSpecimen assigns a stable id and appends the specimen to s.specimens (wired by epic C1.6, see tests/campaign-multiply.cjs for the plantSpecimen/multiplySpecimen commands built on it)", () => {
   const g = new GardenState(null, 1000);
   const specimen = Cultivars.createSpecimen(g.s, { cultivarId: "c1", x: 2.5, z: -1 });
-  assert.deepEqual(specimen, { id: "sp1", cultivarId: "c1", x: 2.5, z: -1, stage: 0 });
+  assert.deepEqual(specimen, {
+    id: "sp1",
+    cultivarId: "c1",
+    x: 2.5,
+    z: -1,
+    stage: 0,
+    moistureAt: 0,
+    readyToProduce: false,
+  });
   assert.deepEqual(g.s.specimens, [specimen]);
   assert.equal(g.s.specimenNextId, 2);
 });
