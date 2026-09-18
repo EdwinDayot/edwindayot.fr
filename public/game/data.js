@@ -17,6 +17,7 @@
   const {
     species,
     zones,
+    zoneGroundColors,
     recipes,
     mining,
     tools,
@@ -47,6 +48,12 @@
       [-35, -12],
       [-29, -27],
       [-22, -19],
+    ],
+    // Zone 4 (Épic C3.5), clear of the gate [-6, 23] and the two houses.
+    [
+      [-14, 31],
+      [-2, 31],
+      [-6, 33],
     ],
   ];
   const resources = zones.flatMap((z) =>
@@ -129,6 +136,11 @@
       [-37, -15],
       [-24, -22],
       [-29, -33],
+      // Zone 4 (Épic C3.5): raises wood/stone/clay to four each there too,
+      // matching the >=4-per-zone-per-type floor already true for zones 0-3.
+      [-15, 24],
+      [1, 24],
+      [-14, 33],
     ],
     stone: [
       [-9, -1],
@@ -143,6 +155,9 @@
       [-20, -8],
       [-34, -24],
       [-25, -31],
+      [-15, 27],
+      [1, 27],
+      [-2, 33],
     ],
     clay: [
       [-13, 3],
@@ -157,6 +172,9 @@
       [-32, -10],
       [-19, -24],
       [-28, -14],
+      [-11, 23],
+      [3, 23],
+      [-9, 31],
     ],
   };
   for (const [type, points] of Object.entries(sites))
@@ -200,6 +218,7 @@
     balance,
     species,
     zones,
+    zoneGroundColors,
     recipes,
     visitors,
     buildings,

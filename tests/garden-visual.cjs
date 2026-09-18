@@ -38,7 +38,7 @@ const url = process.env.GARDEN_URL || "http://127.0.0.1:4174/";
       const D = GardenData,
         g = new GardenRules.GardenState();
       g.s.entities = [];
-      g.s.unlocked = [0, 1, 2, 3];
+      g.s.unlocked = D.zones.map((z) => z.id);
       g.s.discovered = D.species.map((p) => p.id);
       let id = 1;
       for (let i = 0; i < 48; i++)

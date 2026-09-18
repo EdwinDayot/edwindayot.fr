@@ -34,6 +34,10 @@
     typeof module !== "undefined"
       ? require("./game/cultivars.js")
       : root.GardenCultivars;
+  const House =
+    typeof module !== "undefined"
+      ? require("./game/campaign-house.js")
+      : root.GardenCampaignHouse;
   // Epic C2.6c: only read here for its CYCLE_SECONDS bound on a persisted rainelle.job.remaining
   // (see campaign-automation.js's own header comment on that constant) — never for validate()'s
   // own control flow, so this stays a pure sibling of the Cultivars/Rainelles/Stations reads
@@ -143,7 +147,7 @@
         "Réseau invalide : substances incompatibles reliées ensemble.",
       );
     for (const [key, allowed] of [
-      ["unlocked", [0, 1, 2, 3]],
+      ["unlocked", [0, 1, 2, 3, 4]],
       ["discovered", D.species.map((p) => p.id)],
       ["plans", Object.keys(D.recipes)],
       ["botanyRewards", [3, 6, 9, 12]],
@@ -391,7 +395,12 @@
             (r.job !== undefined &&
               r.job !== null &&
               (typeof r.job !== "object" ||
-                !finite(r.job.remaining, 0, CampaignAutomation.CYCLE_SECONDS))),
+                !finite(r.job.remaining, 0, CampaignAutomation.CYCLE_SECONDS))) ||
+            // Epic C3.4: a bourgeon has no shape of its own beyond "present or not" (see
+            // rainelles.js's own comment) — optional so a pre-epic rainelle still loads.
+            (r.bourgeon !== undefined &&
+              r.bourgeon !== null &&
+              r.bourgeon !== true),
         ))
     )
       throw Error("Rainelle invalide.");
@@ -408,6 +417,30 @@
       typeof s.campaignFrogEncounterPending !== "boolean"
     )
       throw Error("Rencontre de la grenouille invalide.");
+    // Epic C3.4: a nursery entry only ever carries the cultivarId inherited from the Rainelle
+    // whose bourgeon produced it (see rainelles.js's harvestBud comment) — validated against
+    // s.cultivars exactly like rainelle.cultivarId is, just above.
+    if (
+      s.campaignNursery !== undefined &&
+      (!Array.isArray(s.campaignNursery) ||
+        new Set(s.campaignNursery.map((n) => n?.id)).size !==
+          s.campaignNursery.length ||
+        s.campaignNursery.some(
+          (n) =>
+            !n ||
+            !/^nu\d+$/.test(n.id) ||
+            !s.cultivars?.some((c) => c.id === n.cultivarId),
+        ))
+    )
+      throw Error("Nurserie invalide.");
+    if (s.campaignNurseryNextId !== undefined && !count(s.campaignNurseryNextId))
+      throw Error("Nurserie invalide.");
+    if (
+      s.campaignNursery?.length &&
+      s.campaignNurseryNextId <=
+        Math.max(...s.campaignNursery.map((n) => Number(n.id.slice(2))))
+    )
+      throw Error("Identifiants de nurserie invalides.");
     // A gesture-shaped object (verbe/poste/source/destination/condition), the same fields
     // rainelle.geste already validates above — shared here so campaignTeaching's draft and
     // campaignLastDemonstration can't silently drift from what a Rainelle is actually allowed
@@ -458,6 +491,12 @@
       for (const kind of Object.keys(Stations.KINDS)) {
         const { collection, prefix, counter } = Stations.KINDS[kind];
         const list = s.campaignStations[collection];
+        // Epic C3.3: unlike bornes/zones/paniers (present since C2.6a, whenever campaignStations
+        // itself exists at all), a save from before this epic has campaignStations but no
+        // habitats collection yet — valid as "not migrated yet", defaulted below rather than
+        // rejected here. A save that HAS started a habitats collection is still validated fully.
+        if (kind === "habitat" && list === undefined && s.campaignStations[counter] === undefined)
+          continue;
         if (
           !Array.isArray(list) ||
           new Set(list.map((st) => st?.id)).size !== list.length ||
@@ -504,6 +543,14 @@
           )
         )
           throw Error("Registre de stations invalide.");
+        // Epic C3.3: a habitat's capacity is required (no optional/default path — unlike a
+        // panier's capacity/min, no pre-epic habitat can exist to migrate), and bounded below by
+        // Stations.MIN_HABITAT_CAPACITY (design §6's "plusieurs places de vie", more than one).
+        if (
+          kind === "habitat" &&
+          list.some((st) => !finite(st.capacity, Stations.MIN_HABITAT_CAPACITY, Infinity))
+        )
+          throw Error("Registre de stations invalide.");
         if (!count(s.campaignStations[counter]))
           throw Error("Registre de stations invalide.");
         if (
@@ -514,6 +561,34 @@
           throw Error("Identifiants de station invalides.");
       }
     }
+    // Epic C3.1: when present, campaignHouse must already carry all six named spaces (no
+    // partial-object migration here — the whole registry is introduced by this epic, so an
+    // older save simply lacks the field entirely and gets House.freshHouse() below).
+    if (
+      s.campaignHouse !== undefined &&
+      (typeof s.campaignHouse !== "object" ||
+        s.campaignHouse === null ||
+        typeof s.campaignHouse.spaces !== "object" ||
+        s.campaignHouse.spaces === null ||
+        House.SPACE_IDS.some((id) => {
+          const space = s.campaignHouse.spaces[id];
+          return (
+            !space ||
+            !["delabre", "repare"].includes(space.status) ||
+            typeof space.locked !== "boolean"
+          );
+        }))
+    )
+      throw Error("Maison refuge invalide.");
+    // Epic C3.6: when present, campaignTools must be a flat list of unique string ids — no shape
+    // beyond that (unlike cultivars/rainelles, a tool carries no other persisted data yet).
+    if (
+      s.campaignTools !== undefined &&
+      (!Array.isArray(s.campaignTools) ||
+        s.campaignTools.some((t) => typeof t !== "string") ||
+        new Set(s.campaignTools).size !== s.campaignTools.length)
+    )
+      throw Error("Outils de campagne invalides.");
     const result = clone(s);
     result.hotbar ??= [...D.defaultHotbar];
     result.quests ??= { active: [], completed: [] };
@@ -540,12 +615,17 @@
     };
     // Epic C2.6c: job migrates per rainelle, same reasoning as specimens' moistureAt/
     // readyToProduce just above — a pre-epic rainelle only lacks this one field.
+    // Epic C3.4: bourgeon migrates per rainelle, same reasoning as job just above — a pre-epic
+    // rainelle only lacks this one field.
     result.rainelles = (result.rainelles ?? []).map((r) => ({
       job: null,
+      bourgeon: null,
       ...r,
     }));
     result.rainelleNextId ??= 1;
     result.campaignFrogEncounterPending ??= false;
+    result.campaignNursery ??= [];
+    result.campaignNurseryNextId ??= 1;
     result.campaignTeaching ??= null;
     result.campaignLastDemonstration ??= null;
     result.campaignStations ??= {
@@ -555,7 +635,14 @@
       borneNextId: 1,
       zoneNextId: 1,
       panierNextId: 1,
+      habitats: [],
+      habitatNextId: 1,
     };
+    // Epic C3.3: a pre-epic save has campaignStations but no habitats collection at all (the
+    // object above only fires when campaignStations itself is entirely missing) — defaulted here
+    // too, same two-level migration already used for paniers' buffer/capacity/min just below.
+    result.campaignStations.habitats ??= [];
+    result.campaignStations.habitatNextId ??= 1;
     // Epic C2.6c/C2.8: buffer/capacity/min migrate per panier, same reasoning — a pre-epic
     // panier only lacks these fields; bornes/zones never had any of them to begin with.
     // DEFAULT_PANIER_CAPACITY/MIN mirror exactly what registerStation itself now sets on a
@@ -568,6 +655,8 @@
         ...p,
       }),
     );
+    result.campaignHouse ??= House.freshHouse();
+    result.campaignTools ??= [];
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };

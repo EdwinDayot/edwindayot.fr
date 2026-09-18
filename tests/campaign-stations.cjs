@@ -8,8 +8,13 @@ const Stations = require("../public/game/campaign-stations.js");
 // chacun avec un id stable et une position, plus une fonction pure de résolution contre ce
 // registre. Aucune commande de geste n'est câblée dessus ici (teachGesture/demonstrateGesture
 // restent du texte libre, comportement inchangé) : voir campaign-stations.js pour la raison.
+//
+// Epic C3.3 ajoute une quatrième collection, `habitats` (design §5/§6 : « le nombre de postes de
+// travail ouvrables dépend des habitats aménagés... un habitat fournit plusieurs places de vie »).
+// Toutes les fixtures de registre ci-dessus incluent donc désormais `habitats`/`habitatNextId`,
+// vides par défaut — voir tests/campaign-habitats.cjs pour les tests dédiés à cette collection.
 
-test("a fresh campaign save declares an empty stations registry with the three collections", () => {
+test("a fresh campaign save declares an empty stations registry with all four collections", () => {
   const g = new GardenState(null, 1000);
   assert.deepEqual(g.s.campaignStations, {
     bornes: [],
@@ -18,6 +23,8 @@ test("a fresh campaign save declares an empty stations registry with the three c
     borneNextId: 1,
     zoneNextId: 1,
     panierNextId: 1,
+    habitats: [],
+    habitatNextId: 1,
   });
 });
 
@@ -29,6 +36,8 @@ test("registerStation assigns a stable, kind-prefixed id and appends to the righ
     borneNextId: 1,
     zoneNextId: 1,
     panierNextId: 1,
+    habitats: [],
+    habitatNextId: 1,
   };
   const borne = Stations.registerStation(registry, "borne", { x: 1, z: 2 });
   const zone = Stations.registerStation(registry, "zone", { x: 3, z: 4 });
@@ -59,6 +68,8 @@ test("registerStation increments a per-kind counter, never reusing an id even ac
     borneNextId: 1,
     zoneNextId: 1,
     panierNextId: 1,
+    habitats: [],
+    habitatNextId: 1,
   };
   const b1 = Stations.registerStation(registry, "borne", { x: 0, z: 0 });
   const b2 = Stations.registerStation(registry, "borne", { x: 1, z: 0 });
@@ -78,6 +89,8 @@ test("registerStation refuses an unknown kind, never silently creating a malform
     borneNextId: 1,
     zoneNextId: 1,
     panierNextId: 1,
+    habitats: [],
+    habitatNextId: 1,
   };
   assert.throws(() => Stations.registerStation(registry, "arbre", { x: 0, z: 0 }));
   assert.equal(registry.bornes.length, 0);
@@ -93,6 +106,8 @@ test("resolveStation finds a known id in any of the three collections", () => {
     borneNextId: 1,
     zoneNextId: 1,
     panierNextId: 1,
+    habitats: [],
+    habitatNextId: 1,
   };
   const borne = Stations.registerStation(registry, "borne", { x: 0, z: 0 });
   const zone = Stations.registerStation(registry, "zone", { x: 1, z: 1 });
@@ -122,6 +137,8 @@ test("resolveStation fails explicitly on an unknown id — never a silent undefi
     borneNextId: 1,
     zoneNextId: 1,
     panierNextId: 1,
+    habitats: [],
+    habitatNextId: 1,
   };
   const r = Stations.resolveStation(registry, "b999");
   assert.equal(r.ok, false);
@@ -144,6 +161,8 @@ test("a real round trip through JSON keeps a populated registry strictly identic
     borneNextId: 1,
     zoneNextId: 1,
     panierNextId: 1,
+    habitats: [],
+    habitatNextId: 1,
   };
   Stations.registerStation(registry, "borne", { x: 1.5, z: -2 });
   Stations.registerStation(registry, "zone", { x: 0, z: 0 });
@@ -164,6 +183,8 @@ test("an existing save without campaignStations migrates to the empty default re
     borneNextId: 1,
     zoneNextId: 1,
     panierNextId: 1,
+    habitats: [],
+    habitatNextId: 1,
   });
 });
 

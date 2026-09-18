@@ -152,6 +152,33 @@
       roofColor: 0x5c4632,
       roofHeight: 2.55,
     },
+    // Épic C3.5: le coin de village (zone 4), deux habitants génériques sans
+    // identité narrative (voir note de tête de la phase 3 du backlog) — le
+    // rôle "resident" existant suffit à prouver la capacité mécanique d'une
+    // zone habitée ; l'identité et une éventuelle quête réelle sont un
+    // chantier de la phase 4 (C4.3 et suivants).
+    {
+      visitorId: "villageois-1",
+      cx: -11,
+      cz: 26,
+      accent: 0x7a8f6a,
+      personColor: 0xcf9b6d,
+      role: "resident",
+      roleData: { line: "range le bois pour l’hiver" },
+      roofColor: 0x6b4a3a,
+      roofHeight: 2.6,
+    },
+    {
+      visitorId: "villageois-2",
+      cx: -1,
+      cz: 26,
+      accent: 0x9c8a6a,
+      personColor: 0xdbaea0,
+      role: "resident",
+      roleData: { line: "répare une clôture" },
+      roofColor: 0x5c4632,
+      roofHeight: 2.7,
+    },
   ].map(
     ({
       visitorId,
@@ -193,6 +220,8 @@
     ines: "Ines · céramique",
     hugo: "Hugo · lecture",
     zoe: "Zoé · sieste",
+    "villageois-1": "Villageois 1 · coin de village",
+    "villageois-2": "Villageois 2 · coin de village",
   };
   const visitors = buildings.map((b) => ({
     id: b.visitorId,

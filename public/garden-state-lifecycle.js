@@ -10,6 +10,10 @@
     typeof module !== "undefined"
       ? require("./game/campaign-clock.js")
       : root.GardenCampaignClock;
+  const House =
+    typeof module !== "undefined"
+      ? require("./game/campaign-house.js")
+      : root.GardenCampaignHouse;
   function fresh(now) {
     return {
       version: 3,
@@ -51,7 +55,11 @@
         },
       ],
       links: [],
-      unlocked: [0],
+      // Zone 4 ("Le coin de village", Épic C3.5) is always unlocked like
+      // zone0: it has no cost/rep gate of its own (data-world.js), and it
+      // only borders zone0, so a locked-by-default zone4 would be an
+      // unreachable island whenever zone1/2/3 are still locked.
+      unlocked: [0, 4],
       discovered: ["pilea", "monstera", "calathea"],
       reputation: 0,
       trades: 0,
@@ -108,6 +116,13 @@
       rainelles: [],
       rainelleNextId: 1,
       campaignFrogEncounterPending: false,
+      // Epic C3.4: a bourgeon prélevé (harvestBud, garden-state-cmd-m.js) waits here — a plain
+      // FIFO of { id, cultivarId } — until the next "sleep" resolves each entry into a brand-new
+      // Rainelle (garden-state-cmd-f.js), the same "posed, then resolved at the next sleep"
+      // pattern as campaignPot.pending. A reload mid-maturation can therefore never wake it early
+      // or twice: resolution only ever happens inside the sleep command itself, never on load.
+      campaignNursery: [],
+      campaignNurseryNextId: 1,
       // Epic C2.5: null outside a lesson. While a lesson runs, {rainelleId, step, draft} —
       // step "watching" (just after "Regarde-moi", clock paused, no draft yet) or "reviewing"
       // (a demonstration was captured; draft holds {verbe, poste, source, destination,
@@ -130,7 +145,20 @@
         borneNextId: 1,
         zoneNextId: 1,
         panierNextId: 1,
+        // Epic C3.3: fourth collection, living places (design §6) — see campaign-stations.js's
+        // own header comment for why it lives here rather than in a separate field.
+        habitats: [],
+        habitatNextId: 1,
       },
+      // Epic C3.1: the refuge house's six named spaces (design §6), delabre/locked by default
+      // except the reception room (locked: false, still delabre — see campaign-house.js's own
+      // header comment for why unlocked and repaired are kept distinct).
+      campaignHouse: House.freshHouse(),
+      // Epic C3.6: named tools granted by quest completion (reward.tools, garden-state-cmd-e.js),
+      // a plain list of string ids — no mechanical effect yet (no campaign construction gesture
+      // consumes a tool as a prerequisite today), same "posed, not wired" gap already documented
+      // at specimens/rainelles/campaignStations above.
+      campaignTools: [],
     };
   }
   function migrate(old, now = Date.now()) {

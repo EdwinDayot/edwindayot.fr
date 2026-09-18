@@ -3,8 +3,9 @@
    yet — that is the campaign's own s.campaignPot, not the free-garden's "pot" entity type), so
    neither is added to garden-state.js's `physical` list, which requires a nearby entity.
    Epic C2.2 extends "sleep" with the campaign day/clock bilan (see its own comment below);
-   Epic C2.3 further extends it with the scripted frog encounter (see below); sowPot is
-   unchanged by either. */
+   Epic C2.3 further extends it with the scripted frog encounter (see below); Epic C3.4 further
+   extends it with the bourgeon/nursery resolution (see below). sowPot is unchanged by all
+   three. */
 (function (root) {
   const Genetics =
     typeof module !== "undefined"
@@ -67,6 +68,15 @@
           Rainelles.createRainelle(s, { cultivarId: frogCultivarId, name: "" });
           s.campaignFrogEncounterPending = false;
         }
+        // Epic C3.4: every bourgeon harvestBud already deposited resolves here, exactly once,
+        // the same "posed, then resolved at the next sleep" pattern as campaignPot.pending just
+        // above — never on load, only inside this command. Each new individual is born without a
+        // taught gesture (design §5: "il ne copie pas un souvenir ni une obligation de métier"),
+        // sharing the cultivar of the Rainelle that formed its bourgeon (see rainelles.js's own
+        // harvestBud comment).
+        for (const bud of s.campaignNursery)
+          Rainelles.createRainelle(s, { cultivarId: bud.cultivarId, name: "" });
+        s.campaignNursery = [];
         // Epic C2.2: the atomic night bilan. "sleep" is the single command a scripted 23h
         // transition and a voluntary early bedtime ("dormir plus tôt", design §3) both end up
         // calling — neither reads s.campaignClock.gameSeconds beforehand, so an early sleep

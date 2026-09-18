@@ -99,7 +99,7 @@ test("Renewable sites are spread over all zones and old saves retain their coold
   const saved = g.serialize();
   saved.resources[0].work = 99;
   assert.throws(() => validate(saved));
-  g.s.unlocked = [0, 1, 2, 3];
+  g.s.unlocked = D.zones.map((z) => z.id);
   for (const resource of g.s.resources)
     assert.ok(
       C.approach(g.s, { x: 0, z: 4 }, resource).length,

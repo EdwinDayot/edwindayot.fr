@@ -61,6 +61,23 @@ const TRANSPARENT_ALLOWLIST = [
         });
       }
 
+      // Epic C3.2 (docs/campagne-backlog.md): the refuge house, both delabre and repare states,
+      // exercised through this exact live-page scene graph for the same reason as the hybrids
+      // above — this audit is the real gate for a rendering epic, not a screenshot. Positioned
+      // far off the playable area, same convention as the hybrids block.
+      if (window.GardenCampaignHouse && window.GardenRenderCampaignHouse) {
+        const House = window.GardenCampaignHouse,
+          RenderHouse = window.GardenRenderCampaignHouse;
+        const delabre = RenderHouse.buildRefugeHouseGroup(House.freshHouse());
+        delabre.position.set(220, 0, 220);
+        v.scene.add(delabre);
+        const repaired = House.freshHouse();
+        repaired.spaces.accueil.status = "repare";
+        const repare = RenderHouse.buildRefugeHouseGroup(repaired);
+        repare.position.set(230, 0, 220);
+        v.scene.add(repare);
+      }
+
       // Sample a few times of day: a defect that only shows under one lighting angle (the
       // terrain-normal bug was exactly this — it read fine at some sun angles) must not hide.
       const times = [50, 300, 600, 900, 1150];
