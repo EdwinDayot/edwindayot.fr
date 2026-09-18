@@ -30,6 +30,10 @@
     typeof module !== "undefined"
       ? require("./game/campaign-stations.js")
       : root.GardenCampaignStations;
+  const Cultivars =
+    typeof module !== "undefined"
+      ? require("./game/cultivars.js")
+      : root.GardenCultivars;
   function validate(s) {
     s = migrateLandscape(s);
     if (
@@ -321,7 +325,12 @@
             !s.cultivars?.some((c) => c.id === sp.cultivarId) ||
             !finite(sp.x, -64, 64) ||
             !finite(sp.z, -64, 64) ||
-            !count(sp.stage),
+            !count(sp.stage) ||
+            (sp.moistureAt !== undefined &&
+              !finite(sp.moistureAt, 0, Number.MAX_SAFE_INTEGER)) ||
+            (sp.readyToProduce !== undefined &&
+              typeof sp.readyToProduce !== "boolean") ||
+            (sp.readyToProduce === true && !Cultivars.isMature(sp)),
         ))
     )
       throw Error("Spécimen invalide.");
@@ -463,7 +472,16 @@
     result.cultivarNextId ??= 1;
     result.campaignPot ??= { capacity: 1, pending: [] };
     result.campaignSeedBox ??= { seeded: false, cultivarId: null, retrievals: 0 };
-    result.specimens ??= [];
+    // Epic C2.6b: moistureAt/readyToProduce migrate per specimen, not just the array as a whole
+    // — a pre-epic specimen only lacks these two fields, defaulted here rather than left
+    // undefined so specimenMoisture/setReadyToProduce always see a well-formed specimen.
+    // moistureAt defaults to "fully moist as of right now" (the save's own s.elapsed) rather
+    // than 0, so a specimen from before this epic doesn't retroactively look bone dry.
+    result.specimens = (result.specimens ?? []).map((sp) => ({
+      moistureAt: s.elapsed ?? 0,
+      readyToProduce: false,
+      ...sp,
+    }));
     result.specimenNextId ??= 1;
     result.campaignDay ??= 1;
     result.campaignClock ??= {
