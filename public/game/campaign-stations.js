@@ -31,6 +31,12 @@
     borne: { collection: "bornes", prefix: "b", counter: "borneNextId" },
     zone: { collection: "zones", prefix: "z", counter: "zoneNextId" },
     panier: { collection: "paniers", prefix: "pn", counter: "panierNextId" },
+    // Epic C3.3 (design §6 : « le nombre de postes de travail ouvrables dépend des habitats
+    // aménagés... un habitat fournit plusieurs places de vie ; son style n'influe pas sur les
+    // capacités »). A fifth, disjoint id prefix ("h") keeps resolveStation unambiguous exactly
+    // like the first three; a habitat is never a gesture's poste/source/destination (no verb
+    // targets one), it only ever appears through the population functions below.
+    habitat: { collection: "habitats", prefix: "h", counter: "habitatNextId" },
   };
 
   // Epic C2.8 (design §5, "Conditions, réservations et lecture des blocages" : "le réglage
@@ -44,12 +50,18 @@
   const DEFAULT_PANIER_CAPACITY = 24;
   const DEFAULT_PANIER_MIN = 0;
 
+  // Epic C3.3: design §6 states a habitat "fournit plusieurs places de vie" but never names a
+  // number — no default is invented here (unlike DEFAULT_PANIER_CAPACITY, which had a real
+  // precedent to borrow from). Capacity is a required argument at registration instead, only
+  // bounded below by what "plusieurs" (more than one) literally means.
+  const MIN_HABITAT_CAPACITY = 2;
+
   // Epic C2.6c: a panier additionally carries a `buffer` (item id -> qty), the same shape as
   // automation.js's `e.buffer` (design §5's "récolter... dépose dans un panier"). Only paniers
   // get it — a borne/zone never holds produce — set at creation here rather than defaulted
   // globally in garden-state-lifecycle.js, the same "the factory sets its own new field" posture
   // C2.6b used for a specimen's moistureAt/readyToProduce (see cultivars.js's own header comment).
-  function registerStation(registry, kind, { x, z }) {
+  function registerStation(registry, kind, { x, z, capacity }) {
     const def = KINDS[kind];
     if (!def) throw Error(`Type de station inconnu : "${kind}".`);
     const station = { id: `${def.prefix}${registry[def.counter]++}`, x, z };
@@ -58,8 +70,56 @@
       station.capacity = DEFAULT_PANIER_CAPACITY;
       station.min = DEFAULT_PANIER_MIN;
     }
+    if (kind === "habitat") {
+      if (!Number.isFinite(capacity) || capacity < MIN_HABITAT_CAPACITY)
+        throw Error(
+          `Capacité d'habitat invalide (minimum ${MIN_HABITAT_CAPACITY}) : ${capacity}.`,
+        );
+      station.capacity = capacity;
+    }
     registry[def.collection].push(station);
     return station;
+  }
+
+  // Total living places across every registered habitat — "plusieurs places de vie" summed,
+  // never per-habitat occupancy (no command assigns a Rainelle to a specific habitat; the
+  // population is only ever compared against the community-wide total, design §6's own framing:
+  // "le nombre de postes de travail ouvrables dépend des habitats aménagés").
+  function habitatCapacityTotal(registry) {
+    return registry.habitats.reduce((n, h) => n + h.capacity, 0);
+  }
+
+  // Positive: places still open. Zero or negative: no new birth/arrival fits (a caller compares
+  // against > 0, never against truthiness — 0 is a valid, meaningful "none left").
+  function freeLivingPlaces(registry, aliveRainelleCount) {
+    return habitatCapacityTotal(registry) - aliveRainelleCount;
+  }
+
+  // Epic C3.3 (design §6 : « un habitat occupé ne peut pas être supprimé sans destination de
+  // relogement »). No per-habitat occupancy is tracked (see habitatCapacityTotal's own comment),
+  // so "occupied" is read the only way the current data can support it: removing this habitat
+  // would drop the community's total capacity below its actual population. Pure function, not
+  // yet wired to a command (no world placement/removal UI exists for any station kind today,
+  // borne/zone/panier included) — same "pure factory, not yet a command" posture registerStation
+  // itself started at in C2.6a.
+  function removeHabitat(registry, habitatId, aliveRainelleCount) {
+    const habitat = registry.habitats.find((h) => h.id === habitatId);
+    if (!habitat)
+      return { ok: false, error: `Identifiant d'habitat inconnu : "${habitatId}".` };
+    const remainingCapacity = habitatCapacityTotal(registry) - habitat.capacity;
+    if (remainingCapacity < aliveRainelleCount)
+      return {
+        ok: false,
+        error:
+          "Cet habitat est occupé : le retirer romprait le nombre de places de vie sous la population actuelle. Prévoir une destination de relogement d'abord.",
+      };
+    return {
+      ok: true,
+      registry: {
+        ...registry,
+        habitats: registry.habitats.filter((h) => h.id !== habitatId),
+      },
+    };
   }
 
   // Total items currently held by a panier, across every resource key — the single number both
@@ -83,9 +143,13 @@
     KINDS,
     DEFAULT_PANIER_CAPACITY,
     DEFAULT_PANIER_MIN,
+    MIN_HABITAT_CAPACITY,
     registerStation,
     resolveStation,
     panierTotal,
+    habitatCapacityTotal,
+    freeLivingPlaces,
+    removeHabitat,
   };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenCampaignStations = api;

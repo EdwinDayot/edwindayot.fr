@@ -134,6 +134,10 @@
         borneNextId: 1,
         zoneNextId: 1,
         panierNextId: 1,
+        // Epic C3.3: fourth collection, living places (design §6) — see campaign-stations.js's
+        // own header comment for why it lives here rather than in a separate field.
+        habitats: [],
+        habitatNextId: 1,
       },
       // Epic C3.1: the refuge house's six named spaces (design §6), delabre/locked by default
       // except the reception room (locked: false, still delabre — see campaign-house.js's own

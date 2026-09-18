@@ -462,6 +462,12 @@
       for (const kind of Object.keys(Stations.KINDS)) {
         const { collection, prefix, counter } = Stations.KINDS[kind];
         const list = s.campaignStations[collection];
+        // Epic C3.3: unlike bornes/zones/paniers (present since C2.6a, whenever campaignStations
+        // itself exists at all), a save from before this epic has campaignStations but no
+        // habitats collection yet — valid as "not migrated yet", defaulted below rather than
+        // rejected here. A save that HAS started a habitats collection is still validated fully.
+        if (kind === "habitat" && list === undefined && s.campaignStations[counter] === undefined)
+          continue;
         if (
           !Array.isArray(list) ||
           new Set(list.map((st) => st?.id)).size !== list.length ||
@@ -506,6 +512,14 @@
               (st.min !== undefined &&
                 !finite(st.min, 0, st.capacity ?? Infinity)),
           )
+        )
+          throw Error("Registre de stations invalide.");
+        // Epic C3.3: a habitat's capacity is required (no optional/default path — unlike a
+        // panier's capacity/min, no pre-epic habitat can exist to migrate), and bounded below by
+        // Stations.MIN_HABITAT_CAPACITY (design §6's "plusieurs places de vie", more than one).
+        if (
+          kind === "habitat" &&
+          list.some((st) => !finite(st.capacity, Stations.MIN_HABITAT_CAPACITY, Infinity))
         )
           throw Error("Registre de stations invalide.");
         if (!count(s.campaignStations[counter]))
@@ -578,7 +592,14 @@
       borneNextId: 1,
       zoneNextId: 1,
       panierNextId: 1,
+      habitats: [],
+      habitatNextId: 1,
     };
+    // Epic C3.3: a pre-epic save has campaignStations but no habitats collection at all (the
+    // object above only fires when campaignStations itself is entirely missing) — defaulted here
+    // too, same two-level migration already used for paniers' buffer/capacity/min just below.
+    result.campaignStations.habitats ??= [];
+    result.campaignStations.habitatNextId ??= 1;
     // Epic C2.6c/C2.8: buffer/capacity/min migrate per panier, same reasoning — a pre-epic
     // panier only lacks these fields; bornes/zones never had any of them to begin with.
     // DEFAULT_PANIER_CAPACITY/MIN mirror exactly what registerStation itself now sets on a
