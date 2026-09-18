@@ -43,6 +43,13 @@
           // above — a named tool joins s.campaignTools only at completion, never at acceptance.
           for (const tool of reward.tools || [])
             if (!s.campaignTools.includes(tool)) s.campaignTools.push(tool);
+          // Épic C4.2: same additive pattern again — a named house space is unlocked (locked:
+          // false) only at completion, never repaired automatically (repairHouseSpace, C3.1,
+          // stays the only way to actually repair it; a missing/unknown space id is ignored
+          // rather than thrown, same defensive posture as the tools/plans loops above).
+          for (const spaceId of reward.unlockHouseSpace || [])
+            if (s.campaignHouse.spaces[spaceId])
+              s.campaignHouse.spaces[spaceId].locked = false;
           if (reward.reputation) s.reputation += reward.reputation;
           st.message = `${quest.title} · terminée.`;
         } else return fail("Action de quête inconnue.");

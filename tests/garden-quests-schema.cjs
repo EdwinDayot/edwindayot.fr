@@ -50,9 +50,10 @@ test("The quest-giver role is registered and self-contained, even though no visi
   assert.notEqual(context, null, "existing roles are unaffected");
 });
 
-test("D.quests carries the two free-garden starter entries plus C3.6's campaign tool quest, not the full 6-10 quest ladder (Épic 2.2, separate task)", () => {
+test("D.quests carries the two free-garden starter entries plus C3.6's campaign tool quest and C4.2's house-unlock quest, not the full 6-10 quest ladder (Épic 2.2, separate task)", () => {
   assert.deepEqual(Object.keys(D.quests).sort(), [
     "bois-pour-l-hiver",
+    "fenetre-de-noe",
     "first-drip",
     "first-harvest",
   ]);

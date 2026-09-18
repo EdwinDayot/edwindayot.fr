@@ -41,6 +41,30 @@
       reward: { tools: ["hachette"] },
       requires: [],
     },
+    // Épic C4.2 (design §10, chapitre 2, "Ce qu'on reconnaît encore"): npcId points at "noe" —
+    // NOT a new building. data-buildings.js already has a visitorId "noe" (role "vendor", sells
+    // a pot, zone 0, unlocked by default) predating the campaign; the design's own named-cast
+    // table (§10) names every campaign character — Noé, Mira, Basile, Anouk, Inès, Léa, Iris —
+    // after an already-existing jardin libre visitor, role-for-role plausible in every case
+    // (Iris is already role "botanist"). Verified before writing this, not assumed: adding a
+    // second, differently-id'd "Noé" building would either collide with the existing id or
+    // create two unrelated people sharing one name, neither acceptable; reusing "noe" as-is
+    // (role/position/wares all untouched) is the same posture C3.6 already used for
+    // villageois-1 (a real quest attached to an npcId whose role stays "resident", never
+    // "quest-giver" — the quest-giver role remains unused by any visitor, still reachable only
+    // through GardenState.command(), same as every quest so far).
+    // Objective item deliberately "cutting:pilea" quantity 1, the exact same item/quantity
+    // first-harvest already proves reachable from a brand-new save without the pot (pilea is
+    // pre-planted in pot e1 by fresh(), garden-play.cjs exercises the full grow-then-cut path
+    // end to end) — matches design's "accessible avec les semences de départ, sans croisement
+    // obligatoire" without inventing an untested delivery path.
+    "fenetre-de-noe": {
+      npcId: "noe",
+      title: "Une plante pour sa fenêtre",
+      objective: { type: "deliver", item: "cutting:pilea", quantity: 1 },
+      reward: { unlockHouseSpace: ["serre"] },
+      requires: [],
+    },
   };
   P.quests = quests;
   if (typeof module !== "undefined") module.exports = { quests };
