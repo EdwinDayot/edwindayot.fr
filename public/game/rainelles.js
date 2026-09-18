@@ -51,12 +51,20 @@
     "preparer",
     "trier",
   ];
+  // Epic C2.6c: `job` is the countdown campaign-automation.js's tickRainelle drives for
+  // "arroser"/"recolter" (the same `{ remaining }` shape as automation.js's own e.job) — null
+  // until a valid gesture's first tick creates it, same "the factory sets its own new field"
+  // posture C2.6b used for a specimen's moistureAt/readyToProduce (see cultivars.js's header
+  // comment). Never touched by applyGesture: reteaching a gesture (design §5, "réenseigner
+  // remplace le geste") leaves any in-progress cycle exactly where it was rather than resetting
+  // it, since the countdown itself isn't part of what a Rainelle was taught.
   function createRainelle(s, { cultivarId, name = "" }) {
     const rainelle = {
       id: `r${s.rainelleNextId++}`,
       cultivarId,
       name,
       geste: null,
+      job: null,
     };
     s.rainelles.push(rainelle);
     return rainelle;

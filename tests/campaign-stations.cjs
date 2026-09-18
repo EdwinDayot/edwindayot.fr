@@ -35,7 +35,9 @@ test("registerStation assigns a stable, kind-prefixed id and appends to the righ
   const panier = Stations.registerStation(registry, "panier", { x: 5, z: 6 });
   assert.deepEqual(borne, { id: "b1", x: 1, z: 2 });
   assert.deepEqual(zone, { id: "z1", x: 3, z: 4 });
-  assert.deepEqual(panier, { id: "pn1", x: 5, z: 6 });
+  // Epic C2.6c: a panier also carries an empty buffer at creation (design §5's "récolter...
+  // dépose dans un panier"; see campaign-stations.js's own comment on registerStation).
+  assert.deepEqual(panier, { id: "pn1", x: 5, z: 6, buffer: {} });
   assert.deepEqual(registry.bornes, [borne]);
   assert.deepEqual(registry.zones, [zone]);
   assert.deepEqual(registry.paniers, [panier]);

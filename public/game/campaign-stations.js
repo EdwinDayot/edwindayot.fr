@@ -33,10 +33,16 @@
     panier: { collection: "paniers", prefix: "pn", counter: "panierNextId" },
   };
 
+  // Epic C2.6c: a panier additionally carries a `buffer` (item id -> qty), the same shape as
+  // automation.js's `e.buffer` (design §5's "récolter... dépose dans un panier"). Only paniers
+  // get it — a borne/zone never holds produce — set at creation here rather than defaulted
+  // globally in garden-state-lifecycle.js, the same "the factory sets its own new field" posture
+  // C2.6b used for a specimen's moistureAt/readyToProduce (see cultivars.js's own header comment).
   function registerStation(registry, kind, { x, z }) {
     const def = KINDS[kind];
     if (!def) throw Error(`Type de station inconnu : "${kind}".`);
     const station = { id: `${def.prefix}${registry[def.counter]++}`, x, z };
+    if (kind === "panier") station.buffer = {};
     registry[def.collection].push(station);
     return station;
   }

@@ -24,6 +24,10 @@
     typeof module !== "undefined"
       ? require("./game/automation.js")
       : root.GardenAutomation;
+  const CampaignAutomation =
+    typeof module !== "undefined"
+      ? require("./game/campaign-automation.js")
+      : root.GardenCampaignAutomation;
   const Quests =
     typeof module !== "undefined"
       ? require("./game/quests.js")
@@ -147,6 +151,14 @@
         }
         Automation.tick(e, s);
       }
+      // Epic C2.6c: the campaign layer's own actors (s.rainelles) are a separate array from the
+      // free garden's s.entities above — never folded into that loop, same "rules before
+      // rendering" posture already used to keep them apart (see rainelles.js/cultivars.js/
+      // campaign-stations.js's own header comments). A mature specimen becomes ready to produce
+      // once, automatically (see campaign-automation.js's updateSpecimenReadiness for why), then
+      // each taught Rainelle gets exactly one tick of its own gesture.
+      CampaignAutomation.updateSpecimenReadiness(s);
+      for (const r of s.rainelles) CampaignAutomation.tickRainelle(r, s);
     }
     step(seconds) {
       if (!Number.isFinite(seconds) || seconds <= 0) return;

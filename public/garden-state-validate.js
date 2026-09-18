@@ -34,6 +34,14 @@
     typeof module !== "undefined"
       ? require("./game/cultivars.js")
       : root.GardenCultivars;
+  // Epic C2.6c: only read here for its CYCLE_SECONDS bound on a persisted rainelle.job.remaining
+  // (see campaign-automation.js's own header comment on that constant) — never for validate()'s
+  // own control flow, so this stays a pure sibling of the Cultivars/Rainelles/Stations reads
+  // above rather than a real dependency on tick behaviour.
+  const CampaignAutomation =
+    typeof module !== "undefined"
+      ? require("./game/campaign-automation.js")
+      : root.GardenCampaignAutomation;
   function validate(s) {
     s = migrateLandscape(s);
     if (
@@ -376,7 +384,14 @@
                 !r.geste.source ||
                 typeof r.geste.destination !== "string" ||
                 !r.geste.destination ||
-                typeof r.geste.condition !== "string")),
+                typeof r.geste.condition !== "string")) ||
+            // Epic C2.6c: job is optional (a pre-epic save, or a Rainelle whose gesture never
+            // reached a valid station, has none) but well-formed when present — the same
+            // countdown shape as automation.js's own e.job.
+            (r.job !== undefined &&
+              r.job !== null &&
+              (typeof r.job !== "object" ||
+                !finite(r.job.remaining, 0, CampaignAutomation.CYCLE_SECONDS))),
         ))
     )
       throw Error("Rainelle invalide.");
@@ -455,6 +470,25 @@
           )
         )
           throw Error("Registre de stations invalide.");
+        // Epic C2.6c: only a panier carries a buffer (item id -> qty, same shape as
+        // automation.js's own e.buffer); optional so a pre-epic panier still loads, well-formed
+        // when present. cultivarId is used as the buffer's key (see campaign-automation.js's own
+        // tickRecolter comment) so a valid key is any known cultivar, not knownItem() — a
+        // campaign cultivar was never an inventory item to begin with.
+        if (
+          kind === "panier" &&
+          list.some(
+            (st) =>
+              st.buffer !== undefined &&
+              (typeof st.buffer !== "object" ||
+                st.buffer === null ||
+                Object.entries(st.buffer).some(
+                  ([cultivarId, qty]) =>
+                    !s.cultivars?.some((c) => c.id === cultivarId) || !count(qty),
+                )),
+          )
+        )
+          throw Error("Registre de stations invalide.");
         if (!count(s.campaignStations[counter]))
           throw Error("Registre de stations invalide.");
         if (
@@ -489,7 +523,12 @@
       gameSeconds: 0,
       paused: false,
     };
-    result.rainelles ??= [];
+    // Epic C2.6c: job migrates per rainelle, same reasoning as specimens' moistureAt/
+    // readyToProduce just above — a pre-epic rainelle only lacks this one field.
+    result.rainelles = (result.rainelles ?? []).map((r) => ({
+      job: null,
+      ...r,
+    }));
     result.rainelleNextId ??= 1;
     result.campaignFrogEncounterPending ??= false;
     result.campaignTeaching ??= null;
@@ -502,6 +541,11 @@
       zoneNextId: 1,
       panierNextId: 1,
     };
+    // Epic C2.6c: buffer migrates per panier, same reasoning — a pre-epic (C2.6a) panier only
+    // lacks this one field; bornes/zones never had one to begin with.
+    result.campaignStations.paniers = (result.campaignStations.paniers ?? []).map(
+      (p) => ({ buffer: {}, ...p }),
+    );
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };
