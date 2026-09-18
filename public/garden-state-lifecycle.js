@@ -112,6 +112,13 @@
       rainelles: [],
       rainelleNextId: 1,
       campaignFrogEncounterPending: false,
+      // Epic C3.4: a bourgeon prélevé (harvestBud, garden-state-cmd-m.js) waits here — a plain
+      // FIFO of { id, cultivarId } — until the next "sleep" resolves each entry into a brand-new
+      // Rainelle (garden-state-cmd-f.js), the same "posed, then resolved at the next sleep"
+      // pattern as campaignPot.pending. A reload mid-maturation can therefore never wake it early
+      // or twice: resolution only ever happens inside the sleep command itself, never on load.
+      campaignNursery: [],
+      campaignNurseryNextId: 1,
       // Epic C2.5: null outside a lesson. While a lesson runs, {rainelleId, step, draft} —
       // step "watching" (just after "Regarde-moi", clock paused, no draft yet) or "reviewing"
       // (a demonstration was captured; draft holds {verbe, poste, source, destination,

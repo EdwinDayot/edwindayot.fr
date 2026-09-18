@@ -58,6 +58,10 @@
   // comment). Never touched by applyGesture: reteaching a gesture (design §5, "réenseigner
   // remplace le geste") leaves any in-progress cycle exactly where it was rather than resetting
   // it, since the countdown itself isn't part of what a Rainelle was taught.
+  // Epic C3.4: null outside a bourgeon (design §5, "Multiplication et vie propre" — a bourgeon
+  // has no separate growth timer of its own before harvest, unlike the nursery entry it becomes
+  // once prélevé; see garden-state-cmd-m.js/garden-state-cmd-f.js). `true` rather than an object:
+  // there is no state to a bourgeon beyond "present or not" at this stage.
   function createRainelle(s, { cultivarId, name = "" }) {
     const rainelle = {
       id: `r${s.rainelleNextId++}`,
@@ -65,9 +69,37 @@
       name,
       geste: null,
       job: null,
+      bourgeon: null,
     };
     s.rainelles.push(rainelle);
     return rainelle;
+  }
+
+  // formBud/harvestBud (Epic C3.4, design §5): "après un petit événement de familiarisation
+  // générique, une Rainelle forme un bourgeon de sa lignée" — no scripted staging exists yet
+  // (same posture as triggerFrogEncounter for the first Rainelle, C2.3), so formBud simply marks
+  // the bourgeon present, refusing a second one while the first is still unharvested. No cooldown
+  // after a harvest either: the design names no rhythm beyond "l'attente" of the nursery itself
+  // (see garden-state-cmd-f.js's "sleep" wiring), so nothing here throttles how soon a Rainelle
+  // can form another — a deliberately minimal scope, not an oversight.
+  function formBud(rainelle) {
+    if (rainelle.bourgeon)
+      return { ok: false, error: "Cette Rainelle porte déjà un bourgeon." };
+    rainelle.bourgeon = true;
+    return { ok: true };
+  }
+
+  // Free-living-place gating (design §5, "chaque naissance exige une place de vie libre") is a
+  // campaign-stations.js concern, not this file's — see garden-state-cmd-m.js's harvestBud
+  // command, which checks it before calling this function at all, so a refusal here never partly
+  // consumes the bourgeon. cultivarId is returned, not stored anywhere yet: "de sa lignée" reads
+  // as the new individual sharing its parent's cultivar/foliage, carried by the nursery entry the
+  // caller creates (garden-state-lifecycle.js's s.campaignNursery) until the next "sleep".
+  function harvestBud(rainelle) {
+    if (!rainelle.bourgeon)
+      return { ok: false, error: "Cette Rainelle ne porte aucun bourgeon à prélever." };
+    rainelle.bourgeon = null;
+    return { ok: true, cultivarId: rainelle.cultivarId };
   }
 
   // Same five fields teachGesture already validates (C2.4); pulled out so C2.5's multi-step
@@ -164,6 +196,8 @@
 
   const api = {
     createRainelle,
+    formBud,
+    harvestBud,
     VERBS,
     MULTIPLY_REFUSAL,
     validateGestureFields,

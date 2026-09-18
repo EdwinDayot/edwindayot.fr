@@ -395,7 +395,12 @@
             (r.job !== undefined &&
               r.job !== null &&
               (typeof r.job !== "object" ||
-                !finite(r.job.remaining, 0, CampaignAutomation.CYCLE_SECONDS))),
+                !finite(r.job.remaining, 0, CampaignAutomation.CYCLE_SECONDS))) ||
+            // Epic C3.4: a bourgeon has no shape of its own beyond "present or not" (see
+            // rainelles.js's own comment) — optional so a pre-epic rainelle still loads.
+            (r.bourgeon !== undefined &&
+              r.bourgeon !== null &&
+              r.bourgeon !== true),
         ))
     )
       throw Error("Rainelle invalide.");
@@ -412,6 +417,30 @@
       typeof s.campaignFrogEncounterPending !== "boolean"
     )
       throw Error("Rencontre de la grenouille invalide.");
+    // Epic C3.4: a nursery entry only ever carries the cultivarId inherited from the Rainelle
+    // whose bourgeon produced it (see rainelles.js's harvestBud comment) — validated against
+    // s.cultivars exactly like rainelle.cultivarId is, just above.
+    if (
+      s.campaignNursery !== undefined &&
+      (!Array.isArray(s.campaignNursery) ||
+        new Set(s.campaignNursery.map((n) => n?.id)).size !==
+          s.campaignNursery.length ||
+        s.campaignNursery.some(
+          (n) =>
+            !n ||
+            !/^nu\d+$/.test(n.id) ||
+            !s.cultivars?.some((c) => c.id === n.cultivarId),
+        ))
+    )
+      throw Error("Nurserie invalide.");
+    if (s.campaignNurseryNextId !== undefined && !count(s.campaignNurseryNextId))
+      throw Error("Nurserie invalide.");
+    if (
+      s.campaignNursery?.length &&
+      s.campaignNurseryNextId <=
+        Math.max(...s.campaignNursery.map((n) => Number(n.id.slice(2))))
+    )
+      throw Error("Identifiants de nurserie invalides.");
     // A gesture-shaped object (verbe/poste/source/destination/condition), the same fields
     // rainelle.geste already validates above — shared here so campaignTeaching's draft and
     // campaignLastDemonstration can't silently drift from what a Rainelle is actually allowed
@@ -577,12 +606,17 @@
     };
     // Epic C2.6c: job migrates per rainelle, same reasoning as specimens' moistureAt/
     // readyToProduce just above — a pre-epic rainelle only lacks this one field.
+    // Epic C3.4: bourgeon migrates per rainelle, same reasoning as job just above — a pre-epic
+    // rainelle only lacks this one field.
     result.rainelles = (result.rainelles ?? []).map((r) => ({
       job: null,
+      bourgeon: null,
       ...r,
     }));
     result.rainelleNextId ??= 1;
     result.campaignFrogEncounterPending ??= false;
+    result.campaignNursery ??= [];
+    result.campaignNurseryNextId ??= 1;
     result.campaignTeaching ??= null;
     result.campaignLastDemonstration ??= null;
     result.campaignStations ??= {

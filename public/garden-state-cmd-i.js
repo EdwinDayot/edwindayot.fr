@@ -12,7 +12,8 @@
       if (c.type === "triggerFrogEncounter") {
         st.taken = true;
         // Only ever the *first* Rainelle: later individuals come from the bourgeon/nursery
-        // mechanic (design §5, chapitre 6), a different epic, not a second frog encounter.
+        // mechanic (design §5, chapitre 6; garden-state-cmd-m.js, Epic C3.4), not a second frog
+        // encounter.
         if (s.rainelles.length)
           return fail("La première Rainelle est déjà née.");
         if (s.campaignFrogEncounterPending)
