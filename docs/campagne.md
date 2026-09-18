@@ -716,3 +716,43 @@ Déclenchement automatisé (routine cloud horaire). Anti-hallucination faite ava
 Aucune géométrie ni matériau touché (epic entièrement moteur, aucun rendu) : `test:browser`/`test:visual` complets non requis (voir `execution-continue.md`, même exemption que C2.6a/b/c/C2.7/C2.8/C2.11). Deux nouvelles balises `<script>` ajoutées à `index.html` malgré tout — vérification ciblée faite comme à C2.8 : page servie localement (`python3 -m http.server`), chargée avec Playwright (exécutable Chromium préinstallé) — aucune erreur console ni erreur de page, `window.GardenCampaignHouse` bien défini avec les six identifiants d'espace attendus. Aucune relecture narrative adverse requise (pas un epic de Scénariste). Aucun choix déjà confirmé du design touché (Alma vivante, nom des Rainelles, culpabilisation de fin de campagne) ; aucune teinte/matériau de `direction-artistique.md` utilisé (aucun rendu dans cet epic).
 
 **Limite honnête documentée, pas contournée** : les coûts de réparation eux-mêmes (`SPACES[...].cost`) sont un choix de dosage de cet epic, pas une valeur donnée littéralement par le design (qui ne cite que la fonction de chaque espace, jamais un coût précis) — dimensionnés par rapport à l'inventaire initial et au rendement de récolte existants, documentés comme tels dans `campaign-house.js` plutôt que présentés comme dérivés d'une source. C3.2 (rendu de la maison refuge) reste `todo`, sa propre entrée de backlog documentant déjà la généralisation nécessaire de `buildHouse()`.
+
+## Déclenchement du 18 septembre 2026 — rendu de la maison refuge (epic C3.2)
+
+Déclenchement automatisé (routine cloud horaire). Anti-hallucination faite avant tout le reste : dernier epic « fait » du backlog était C3.1, commit `5564102ce24b0bfac13fd9f0c021b21048fb9650` — `git show --stat 5564102` confirme le commit réel (correspond exactement à l'entrée précédente de `docs/campagne-backlog.md`) ; `npm ci && npm test` relancés indépendamment → 342/342, identique au rapport existant. Aucun bandeau de pause en tête de `campagne-backlog.md`. Aucune anomalie, `docs/campagne-anomalies.md` toujours absent. Aucun blocage récent : aucune pause anti-emballement à déclencher.
+
+**Choix de l'epic : C3.2** (dépendance C3.1, `fait`), en continuité de la chaîne C3.1→C3.2 déjà engagée par le lot Cartographe de la phase 3, plutôt que C3.3/C3.5 (également disponibles) — voir le raisonnement complet dans `docs/campagne-backlog.md`.
+
+**Vérification préalable faite avant d'écrire du code**, comme la propre entrée de backlog de cet epic le demandait explicitement : `render-houses.js:295-307` (`buildHouse(b)`) lu directement — confirme l'appel sans garde à `D.visitors.find((v) => v.id === b.visitorId).name`, donc une exception certaine sur une maison sans visiteur. Décision documentée : un module frère autonome plutôt qu'une branche visiteur optionnelle dans `buildHouse` ou une entrée `data-buildings.js` (les deux auraient mélangé la donnée « une rangée par PNJ » du jardin libre avec la maison du joueur, qui n'a pas de visiteur) — voir le détail complet dans `docs/campagne-backlog.md`.
+
+**Livré** :
+- Nouveau `public/game/render-campaign-house.js` : `buildRefugeHouseGroup(house)`, autonome (seul `THREE` requis, testable en Node pur comme `botany-hybrids.js`), lisant `house.spaces.accueil.status` (schéma C3.1). Réutilise les couleurs exactes déjà en usage pour toute maison du jeu (`render.js`'s stone/bark/cream, `render-houses.js`'s stoneDark) et la même technique de pignon que `gableGeometry`. Distinction repare/delabre par trois différences nommables : pierre claire/toit à deux pans intacts/porte fermée contre pierre sombre/un seul pan de toit survivant (l'autre manquant, charpente visible)/planches croisées sur l'ouverture. Aucun émissif introduit.
+- `public/index.html` : une nouvelle balise `<script>` après `render-houses.js`.
+- Nouveau `tests/campaign-house-render.cjs` (7 tests Node purs) : construction sans exception des deux états, différences roof/porte testées explicitement, aucune métallicité, rugosité 0,72 (voir écart documenté ci-dessous), couleurs limitées à l'ensemble déjà en usage, déterminisme, fidélité du profil de pignon.
+- `tests/garden-material-audit.cjs` étendu : injecte les deux états de la maison dans la scène réelle de la page servie, loin de la zone jouable — le vrai gate, exécuté et passé.
+- Nouveau `tests/campaign-house-visual.cjs` (banc dédié, sur le modèle de `campaign-botany-visual.cjs`) : les deux états côte à côte, vérifications programmatiques (sommets finis, pas de chevauchement, différences roof/porte), capture sauvegardée pour relecture multimodale.
+- `package.json` : les deux nouveaux fichiers de test ajoutés aux listes explicites de `test`/`test:browser`.
+
+**Résultat réellement exécuté** : `npm ci` puis `npm test` → **349/349** (342 existants + 7 nouveaux, zéro régression).
+
+```
+# tests 349
+# suites 0
+# pass 349
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+```
+
+**Audit programmatique du rendu, le vrai gate** : page servie localement (`python3 -m http.server 4174 --directory public`) puis `node tests/garden-material-audit.cjs` exécuté directement → `PASS material/geometry audit: {"materialsInspected":97,"transparentAllowed":1,"timesSampled":5}` (les deux états de la maison refuge font partie des matériaux inspectés ; aucune anomalie relevée sur les nouveaux maillages). `node tests/campaign-house-visual.cjs` exécuté directement → `PASS campaign-house-visual: {"overlap":false,"delabreRoofPanelCount":1,"repareRoofPanelCount":2,"delabreDoorStyle":"boarded","repareDoorStyle":"closed"}`.
+
+`/code-review` (niveau medium, skill `code-review`) exécuté sur le diff complet : aucun défaut relevé.
+
+**Limite honnête sur `npm run test:browser` en tant que chaîne complète** : échoue dès son premier script, `tests/garden-play.cjs` (non modifié par cet epic), faute du repli d'exécutable Chromium (`/opt/pw-browsers/chromium`) que ce script n'a jamais porté, contrairement à `garden-material-audit.cjs`/`campaign-botany-visual.cjs` — un défaut d'environnement préexistant, sans rapport avec cet epic, non corrigé ici (hors périmètre). Les deux scripts navigateur réellement concernés par ce rendu ont donc été exécutés directement, avec succès, comme rapporté ci-dessus.
+
+**Relecture multimodale réelle** (capture `/tmp/campaign-house-visual.png`, lue avec l'outil Read, comparée explicitement à `direction-artistique.md`) : les deux états se distinguent nettement à la silhouette seule — repare : pierre claire, toit brun intact, porte en bois fermée, identique en teinte à toute maison de visiteur déjà en jeu ; delabre : pierre plus sombre, un seul pan de toit (l'autre manquant, intérieur sombre et vide du faîtage visibles), grandes planches croisées sur l'ouverture. Matériaux mats, aucune couleur hors des familles pierre/bois documentées. Conforme à direction-artistique.md §« Silhouette et géométrie ». Complément documenté, jamais le gate lui-même (déjà passé indépendamment ci-dessus).
+
+**Écart honnête découvert, documenté sans le corriger dans cet epic** : direction-artistique.md affirme une rugosité « observée entre 0,15 et 0,48 » pour tous les matériaux du jeu, mais `render.js`'s stone/bark/wood/cream (donc toute maison déjà en jeu, avant cet epic) utilisent la rugosité par défaut de `GardenModels.mat()`, **0,72**, hors de cette plage (vérifié dans `garden-models.js:16`). Cet epic reprend fidèlement la convention déjà en usage plutôt que d'inventer une rugosité juste pour correspondre au texte du guide (que `direction-artistique.md` interdit lui-même). La correction de cette inexactitude documentaire est laissée à un futur passage, hors du mandat de cet epic de rendu.
+
+Aucun choix déjà confirmé du design touché (Alma vivante, nom des Rainelles, culpabilisation de fin de campagne). Aucune identité narrative introduite.

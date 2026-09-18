@@ -135,6 +135,11 @@
     <script src="/game/render-world.js" defer></script>
     <script src="/game/render-actors.js" defer></script>
     <script src="/game/render-houses.js" defer></script>
+    <!-- Epic C3.2: refuge house rendering, kept apart from render-houses.js's buildHouse() (which
+         hard-requires a visitor) the same way botany-hybrids.js sits apart from botany.js — no
+         dependency at load time beyond THREE, so its only ordering requirement is loading after
+         /vendor/three.min.js (line 28), same as botany-hybrids.js above. -->
+    <script src="/game/render-campaign-house.js" defer></script>
     <script src="/game/render-scene.js" defer></script>
     <script src="/game/render-items.js" defer></script>
     <script src="/game/render-flow.js" defer></script>
