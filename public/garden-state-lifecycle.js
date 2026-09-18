@@ -119,6 +119,18 @@
       // remembers). null until the very first confirmTeaching. Reapplied as-is by
       // teachGestureQuick, design §5's "courte répétition... sans refaire tout le tutoriel".
       campaignLastDemonstration: null,
+      // Epic C2.6a: registry of water bornes/culture zones/paniers a gesture's poste/source/
+      // destination can eventually resolve against (see campaign-stations.js's own header
+      // comment). Empty on a fresh save — no command places a station yet, same "posed, not
+      // wired" gap as specimens/rainelles at their own introduction.
+      campaignStations: {
+        bornes: [],
+        zones: [],
+        paniers: [],
+        borneNextId: 1,
+        zoneNextId: 1,
+        panierNextId: 1,
+      },
     };
   }
   function migrate(old, now = Date.now()) {

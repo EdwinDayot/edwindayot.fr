@@ -26,6 +26,10 @@
     typeof module !== "undefined"
       ? require("./game/rainelles.js")
       : root.GardenRainelles;
+  const Stations =
+    typeof module !== "undefined"
+      ? require("./game/campaign-stations.js")
+      : root.GardenCampaignStations;
   function validate(s) {
     s = migrateLandscape(s);
     if (
@@ -422,6 +426,36 @@
       !validGesteFields(s.campaignLastDemonstration)
     )
       throw Error("Dernière démonstration invalide.");
+    if (s.campaignStations !== undefined) {
+      if (typeof s.campaignStations !== "object" || s.campaignStations === null)
+        throw Error("Registre de stations invalide.");
+      // No cross-collection uniqueness check needed: distinct prefixes (b/z/pn) already make a
+      // borne/zone/panier id disjoint by construction, so per-collection uniqueness suffices.
+      for (const kind of Object.keys(Stations.KINDS)) {
+        const { collection, prefix, counter } = Stations.KINDS[kind];
+        const list = s.campaignStations[collection];
+        if (
+          !Array.isArray(list) ||
+          new Set(list.map((st) => st?.id)).size !== list.length ||
+          list.some(
+            (st) =>
+              !st ||
+              !new RegExp(`^${prefix}\\d+$`).test(st.id) ||
+              !finite(st.x, -64, 64) ||
+              !finite(st.z, -64, 64),
+          )
+        )
+          throw Error("Registre de stations invalide.");
+        if (!count(s.campaignStations[counter]))
+          throw Error("Registre de stations invalide.");
+        if (
+          list.length &&
+          s.campaignStations[counter] <=
+            Math.max(...list.map((st) => Number(st.id.slice(prefix.length))))
+        )
+          throw Error("Identifiants de station invalides.");
+      }
+    }
     const result = clone(s);
     result.hotbar ??= [...D.defaultHotbar];
     result.quests ??= { active: [], completed: [] };
@@ -442,6 +476,14 @@
     result.campaignFrogEncounterPending ??= false;
     result.campaignTeaching ??= null;
     result.campaignLastDemonstration ??= null;
+    result.campaignStations ??= {
+      bornes: [],
+      zones: [],
+      paniers: [],
+      borneNextId: 1,
+      zoneNextId: 1,
+      panierNextId: 1,
+    };
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };

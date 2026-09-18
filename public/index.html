@@ -59,6 +59,9 @@
          this time before commit rather than after. Still also loaded before garden-state-cmd-f.js/
          -i.js/-j.js further below, which read it again at their own execution time. -->
     <script src="/game/rainelles.js" defer></script>
+    <!-- Epic C2.6a: campaign-stations.js's registry is read by garden-state-validate.js just
+         below, same reason rainelles.js/campaign-clock.js load before it. -->
+    <script src="/game/campaign-stations.js" defer></script>
     <script src="/garden-state-util.js" defer></script>
     <script src="/garden-state-migrate.js" defer></script>
     <script src="/garden-state-validate.js" defer></script>
