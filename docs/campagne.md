@@ -1796,3 +1796,38 @@ Aucun rendu/géométrie/matériau touché (règles/narration pures, comme C1.2/C
 Aucun choix déjà confirmé du design remis en cause (Alma vivante, nom des Rainelles, culpabilisation de fin de campagne). Aucune règle de `direction-artistique.md` concernée (aucun rendu touché).
 
 **Pour le prochain déclenchement** : **C5.8** (porte de sortie mécanique de la phase 5 : partie attentive et partie intensive distinguées par les faits) devient le seul epic `todo` du lot à dépendances satisfaites (dépend de C5.4 et C5.7, tous deux désormais `fait`). Son critère de sortie exige un test d'intégration rejouant deux parties courtes (attentive/intensive) via `GardenState.command()` uniquement, sur le modèle de `campaign-phase4-gate.cjs` — et rappelle explicitement que cette porte reste **mécanique**, pas la fermeture réelle de la phase 5 (qui attend un chantier de rendu/déplacement des Rainelles encore non détaillé) : ne pas fusionner `maison-des-possibles` dans `main` sur la seule base de cet epic.
+
+## Implémentation du 19 septembre 2026 — Épic C5.8 : porte de sortie mécanique de la phase 5, partie attentive et partie intensive distinguées par les faits
+
+Déclenchement automatisé (routine cloud horaire). **Anti-hallucination faite avant tout le reste** : dernier epic « fait » du backlog était C5.7, commit `7d3b561db40efe34a5f40f77194ad9b5411dbf39` — `git show --stat 7d3b561` confirme le commit réel (existe, message et contenu cohérents avec l'entrée précédente de ce fichier). `npm ci && npm test` relancés indépendamment, avant toute édition → **551/551**, identique au rapport existant, zéro échec. Aucun bandeau de pause en tête de `campagne-backlog.md` (vérifié, première ligne du fichier). Aucune anomalie : `docs/campagne-anomalies.md` toujours absent (vérifié, fichier inexistant). Les trois derniers epics consignés (C5.5, C5.6, C5.7) sont tous `fait` : aucune pause anti-emballement à déclencher.
+
+**Choix de l'epic.** Seul epic `todo` à dépendances satisfaites dans toute la phase 5 : **C5.8** (dépendances C5.4/C5.7, toutes deux `fait`). Ailleurs dans le backlog, C2.2v/C2.5v/C2.8v/C2.9 (phases 1/2) restent différés pour la raison inchangée depuis de très nombreux déclenchements (aucune scène/position de Rainelle dans le monde). C5.8 était donc le seul candidat réel, sans ambiguïté.
+
+**Implémenté directement par l'orchestrateur** (épic de test d'intégration pur, aucun rendu, taille jugée adaptée à une session unique sans délégation), sur le modèle exact de `campaign-phase1/2/3/4-gate.cjs`. Nouveau `tests/campaign-phase5-gate-mecanique.cjs`, rejouant deux parties courtes via `GardenState.command()` — à l'exception de `Stations.registerStation`/`Cultivars.createSpecimen`, aucune commande de placement dans le monde n'existant encore, même précédent que `campaign-phase4-gate.cjs` pour ses propres bornes/zones/spécimens :
+
+- **Partie attentive** (dix nuits jouées, veilleuse et prise à fort débit jamais activées sur toute la partie) : vérifié à *chaque* nuit qu'aucun des deux textes C5.6/C5.7 (`persistance-geste-vide`/`geste-qui-sarrete`) ne se déclenche jamais et que `Memory.bassinCommunLevel` reste strictement égal à `Memory.BASSIN_COMMUN_CAPACITY`, sans une seule exception sur toute la durée — la lecture littérale de design §16 (« ne pas ajouter... culpabilité artificielle... jouer un profil attentif »).
+- **Partie intensive** : `Memory.OVEREXERTION_THRESHOLD + 1` nuits consécutives de travail nocturne réel (veilleuse et prise à fort débit actives, un spécimen réellement arrosé chaque nuit) portent la Rainelle au-delà du seuil de sursollicitation et font mesurablement baisser le bassin commun (vérifié `after < before`) — sans déclencher la persistance tant que la source ne tarit pas, chaque nuit ayant réellement travaillé. La source est ensuite tarie (`s.specimens.length = 0`, aucune commande de retrait de spécimen n'existant encore) : la Rainelle entre cette nuit-là déjà sursollicitée par les nuits précédentes, sans plus rien à arroser — la persistance se déclenche (`persistance-geste-vide`, `campaignMemory.persistentGestureIds` contient bien son id), et le bassin commun reste inchangé cette même nuit (aucun travail réel, donc aucun retrait supplémentaire). Veilleuse et prise à fort débit sont enfin coupées ; une boucle rejoue `sleep` jusqu'à ce que `overexertion` retombe exactement à zéro par décroissance progressive (jamais remis à zéro d'un coup, C5.3) — la réparation se déclenche exactement à cette nuit-là (`geste-qui-sarrete`), et le niveau du bassin commun reste strictement égal à celui d'après la nuit de persistance : couper la prise arrête la baisse sans jamais la faire remonter (design §11, « coût réel, jamais une annulation gratuite »).
+
+`package.json` mis à jour (ajout du fichier à la liste explicite du script `test`, qui n'énumère pas les fichiers par glob — même précédent que C2.11/C5.1-C5.7).
+
+**Limite honnête, documentée comme l'exige le critère de sortie de C5.8 et déjà annoncée par la note d'ouverture du second lot de la phase 5 (entrée du Cartographe, 2026-09-19, dans `campagne-backlog.md`)** : ce test prouve que les *faits* distinguent les deux parties (le critère de sortie littéral de la phase, design §15), pas qu'un joueur peut aujourd'hui *observer* cette scène dans le monde rendu — aucune Rainelle n'a de position ni de représentation 3D à ce jour (confirmé par C2.3, C3.7, et par C2.8v/C2.9 toujours `todo`). **Cet epic ferme donc seulement la porte mécanique de la phase 5, jamais la phase elle-même** : `maison-des-possibles` n'est **pas** fusionnée dans `main` sur la base de ce commit, à la différence des portes de sortie des phases 1 à 4. La fermeture réelle de la porte de sortie de la phase 5 attend le chantier de représentation/déplacement des Rainelles, encore à détailler par un futur passage du Cartographe.
+
+`npm ci && npm test` → **552/552** (551 existants + 1 nouveau, zéro régression) :
+
+```
+# tests 552
+# suites 0
+# pass 552
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+```
+
+`/code-review` (skill, niveau medium) exécuté sur le diff complet : aucun défaut relevé — diff purement additif (un nouveau fichier de test, un ajout à la liste du script `test`), aucun chemin de code de production touché, aucune régression de comportement ni de compatibilité inter-fichiers.
+
+Aucun rendu/géométrie/matériau touché (épic de test/moteur pur, comme C1.2/C2.6a/C5.1-C5.7) : `test:browser`/`test:visual` complets non requis, `index.html` inchangé.
+
+Aucun choix déjà confirmé du design remis en cause (Alma vivante, nom des Rainelles, culpabilisation de fin de campagne). Aucune règle de `direction-artistique.md` concernée (aucun rendu touché).
+
+**Pour le prochain déclenchement** : la porte **mécanique** de la phase 5 est close, mais pas la phase elle-même (voir limite honnête ci-dessus). Aucun autre epic `todo` à dépendances satisfaites n'existe dans les phases 1/2/5 à ce jour (C2.2v/C2.5v/C2.8v/C2.9 restent bloqués par l'absence de scène/déplacement de campagne dans le monde). Le prochain déclenchement devra endosser le rôle **Cartographe** : détailler le chantier de représentation/déplacement des Rainelles (position dans le monde, rendu 3D, mise en scène des trois scènes de référence du design §11) annoncé par la note d'ouverture du second lot de la phase 5, probablement de l'ampleur de C1.7/C1.8 pour les plantes — seule voie connue aujourd'hui pour fermer réellement la porte de sortie de la phase 5, sauf si une réévaluation du backlog des phases 1/2 (C2.2v/C2.5v/C2.8v/C2.9) fait apparaître un candidat plus tôt.
