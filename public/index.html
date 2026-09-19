@@ -112,6 +112,12 @@
          rainelles-status.js just above. Loaded here anyway for the same missing-script ordering
          reason. -->
     <script src="/game/campaign-scenes.js" defer></script>
+    <!-- Epic C5.10: rainelle-movement.js reads root.GardenConstruction (loaded much earlier
+         above), root.GardenCampaignStations and root.GardenCampaignScenes (LOCATIONS, just
+         above) at its own execution time; nothing reads it back yet (no tick/render wired to it —
+         that is C5.11's job), same "posed, not wired" gap as campaign-scenes.js just above.
+         Loaded here anyway for the same missing-script ordering reason. -->
+    <script src="/game/rainelle-movement.js" defer></script>
     <!-- Epic C1.5: moved here from much further below (its previous position after garden-
          state-cmd-e.js): garden-state-validate.js now also reads root.GardenGenetics (AXES,
          founders, to validate a pinned trait) at script-execution time, the same ordering fix

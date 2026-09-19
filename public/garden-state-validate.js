@@ -56,6 +56,17 @@
     typeof module !== "undefined"
       ? require("./game/campaign-automation.js")
       : root.GardenCampaignAutomation;
+  // Epic C5.10: a Rainelle's x/z are optional (null until C5.11 assigns a real position,
+  // rainelles.js's own createRainelle comment) — the only two valid shapes are "both absent/null"
+  // (no position yet) and "both finite world coordinates" (same -64..64 bound already used for
+  // s.entities/s.player/specimens/stations elsewhere in this file), never one axis set without
+  // the other.
+  function badRainellePosition(x, z) {
+    const xEmpty = x === undefined || x === null;
+    const zEmpty = z === undefined || z === null;
+    if (xEmpty !== zEmpty) return true;
+    return !xEmpty && (!finite(x, -64, 64) || !finite(z, -64, 64));
+  }
   function validate(s) {
     s = migrateLandscape(s);
     if (
@@ -437,7 +448,9 @@
               r.bourgeon !== true) ||
             // Epic C4.6: founder is optional (a pre-epic save has none yet, migrated below) but
             // must be a boolean when present — see rainelles.js's createRainelle comment.
-            (r.founder !== undefined && typeof r.founder !== "boolean"),
+            (r.founder !== undefined && typeof r.founder !== "boolean") ||
+            // Epic C5.10: x/z are optional (see badRainellePosition's own comment).
+            badRainellePosition(r.x, r.z),
         ))
     )
       throw Error("Rainelle invalide.");
@@ -780,10 +793,15 @@
     // exactly the individual that was in fact created first) only when the field is entirely
     // absent; a rainelle that already carries a real `founder` (from createRainelle, post-epic)
     // keeps it untouched by the spread below.
+    // Epic C5.10: x/z migrate per rainelle to `null` (no position yet), same reasoning as job/
+    // bourgeon just above — a pre-epic rainelle only lacks these two fields, never guessed from
+    // a habitat/spawn coordinate here (that real assignment is C5.11's own job).
     result.rainelles = (result.rainelles ?? []).map((r, i) => ({
       job: null,
       bourgeon: null,
       founder: i === 0,
+      x: null,
+      z: null,
       ...r,
     }));
     result.rainelleNextId ??= 1;

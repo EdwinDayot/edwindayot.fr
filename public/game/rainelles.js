@@ -68,6 +68,11 @@
   // path creates it — the scripted frog encounter, C2.3/C4.4, or a later bourgeon/nursery
   // resolution, C3.4) and false for every one after, forever (nothing ever removes from
   // s.rainelles, so "length === 0" can only ever be true once across a save's whole lifetime).
+  // Epic C5.10 (design §14, "les Rainelles naviguent sur un graphe ou une grille partagés"):
+  // `x`/`z` stay `null` at creation, exactly the same "posed, not wired" posture already used by
+  // `job`/`bourgeon` above — no real placement mechanism exists yet (C5.11's own job, see
+  // rainelle-movement.js's header comment), so nothing here would have a meaningful coordinate to
+  // assign; a guessed one would only have to be corrected later.
   function createRainelle(s, { cultivarId, name = "" }) {
     const rainelle = {
       id: `r${s.rainelleNextId++}`,
@@ -77,6 +82,8 @@
       job: null,
       bourgeon: null,
       founder: s.rainelles.length === 0,
+      x: null,
+      z: null,
     };
     s.rainelles.push(rainelle);
     return rainelle;
