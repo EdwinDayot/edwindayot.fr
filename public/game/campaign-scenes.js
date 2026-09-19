@@ -136,7 +136,48 @@
       .map((r) => r.id);
   }
 
-  const api = { LOCATIONS, deriveLocation, detectPersistentGestures };
+  // Epic C5.7 (design §11, "réparation... coût réel, jamais un bouton pardon" ; design ch. 14,
+  // "elle interrompt une première fois le geste, sans redevenir instantanément disponible"). A
+  // Rainelle counts as réparée this exact night only when *all three* facts hold at once — never
+  // a fourth, independent classification, only a narrower read of facts C5.1/C5.3/C5.5/C5.6
+  // already expose:
+  //   - it was already detected in persistance de geste on some *earlier* night — the one fact
+  //     this module cannot derive on its own, so it is handed in as `previouslyPersistentIds`
+  //     (campaign-memory.js's own `persistentGestureIds`, C5.7's new bounded field — see its
+  //     header comment for why this can't be inferred from overexertion alone);
+  //   - its overexertion streak (C5.3) has come back down to exactly zero, read *after* tonight's
+  //     own decreaseOverexertion has already run (garden-state-cmd-f.js) — "après avoir cessé
+  //     d'être sursollicitée" read literally, not merely "lower than before";
+  //   - its location this same night, per deriveLocation (C5.5), is exactly REPOS — a real rest
+  //     night (veilleuse off), never merely "did not work", which also covers HABITAT (no gesture,
+  //     or a gesture whose zone never resolves) — never something that was never a real poste to
+  //     begin with.
+  // A Rainelle can never satisfy both this function and isPersistentGesture the same night:
+  // persistance requires deriveLocation to read HABITAT, réparation requires REPOS — mutually
+  // exclusive return values of the exact same single classification.
+  function isRepairedGesture(rainelle, s, workedThisNight, previouslyPersistentIds) {
+    if (!previouslyPersistentIds.has(rainelle.id)) return false;
+    const overexertion =
+      (s.campaignMemory && s.campaignMemory.overexertion[rainelle.id]) || 0;
+    if (overexertion > 0) return false;
+    return deriveLocation(rainelle, s, workedThisNight) === LOCATIONS.REPOS;
+  }
+
+  // Pure: the list of Rainelle ids réparées this same instant, for garden-state-cmd-f.js's
+  // "sleep" to hand to data-narrative.js's pendingReveal — never mutates anything, same posture
+  // as detectPersistentGestures itself.
+  function detectRepairedGestures(s, workedThisNight, previouslyPersistentIds) {
+    return s.rainelles
+      .filter((r) => isRepairedGesture(r, s, workedThisNight, previouslyPersistentIds))
+      .map((r) => r.id);
+  }
+
+  const api = {
+    LOCATIONS,
+    deriveLocation,
+    detectPersistentGestures,
+    detectRepairedGestures,
+  };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenCampaignScenes = api;
 })(globalThis);

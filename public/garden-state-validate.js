@@ -732,7 +732,18 @@
         typeof M.unsoldStock !== "object" ||
         M.unsoldStock === null ||
         typeof M.contractsFed !== "object" ||
-        M.contractsFed === null
+        M.contractsFed === null ||
+        // Epic C5.7: persistentGestureIds is optional here, same reasoning as overexertion above
+        // (a save from between C5.1/C5.6 and C5.7 already has campaignMemory but never this
+        // field) — the post-clone migration below fills it in. When present, same "flat, unique,
+        // must resolve to a real Rainelle id" shape as births.
+        (M.persistentGestureIds !== undefined &&
+          (!Array.isArray(M.persistentGestureIds) ||
+            M.persistentGestureIds.some(
+              (id) => typeof id !== "string" || !rainelleIds.has(id),
+            ) ||
+            new Set(M.persistentGestureIds).size !==
+              M.persistentGestureIds.length))
       )
         throw Error("Mémoire de campagne invalide.");
     }
@@ -834,6 +845,10 @@
     // between C5.1 and C5.3) migrates to an empty streak map — never guessed from nightlyActivity
     // history that was never recorded as a streak.
     result.campaignMemory.overexertion ??= {};
+    // Epic C5.7: a save with an existing campaignMemory but no persistentGestureIds field yet
+    // (created between C5.1/C5.6 and C5.7) migrates to an empty list — never guessed from
+    // overexertion history that never recorded which Rainelle was actually caught persisting.
+    result.campaignMemory.persistentGestureIds ??= [];
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };

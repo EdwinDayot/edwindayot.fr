@@ -121,6 +121,21 @@
       title: "Une communauté qui sait s’arrêter",
       text: "Aucun geste ne se répète devant un poste vide. La communauté sait déjà s’arrêter.",
     },
+    // Epic C5.7 (design §11, "réparation... coût réel" ; design ch. 14, "elle interrompt une
+    // première fois le geste, sans redevenir instantanément disponible") : révélée la toute
+    // première fois qu'une Rainelle déjà vue en persistance de geste (C5.6) repasse à repos réel
+    // après avoir cessé d'être sursollicitée — jamais au moment où le joueur coupe la veilleuse,
+    // seulement quand le fait se produit réellement, une ou plusieurs nuits plus tard
+    // (campaign-scenes.js's detectRepairedGestures, appelé depuis garden-state-cmd-f.js's
+    // "sleep"). Texte factuel, jamais un texte de félicitations adressé au joueur (design §11 :
+    // "le résultat de la réparation n'appartient pas entièrement au joueur") : il constate un
+    // arrêt, pas une guérison ni un pardon accordé.
+    "geste-qui-sarrete": {
+      id: "geste-qui-sarrete",
+      trigger: "persistentGestureRepaired",
+      title: "Le geste qui s’arrête",
+      text: "Elle s’assied près de l’eau. Le geste ne reprend pas.",
+    },
   };
 
   function findByTrigger(signal) {

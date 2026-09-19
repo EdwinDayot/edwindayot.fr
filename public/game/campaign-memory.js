@@ -84,7 +84,21 @@
    precedent for "how much a shared water reserve holds" — same borrowing already used for
    DEFAULT_PANIER_CAPACITY at C2.6a — rather than inventing an unrelated number; not imported
    directly (this file stays dependency-free, same posture already used for ZONE_WORK_RANGE's own
-   borrowed-but-uncoupled precedent in campaign-automation.js). */
+   borrowed-but-uncoupled precedent in campaign-automation.js).
+
+   Epic C5.7 (design §11, "réparation... coût réel" ; design ch. 14, "elle interrompt une première
+   fois le geste, sans redevenir instantanément disponible") adds `persistentGestureIds`: a flat,
+   never-duplicated list of every Rainelle id ever detected in persistance de geste (C5.6) on any
+   past night — same "bounded, id-list" shape as `births`, keyed by nothing but presence. This is
+   the one fact campaign-scenes.js's own reparation check cannot derive from anything already
+   here: `overexertion` reaching zero again does not by itself mean a Rainelle was ever seen
+   persisting (a Rainelle whose station always has work never goes idle, so it can accrue
+   overexertion and later rest back down to zero without ever once being caught in persistance —
+   that is an ordinary rest night, not a réparation, and design §11's "pas de bouton pardon" means
+   this distinction has to be a recorded fact, not inferred after the fact from a number that
+   could have reached zero for an unrelated reason). Written once per id, from
+   garden-state-cmd-f.js's own "sleep", the same and only call site that already computes
+   `persistentIds` for C5.6's own narrative reveal — never a second detection. */
 (function (root) {
   function freshMemory() {
     return {
@@ -102,6 +116,9 @@
       // Epic C5.4: per-borne cumulative count of specimens watered through a `priseFortDebit`
       // borne — see header comment and recordWaterWithdrawal/bassinCommunLevel below.
       waterWithdrawals: {},
+      // Epic C5.7: flat, never-duplicated list of every Rainelle id ever detected in persistance
+      // de geste (C5.6) — see header comment and recordPersistentGesture below.
+      persistentGestureIds: [],
       // Reserved — no epic yet transforms/removes a habitat once registered (C3.3).
       habitatTransformations: [],
       // Reserved — no unsold-stock concept exists yet (no présentoir/demande system in campaign).
@@ -202,6 +219,16 @@
     return Math.max(0, BASSIN_COMMUN_CAPACITY - total);
   }
 
+  // Epic C5.7: called once per Rainelle id campaign-scenes.js's detectPersistentGestures just
+  // returned for this same night (garden-state-cmd-f.js's "sleep", the only call site) — same
+  // "record once, never duplicated" guard as recordBirth, for the same reason (a Rainelle can be
+  // detected persistent again on a later night, but that must never grow this list past one entry
+  // per id, since the reparation check only cares whether it was *ever* seen, not how many times).
+  function recordPersistentGesture(memory, rainelleId) {
+    if (!memory.persistentGestureIds.includes(rainelleId))
+      memory.persistentGestureIds.push(rainelleId);
+  }
+
   const api = {
     freshMemory,
     OVEREXERTION_THRESHOLD,
@@ -215,6 +242,7 @@
     decreaseOverexertion,
     recordWaterWithdrawal,
     bassinCommunLevel,
+    recordPersistentGesture,
   };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenCampaignMemory = api;

@@ -10,7 +10,9 @@
    croissance, see below) — real work under an active veilleuse and the C5.1 rest counter are now
    mutually exclusive per Rainelle per night, resolved together in the same block. Epic C5.3 adds
    the overexertion streak update to that same block (up on a worked night, down on a rested one —
-   see campaign-memory.js's own header comment). */
+   see campaign-memory.js's own header comment). Epic C5.7 adds the réparation detection
+   (campaign-scenes.js's detectRepairedGestures), read *after* that same streak update — see its
+   own comment below for why the order matters. */
 (function (root) {
   const Genetics =
     typeof module !== "undefined"
@@ -103,6 +105,12 @@
         // nuits précédentes est le sujet de la scène, pas ce que la récupération automatique
         // d'un point va lui retirer dans un instant.
         const persistentIds = Scenes.detectPersistentGestures(s, workedIds);
+        // Epic C5.7 (design §11, réparation) : capturé ici, avant que persistentIds ne soit
+        // replié plus bas dans ce même champ persisté — "déjà vue en persistance" ne peut donc
+        // jamais désigner cette nuit même (de toute façon impossible : REPOS et la persistance
+        // sont deux verdicts mutuellement exclusifs de deriveLocation pour une même Rainelle),
+        // seulement une nuit strictement antérieure.
+        const previouslyPersistentIds = new Set(s.campaignMemory.persistentGestureIds);
         let frogCultivarId = null;
         for (const { a, b, pin } of s.campaignPot.pending) {
           const traits = Pot.resolvePotDraw(a, b, undefined, pin || null);
@@ -161,6 +169,24 @@
             Memory.recordRest(s.campaignMemory, id);
             Memory.decreaseOverexertion(s.campaignMemory, id);
           }
+        // Epic C5.7 : calculé seulement maintenant, après que la boucle ci-dessus ait fait
+        // avancer overexertion pour cette nuit même — "cessé d'être sursollicitée" doit lire le
+        // niveau d'après-récupération, jamais celui d'avant cette nuit (même politique que
+        // capacityLimit, campaign-automation.js). Utilise previouslyPersistentIds capturé plus
+        // haut, avant que persistentIds ne soit replié dans la mémoire ci-dessous.
+        const repairedIds = Scenes.detectRepairedGestures(
+          s,
+          workedIds,
+          previouslyPersistentIds,
+        );
+        // Épic C5.7 : chaque Rainelle détectée en persistance cette nuit rejoint le registre
+        // borné de campaign-memory.js, une fois, jamais dupliquée — après le calcul de
+        // repairedIds ci-dessus, pour qu'une Rainelle nouvellement détectée en persistance cette
+        // nuit même ne puisse jamais aussi compter, cette même nuit, comme sa propre réparation
+        // (déjà impossible par construction, deriveLocation étant à valeur unique, mais cet ordre
+        // rend cette garantie explicite plutôt qu'accidentelle).
+        for (const id of persistentIds)
+          Memory.recordPersistentGesture(s.campaignMemory, id);
         // Epic C5.6: révélé la toute première fois qu'au moins une Rainelle est détectée en
         // persistance de geste cette nuit — jamais à l'armement d'une veilleuse, seulement au
         // moment où le fait se produit réellement (même posture que "traces-mouillees" ci-dessus).
@@ -180,6 +206,17 @@
           const revealed = Narrative.pendingReveal(
             s.campaignFlags,
             "attentiveNightRecognized",
+          );
+          if (revealed) s.campaignFlags.push(revealed.id);
+        }
+        // Epic C5.7 : indépendant des deux révélations ci-dessus (states différents, jamais les
+        // mêmes cette même nuit pour la même Rainelle — voir campaign-scenes.js's own comment sur
+        // l'exclusion mutuelle REPOS/persistance — mais deux Rainelles distinctes pourraient en
+        // théorie déclencher persistance et réparation la même nuit chacune de son côté).
+        if (repairedIds.length) {
+          const revealed = Narrative.pendingReveal(
+            s.campaignFlags,
+            "persistentGestureRepaired",
           );
           if (revealed) s.campaignFlags.push(revealed.id);
         }
