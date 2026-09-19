@@ -38,6 +38,10 @@
     typeof module !== "undefined"
       ? require("./game/campaign-house.js")
       : root.GardenCampaignHouse;
+  const Memory =
+    typeof module !== "undefined"
+      ? require("./game/campaign-memory.js")
+      : root.GardenCampaignMemory;
   // Epic C1.5: read here to validate a pinned trait (AXES/founders), both on s.campaignPin
   // itself and on an optional pin attached to a pending campaignPot entry below.
   const Genetics =
@@ -648,6 +652,44 @@
         new Set(s.campaignFlags).size !== s.campaignFlags.length)
     )
       throw Error("Indicateurs narratifs invalides.");
+    // Epic C5.1: campaignMemory is a bounded journal (campaign-memory.js), never an arbitrary
+    // object — rest/firstGesture only ever key an id that actually resolves to a real
+    // s.rainelles entry (never a stale/hand-edited reference), births is a flat unique list of
+    // such ids, manualInterventions a bare count, and the five reserved fields (no epic writes
+    // real values into them yet, see campaign-memory.js's own header comment) are only type-
+    // checked against their fresh() shape so a future epic's first real write still loads.
+    if (s.campaignMemory !== undefined) {
+      const M = s.campaignMemory;
+      const rainelleIds = new Set((s.rainelles || []).map((r) => r?.id));
+      if (
+        typeof M !== "object" ||
+        M === null ||
+        typeof M.rest !== "object" ||
+        M.rest === null ||
+        Object.entries(M.rest).some(
+          ([id, n]) => !rainelleIds.has(id) || !count(n),
+        ) ||
+        !Array.isArray(M.births) ||
+        M.births.some((id) => typeof id !== "string" || !rainelleIds.has(id)) ||
+        new Set(M.births).size !== M.births.length ||
+        typeof M.firstGesture !== "object" ||
+        M.firstGesture === null ||
+        Object.entries(M.firstGesture).some(
+          ([id, verbe]) => !rainelleIds.has(id) || !Rainelles.VERBS.includes(verbe),
+        ) ||
+        !count(M.manualInterventions) ||
+        typeof M.nightlyActivity !== "object" ||
+        M.nightlyActivity === null ||
+        typeof M.waterWithdrawals !== "object" ||
+        M.waterWithdrawals === null ||
+        !Array.isArray(M.habitatTransformations) ||
+        typeof M.unsoldStock !== "object" ||
+        M.unsoldStock === null ||
+        typeof M.contractsFed !== "object" ||
+        M.contractsFed === null
+      )
+        throw Error("Mémoire de campagne invalide.");
+    }
     const result = clone(s);
     result.hotbar ??= [...D.defaultHotbar];
     result.quests ??= { active: [], completed: [] };
@@ -729,6 +771,9 @@
     result.campaignFlags ??= [];
     // Epic C1.5: a pre-epic save simply has no pin awaiting its next sowPot.
     result.campaignPin ??= null;
+    // Epic C5.1: a pre-epic save simply has no journal yet — fresh, empty, exactly what a new
+    // save would already have (never reconstructed from history that was never recorded).
+    result.campaignMemory ??= Memory.freshMemory();
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };

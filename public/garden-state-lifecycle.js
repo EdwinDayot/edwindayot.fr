@@ -14,6 +14,10 @@
     typeof module !== "undefined"
       ? require("./game/campaign-house.js")
       : root.GardenCampaignHouse;
+  const Memory =
+    typeof module !== "undefined"
+      ? require("./game/campaign-memory.js")
+      : root.GardenCampaignMemory;
   function fresh(now) {
     return {
       version: 3,
@@ -169,6 +173,9 @@
       // Epic C1.5: the single pinned trait awaiting its next sowPot, or none. Consumed (attached
       // to the pending pair, then cleared) by sowPot itself — see garden-state-cmd-f.js/-o.js.
       campaignPin: null,
+      // Epic C5.1: bounded journal of campaign-layer events/aggregates (design §11, "mémoire
+      // factuelle bornée") — see campaign-memory.js's own header comment for its shape and why.
+      campaignMemory: Memory.freshMemory(),
     };
   }
   function migrate(old, now = Date.now()) {

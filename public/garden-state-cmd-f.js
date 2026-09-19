@@ -27,6 +27,10 @@
     typeof module !== "undefined"
       ? require("./game/data-narrative.js")
       : root.GardenNarrative;
+  const Memory =
+    typeof module !== "undefined"
+      ? require("./game/campaign-memory.js")
+      : root.GardenCampaignMemory;
   const M = {
     commandSegF(c, ctx, st) {
       const { s, fail } = st;
@@ -68,6 +72,10 @@
         // encounter only adds a Rainelle carrying that same cultivar's foliage. If nothing was
         // sown this night, the encounter simply carries over (campaignFrogEncounterPending stays
         // true) to the next night that actually resolves a pair, never lost, never duplicated.
+        // Epic C5.1 (design §11, "périodes de repos par Rainelle... vrai par défaut avant toute
+        // veilleuse"): captured before any new individual is created below, so a Rainelle born
+        // this same night is never counted as having rested a night it did not live through.
+        const restingIds = s.rainelles.map((r) => r.id);
         let frogCultivarId = null;
         for (const { a, b, pin } of s.campaignPot.pending) {
           const traits = Pot.resolvePotDraw(a, b, undefined, pin || null);
@@ -83,7 +91,11 @@
         }
         s.campaignPot.pending = [];
         if (frogCultivarId) {
-          Rainelles.createRainelle(s, { cultivarId: frogCultivarId, name: "" });
+          const born = Rainelles.createRainelle(s, {
+            cultivarId: frogCultivarId,
+            name: "",
+          });
+          Memory.recordBirth(s.campaignMemory, born.id);
           s.campaignFrogEncounterPending = false;
           // Epic C4.4: the "traces mouillées" text (design §10, chapitre 4) only ever fires here,
           // the exact night the encounter actually resolves into a real Rainelle — never at
@@ -100,9 +112,17 @@
         // taught gesture (design §5: "il ne copie pas un souvenir ni une obligation de métier"),
         // sharing the cultivar of the Rainelle that formed its bourgeon (see rainelles.js's own
         // harvestBud comment).
-        for (const bud of s.campaignNursery)
-          Rainelles.createRainelle(s, { cultivarId: bud.cultivarId, name: "" });
+        for (const bud of s.campaignNursery) {
+          const born = Rainelles.createRainelle(s, {
+            cultivarId: bud.cultivarId,
+            name: "",
+          });
+          Memory.recordBirth(s.campaignMemory, born.id);
+        }
         s.campaignNursery = [];
+        // Epic C5.1: every Rainelle that already existed before tonight's resolution above just
+        // rested — true by default, since no veilleuse mechanism exists yet (C5.2).
+        for (const id of restingIds) Memory.recordRest(s.campaignMemory, id);
         // Epic C2.2: the atomic night bilan. "sleep" is the single command a scripted 23h
         // transition and a voluntary early bedtime ("dormir plus tôt", design §3) both end up
         // calling — neither reads s.campaignClock.gameSeconds beforehand, so an early sleep

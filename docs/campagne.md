@@ -1502,3 +1502,43 @@ Chaque entrée précise ses fichiers probables (`campaign-memory.js` nouveau ; `
 **Aucun code ni test implémenté à ce déclenchement** (conforme à la règle « un epic par déclenchement », appliquée à une session de planification Cartographe, même précédent que la planification de C4.10) : `npm test` n'a pas été relancé après l'édition du backlog/changelog puisqu'aucun fichier de code/test n'a changé — seule la vérification indépendante déjà rapportée ci-dessus (avant toute édition) fait foi. Aucun choix déjà confirmé du design remis en cause (Alma vivante, nom des Rainelles, culpabilisation de fin de campagne) ; aucune règle de `direction-artistique.md` concernée (aucun rendu touché).
 
 **Pour le prochain déclenchement** : **C5.1** est le seul epic `todo` de la phase 5 à dépendances satisfaites (aucune dépendance, données pures) — candidat naturel pour l'implémentation complète de la routine (Artisan moteur, Vérificateur, Chroniqueur). C5.2/C5.3/C5.4 restent bloqués sur C5.1 (et, pour C5.2, sur C2.6c/C2.8, déjà `fait`) jusqu'à ce que le journal existe réellement.
+
+## Implémentation du 19 septembre 2026 — Épic C5.1 : mémoire factuelle bornée, journal d'activité de campagne
+
+Déclenchement automatisé (routine cloud horaire). **Anti-hallucination faite avant tout le reste** : dernier epic « fait » du backlog était C4.10, commit `660ce6650f435e79353abe9c49371a8730690a67` — `git show --stat 660ce66` confirme le commit réel (message et contenu — nouveau `tests/campaign-phase4-gate.cjs`, `package.json` étendu — cohérents avec l'entrée existante de `campagne-backlog.md` et de ce fichier). `npm ci && npm test` relancés indépendamment, avant toute édition → **477/477**, identique au rapport existant, zéro échec. Aucun bandeau de pause en tête de `campagne-backlog.md`. Aucune anomalie : `docs/campagne-anomalies.md` toujours absent (vérifié, fichier inexistant). Aucun epic à l'état `bloqué` dans tout le backlog (recherche exhaustive : zéro correspondance) : aucune pause anti-emballement à déclencher.
+
+**Choix de l'epic.** Le dernier commit de la branche est une planification Cartographe qui vient de détailler un premier lot d'epics de la phase 5 (C5.1 à C5.4). **C5.1** est le seul de ce lot `todo` à dépendances satisfaites (aucune dépendance, données pures, comme C1.2/C2.6a/C3.5) ; C5.2/C5.3/C5.4 restent bloqués sur lui. Implémenté directement par l'orchestrateur (epic de règles/données pur, sans rendu ni narration).
+
+**Livré**, dans les fichiers probables de l'entrée de backlog plus les points d'entrée réels qui devaient l'appeler (voir le détail complet, non répété ici, dans l'entrée de `campagne-backlog.md` elle-même) : nouveau `public/game/campaign-memory.js` (schéma du journal borné et quatre fonctions d'enregistrement pures), `public/garden-state-lifecycle.js` (`campaignMemory: Memory.freshMemory()` sur une partie neuve), `public/garden-state-validate.js` (validation stricte de forme + migration par défaut), `public/garden-state-cmd-f.js` (repos/naissances, dans `sleep`), `public/garden-state-cmd-j.js`/`-k.js` (intervention manuelle/première affectation de geste, dans `teachGesture`/`confirmTeaching`/`teachGestureQuick`), `public/index.html` (script chargé avant `garden-state-lifecycle.js`/`-validate.js`), nouveau `tests/campaign-memory.cjs`, `package.json` (script `test` étendu).
+
+Quatre catégories déjà observables sans nouveau système, comme demandé par le critère de sortie de l'entrée de backlog :
+- **`rest`** (repos par Rainelle) : incrémenté dans `sleep` pour chaque Rainelle qui existait déjà *avant* la résolution de cette même nuit — capturé en tout début de la commande, avant toute création de nouvel individu (rencontre de la grenouille ou nurserie), afin qu'un individu né cette nuit-là ne soit jamais compté pour une nuit qu'il n'a pas vécue. Prouvé par test : après la naissance de la toute première Rainelle, `rest` reste vide ; la nuit suivante, `rest[id] === 1`.
+- **`births`** : liste plate d'ids, un par naissance réelle (rencontre de la grenouille, C2.3/C4.4, ou résolution de nurserie, C3.4), jamais dupliquée — un id de Rainelle n'étant jamais réattribué (`rainelleNextId` strictement croissant), la garde de non-duplication de `recordBirth` est défensive plutôt que jamais réellement testée comme cas limite atteignable.
+- **`firstGesture`** : verbe de la toute première assignation de geste par Rainelle, jamais écrasé par un réenseignement ultérieur — prouvé par un test qui réenseigne un second verbe et vérifie que le premier reste inchangé.
+- **`manualInterventions`** : compteur unique, incrémenté par `teachGesture` (C2.4, chemin direct), `confirmTeaching` et `teachGestureQuick` (C2.5, parcours en quatre moments et sa répétition rapide).
+
+**Décision d'interprétation documentée, pas devinée** (le critère de sortie de l'entrée de backlog nommait « une commande de geste direct » sans lister precisément laquelle) : seuls les trois points d'entrée ci-dessus qui mutent réellement `rainelle.geste` comptent comme intervention manuelle — les étapes intermédiaires du parcours en quatre moments (`beginTeaching`, `demonstrateGesture`, `reviseGesturePhrase`, `cancelTeaching`) sont des étapes vers une commande de geste, pas l'assignation elle-même, et ne l'incrémentent donc jamais.
+
+Cinq champs réservés mais non renseignés, exactement les cinq catégories restantes du design §11 que ce lot d'epics ne construit pas encore : `nightlyActivity` (C5.2), `waterWithdrawals` (C5.4), `habitatTransformations`, `unsoldStock`, `contractsFed` — chacun présent avec une valeur neutre (`{}` ou `[]`), jamais deviné ni approximé par cet epic, seulement réservé pour que la forme du journal n'ait pas à changer quand un futur epic le remplit réellement.
+
+**Garantie centrale du design (§11 : « une commande refusée ne devient jamais un dommage fictif attribué au joueur »), vérifiée par construction et par test** : chaque fonction d'enregistrement n'est appelée que sur le chemin de succès d'une commande, jamais depuis une branche de validation — un test dédié tente `triggerFrogEncounter` sans cultivar existant et `teachGesture` avec une Rainelle inconnue, un champ vide, ou le verbe `multiplier` (refus narré, C4.6), et vérifie dans les trois cas qu'aucun champ de `campaignMemory` ne bouge. Un test séparé vérifie aussi qu'un tick de `campaign-automation.js` (plusieurs cycles d'arrosage simulés via `g.step()`) ne touche jamais le journal — seule une commande directe le fait, jamais le tick automatique.
+
+**Résultat réellement exécuté** : `npm ci` puis `npm test` → **489/489** (477 existants + 12 nouveaux dans `tests/campaign-memory.cjs`, zéro régression). Sortie complète :
+
+```
+# tests 489
+# suites 0
+# pass 489
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+```
+
+`/code-review` (skill, niveau medium) exécuté sur le diff complet : aucun défaut relevé.
+
+Aucun rendu/géométrie/matériau touché (schéma et règles pures, comme C1.2/C2.6a/C3.5) : `test:browser`/`test:visual` complets non requis. Vérification navigateur ciblée exécutée malgré tout, puisque `public/index.html` a changé (nouvel ordre de script) : page chargée dans Chromium headless (`/opt/pw-browsers/chromium`), zéro erreur console/page, `window.GardenCampaignMemory.freshMemory()` retourne exactement la forme attendue (`{"rest":{},"births":[],"firstGesture":{},"manualInterventions":0,"nightlyActivity":{},"waterWithdrawals":{},"habitatTransformations":[],"unsoldStock":{},"contractsFed":{}}`).
+
+Aucune relecture narrative adverse requise (aucune identité/texte narratif introduit). Aucun choix déjà confirmé du design remis en cause (Alma vivante, nom des Rainelles, culpabilisation de fin de campagne). Aucune règle de `direction-artistique.md` concernée.
+
+**Pour le prochain déclenchement** : **C5.2** (veilleuses de croissance) dépend de C5.1 (fait, ce déclenchement), C2.6c et C2.8 (tous deux déjà `fait`) — dépendances désormais toutes satisfaites, candidat naturel. C5.3 reste bloqué sur C5.2 ; C5.4 reste bloqué sur C5.1 seul (déjà satisfait) mais porte sa propre vérification préalable explicite à trancher avant tout code (réseau d'eau existant vs champ de campagne distinct — voir sa propre entrée de backlog).

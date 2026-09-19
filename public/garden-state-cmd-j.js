@@ -20,6 +20,10 @@
     typeof module !== "undefined"
       ? require("./game/data-narrative.js")
       : root.GardenNarrative;
+  const Memory =
+    typeof module !== "undefined"
+      ? require("./game/campaign-memory.js")
+      : root.GardenCampaignMemory;
   const M = {
     commandSegJ(c, ctx, st) {
       const { s, fail } = st;
@@ -41,6 +45,12 @@
           }
           return fail(r.error);
         }
+        // Epic C5.1: a direct gesture command is a manual intervention (design §11); recorded
+        // only here on success, never on the refusal above (design §11, "une commande refusée ne
+        // devient jamais un dommage fictif attribué au joueur").
+        Memory.recordManualIntervention(s.campaignMemory);
+        if (!r.hadGesture)
+          Memory.recordFirstGesture(s.campaignMemory, rainelle.id, c.verbe);
         st.message = r.hadGesture
           ? `Ancien geste remplacé : ${c.verbe}.`
           : `Geste appris : ${c.verbe}.`;

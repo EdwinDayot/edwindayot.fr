@@ -94,6 +94,12 @@
          loaded here anyway, right after its last dependency, to avoid the exact class of missing-
          script bug documented above for campaign-clock.js/rainelles.js/cultivars.js. -->
     <script src="/game/rainelles-status.js" defer></script>
+    <!-- Epic C5.1: campaign-memory.js's freshMemory/recordRest/recordBirth/recordFirstGesture/
+         recordManualIntervention are read by garden-state-lifecycle.js/garden-state-validate.js
+         just below and by garden-state-cmd-f.js/-j.js/-k.js further below, same ordering
+         requirement already applied to every other pure campaign module above (no dependency of
+         its own). -->
+    <script src="/game/campaign-memory.js" defer></script>
     <!-- Epic C1.5: moved here from much further below (its previous position after garden-
          state-cmd-e.js): garden-state-validate.js now also reads root.GardenGenetics (AXES,
          founders, to validate a pinned trait) at script-execution time, the same ordering fix
