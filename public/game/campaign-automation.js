@@ -41,7 +41,14 @@
    veilleuse on — a genuinely different call site from the ordinary per-second tick() loop above,
    not a parameter on it, since a resolved night has no seconds to advance a job countdown
    through. See runNightWork's own comment for verb scope and the memory-recording contract it
-   exists to satisfy. */
+   exists to satisfy.
+
+   Epic C5.3 (design §11, "des limites physiologiques finissent par réduire la capacité") adds
+   capacityLimit, read by both doArroser and doRecolter (day and night alike, since both share
+   these two functions): once a Rainelle's overexertion streak (campaign-memory.js) is past
+   OVEREXERTION_THRESHOLD, a single cycle moves at most FATIGUED_CAPACITY_PER_CYCLE units instead
+   of everything in range/capacity — never zero, per the design's own "elles ne doivent pas annuler
+   immédiatement tout le gain nocturne". See capacityLimit's own comment for the exact rule. */
 (function (root) {
   const C =
     typeof module !== "undefined"
@@ -55,6 +62,10 @@
     typeof module !== "undefined"
       ? require("./cultivars.js")
       : root.GardenCultivars;
+  const Memory =
+    typeof module !== "undefined"
+      ? require("./campaign-memory.js")
+      : root.GardenCampaignMemory;
 
   // How long one watering/harvest cycle takes, in simulated seconds (s.elapsed, never the wall
   // clock — same convention as every other campaign timer). No existing value in the codebase
@@ -85,6 +96,29 @@
     return r.ok && r.kind === kind ? r.station : null;
   }
 
+  // Epic C5.3 (design §11, "des limites physiologiques finissent par réduire la capacité"): the
+  // volume a single doArroser/doRecolter call may move once a Rainelle's overexertion streak
+  // (campaign-memory.js) has gone past OVEREXERTION_THRESHOLD — a "limite de volume par cycle",
+  // the option this epic's own backlog entry names as one of the two acceptable choices (the
+  // other, a job-duration multiplier, does not apply here: a resolved night has no seconds for a
+  // multiplier to stretch, see this file's own header comment on runNightWork). Never zero (design
+  // §11, "elles ne doivent pas annuler immédiatement tout le gain nocturne") — a single unit still
+  // gets through every cycle, however sursollicitée.
+  const FATIGUED_CAPACITY_PER_CYCLE = 1;
+
+  // Returns how many specimens/units a single doArroser/doRecolter call may act on this cycle for
+  // this Rainelle: unlimited under the threshold (today's behaviour, unchanged), capped once past
+  // it. Reads the streak as it stood *before* tonight's own update (garden-state-cmd-f.js applies
+  // increaseOverexertion/decreaseOverexertion only after runNightWork has already run), so a
+  // Rainelle is never penalised the very night its streak first crosses the threshold — only on
+  // the nights after.
+  function capacityLimit(s, rainelleId) {
+    const level = (s.campaignMemory && s.campaignMemory.overexertion[rainelleId]) || 0;
+    return level > Memory.OVEREXERTION_THRESHOLD
+      ? FATIGUED_CAPACITY_PER_CYCLE
+      : Infinity;
+  }
+
   // Advances a Rainelle's job by one tick and returns true exactly once, the tick the cycle
   // completes (mirroring automation.js's tickJob: a countdown to zero, then restarted for the
   // next cycle — "sans intervention" means it must restart itself, never stall at zero).
@@ -110,12 +144,20 @@
     const borne = resolveKind(s, geste.source, "borne");
     const zone = resolveKind(s, geste.poste, "zone");
     if (!borne || !zone) return false;
+    // Epic C5.3: capped once this Rainelle's overexertion streak is past the threshold — see
+    // capacityLimit's own comment. Infinity under the threshold, so this loop is unchanged from
+    // before this epic in the common case.
+    const limit = capacityLimit(s, rainelle.id);
     let watered = false;
-    for (const specimen of s.specimens)
+    let count = 0;
+    for (const specimen of s.specimens) {
+      if (count >= limit) break;
       if (C.distance(zone, specimen) <= ZONE_WORK_RANGE) {
         Cultivars.waterSpecimen(specimen, s.elapsed);
         watered = true;
+        count++;
       }
+    }
     return watered;
   }
 
@@ -153,11 +195,16 @@
     const zone = resolveKind(s, geste.poste, "zone");
     const panier = resolveKind(s, geste.destination, "panier");
     if (!zone || !panier) return false;
+    // Epic C5.3: a second, independent ceiling alongside the panier's own capacity below — see
+    // capacityLimit's own comment. Infinity under the threshold, unchanged from before this epic.
+    const limit = capacityLimit(s, rainelle.id);
     // Tracked incrementally rather than re-summing Stations.panierTotal(panier) on every
     // specimen: same result, without an O(buffer keys) reduce per specimen visited this cycle.
     let total = Stations.panierTotal(panier);
     let harvested = false;
+    let count = 0;
     for (const specimen of s.specimens) {
+      if (count >= limit) break;
       if (!Cultivars.isMature(specimen) || !specimen.readyToProduce) continue;
       if (C.distance(zone, specimen) > ZONE_WORK_RANGE) continue;
       if (total >= panier.capacity) break;
@@ -165,6 +212,7 @@
         (panier.buffer[specimen.cultivarId] || 0) + 1;
       Cultivars.setReadyToProduce(specimen, false);
       total++;
+      count++;
       harvested = true;
     }
     return harvested;
@@ -302,6 +350,7 @@
   const api = {
     CYCLE_SECONDS,
     ZONE_WORK_RANGE,
+    FATIGUED_CAPACITY_PER_CYCLE,
     tickRainelle,
     updateSpecimenReadiness,
     runNightWork,

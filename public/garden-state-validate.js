@@ -660,13 +660,13 @@
         new Set(s.campaignFlags).size !== s.campaignFlags.length)
     )
       throw Error("Indicateurs narratifs invalides.");
-    // Epic C5.1/C5.2: campaignMemory is a bounded journal (campaign-memory.js), never an
-    // arbitrary object — rest/firstGesture/nightlyActivity only ever key an id that actually
-    // resolves to a real s.rainelles entry (never a stale/hand-edited reference), births is a
-    // flat unique list of such ids, manualInterventions a bare count, and the four still-reserved
-    // fields (no epic writes real values into them yet, see campaign-memory.js's own header
-    // comment) are only type-checked against their fresh() shape so a future epic's first real
-    // write still loads.
+    // Epic C5.1/C5.2/C5.3: campaignMemory is a bounded journal (campaign-memory.js), never an
+    // arbitrary object — rest/firstGesture/nightlyActivity/overexertion only ever key an id that
+    // actually resolves to a real s.rainelles entry (never a stale/hand-edited reference), births
+    // is a flat unique list of such ids, manualInterventions a bare count, and the four still-
+    // reserved fields (no epic writes real values into them yet, see campaign-memory.js's own
+    // header comment) are only type-checked against their fresh() shape so a future epic's first
+    // real write still loads.
     if (s.campaignMemory !== undefined) {
       const M = s.campaignMemory;
       const rainelleIds = new Set((s.rainelles || []).map((r) => r?.id));
@@ -694,6 +694,16 @@
         Object.entries(M.nightlyActivity).some(
           ([id, n]) => !rainelleIds.has(id) || !count(n),
         ) ||
+        // Epic C5.3: overexertion is optional here (undefined) so a save from between C5.1 and
+        // C5.3 — campaignMemory already present, this field simply never added yet — still
+        // validates; the post-clone migration below fills it in. When present, same per-Rainelle-
+        // id-to-count shape as rest/nightlyActivity above.
+        (M.overexertion !== undefined &&
+          (typeof M.overexertion !== "object" ||
+            M.overexertion === null ||
+            Object.entries(M.overexertion).some(
+              ([id, n]) => !rainelleIds.has(id) || !count(n),
+            ))) ||
         typeof M.waterWithdrawals !== "object" ||
         M.waterWithdrawals === null ||
         !Array.isArray(M.habitatTransformations) ||
@@ -793,6 +803,10 @@
     // Epic C5.1: a pre-epic save simply has no journal yet — fresh, empty, exactly what a new
     // save would already have (never reconstructed from history that was never recorded).
     result.campaignMemory ??= Memory.freshMemory();
+    // Epic C5.3: a save with an existing campaignMemory but no overexertion field yet (created
+    // between C5.1 and C5.3) migrates to an empty streak map — never guessed from nightlyActivity
+    // history that was never recorded as a streak.
+    result.campaignMemory.overexertion ??= {};
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };

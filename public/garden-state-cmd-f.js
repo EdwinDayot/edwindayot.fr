@@ -8,7 +8,9 @@
    (a pending pin consumed once, see below) and passes it through to resolvePotDraw in sleep.
    Epic C5.2 further extends "sleep" with campaign-automation.js's runNightWork (veilleuses de
    croissance, see below) — real work under an active veilleuse and the C5.1 rest counter are now
-   mutually exclusive per Rainelle per night, resolved together in the same block. */
+   mutually exclusive per Rainelle per night, resolved together in the same block. Epic C5.3 adds
+   the overexertion streak update to that same block (up on a worked night, down on a rested one —
+   see campaign-memory.js's own header comment). */
 (function (root) {
   const Genetics =
     typeof module !== "undefined"
@@ -138,9 +140,16 @@
         // did real night work under an active veilleuse (workedIds, recorded above by
         // runNightWork's own effect and here by recordNightlyActivity) or rested — the two are
         // mutually exclusive per Rainelle per night, never both, never neither.
+        // Epic C5.3: the same split also drives the overexertion streak — up on a worked night,
+        // down (floored, progressive) on a rested one, same call sites, same mutual exclusion.
         for (const id of restingIds)
-          if (workedIds.has(id)) Memory.recordNightlyActivity(s.campaignMemory, id);
-          else Memory.recordRest(s.campaignMemory, id);
+          if (workedIds.has(id)) {
+            Memory.recordNightlyActivity(s.campaignMemory, id);
+            Memory.increaseOverexertion(s.campaignMemory, id);
+          } else {
+            Memory.recordRest(s.campaignMemory, id);
+            Memory.decreaseOverexertion(s.campaignMemory, id);
+          }
         // Epic C2.2: the atomic night bilan. "sleep" is the single command a scripted 23h
         // transition and a voluntary early bedtime ("dormir plus tôt", design §3) both end up
         // calling — neither reads s.campaignClock.gameSeconds beforehand, so an early sleep

@@ -42,6 +42,21 @@
    something this file already reserves — never guessed or approximated by this epic, only
    reserved.
 
+   Epic C5.3 (design §11, "des limites physiologiques finissent par réduire la capacité... elles
+   ne doivent pas annuler immédiatement tout le gain nocturne") adds `overexertion`: a per-Rainelle
+   *streak* counter, distinct from `nightlyActivity`'s cumulative, never-decreasing total — it goes
+   up by one on a night of real night work (recordNightlyActivity's own call site, garden-state-
+   cmd-f.js's "sleep") and down by one, floored at zero, on a night of real rest (recordRest's own
+   call site, same "sleep" block) — "réduit... progressivement plutôt que de le repartir
+   instantanément à zéro" read literally: a single rest night only ever removes one unit of
+   accumulated overexertion, never the whole streak at once. OVEREXERTION_THRESHOLD is the value
+   this streak must exceed before campaign-automation.js's doArroser/doRecolter start capping the
+   volume moved per cycle (never a full stop, per the design quote above) — chosen and documented
+   here rather than left for that file to invent silently: 3 consecutive nights of real, unaided
+   night work under a veilleuse, the same order of magnitude as a short in-game week, giving a
+   player running a single veilleuse for a night or two no penalty at all before the mechanic ever
+   engages.
+
    A refused command must never move any of these counters (design §11: "une commande refusée ne
    devient jamais un dommage fictif attribué au joueur") — true by construction, since every
    recordX function below is only ever called from a command's *success* path (after a `fail()`
@@ -57,6 +72,10 @@
       // Epic C5.2: per-Rainelle count of real night work under an active veilleuse — see header
       // comment and recordNightlyActivity below.
       nightlyActivity: {},
+      // Epic C5.3: per-Rainelle consecutive-night streak of real night work, distinct from
+      // nightlyActivity's cumulative total — see header comment and increase/decreaseOverexertion
+      // below.
+      overexertion: {},
       // Reserved for C5.4 (prise d'eau à fort débit) — see header comment.
       waterWithdrawals: {},
       // Reserved — no epic yet transforms/removes a habitat once registered (C3.3).
@@ -67,6 +86,11 @@
       contractsFed: {},
     };
   }
+
+  // Epic C5.3 (design §11): the streak threshold campaign-automation.js's doArroser/doRecolter
+  // compare a Rainelle's current overexertion level against — see the header comment above for
+  // why 3 was chosen. Exported so that file never hardcodes its own copy of this number.
+  const OVEREXERTION_THRESHOLD = 3;
 
   // Called once per Rainelle that already existed *before* "sleep" resolves any new individual
   // this same night (garden-state-cmd-f.js) — a brand-new individual has not experienced a night
@@ -107,13 +131,36 @@
       (memory.nightlyActivity[rainelleId] || 0) + 1;
   }
 
+  // Epic C5.3: called alongside recordNightlyActivity, from the same "sleep" block
+  // (garden-state-cmd-f.js), once per Rainelle that did real night work this night — the streak
+  // has no ceiling of its own (campaign-automation.js only ever checks it against
+  // OVEREXERTION_THRESHOLD, a fixed comparison, so an unbounded streak is harmless and never
+  // makes the penalty itself grow past the fixed cap it applies).
+  function increaseOverexertion(memory, rainelleId) {
+    memory.overexertion[rainelleId] = (memory.overexertion[rainelleId] || 0) + 1;
+  }
+
+  // Epic C5.3: called alongside recordRest, from the same "sleep" block, once per Rainelle that
+  // rested this night (whether it never had a veilleuse, or its veilleuse was on but idle for
+  // want of input — "sleep" already treats both as rest, see recordRest's own call site). Floored
+  // at zero, and removes only one unit per rest night ("réduit... progressivement", design §11) —
+  // never reset to zero by a single night off, matching a Rainelle not becoming immediately
+  // "disponible" after one rest (design ch. 14, cited by this epic's own backlog entry).
+  function decreaseOverexertion(memory, rainelleId) {
+    const current = memory.overexertion[rainelleId] || 0;
+    if (current > 0) memory.overexertion[rainelleId] = current - 1;
+  }
+
   const api = {
     freshMemory,
+    OVEREXERTION_THRESHOLD,
     recordRest,
     recordBirth,
     recordFirstGesture,
     recordManualIntervention,
     recordNightlyActivity,
+    increaseOverexertion,
+    decreaseOverexertion,
   };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenCampaignMemory = api;
