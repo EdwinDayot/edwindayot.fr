@@ -109,6 +109,42 @@ const TRANSPARENT_ALLOWLIST = [
         v.scene.add(twinB);
       }
 
+      // Epic C5.11 (docs/campagne-backlog.md): the render.js/render-flow.js wiring itself —
+      // this epic's own criterion, "un point d'appel réel dans render.js/garden-frame.js...
+      // jamais reconstruit à chaque frame" — exercised through the REAL live game state
+      // (window.GardenApp.game.s) and the real v.sync() call site, not an isolated
+      // buildRainelleGroup() call like the C5.9 block just above (which only ever exercised the
+      // rendering module in isolation, never sync()'s own new branch). A synthetic cultivar
+      // (borrowing a real founder's traits — only the {id, name, parentIds, traits} shape
+      // matters to buildRainelleGroup) and a Rainelle referencing it are pushed directly into the
+      // live save, bypassing "sleep"/the frog encounter — the same posture the hybrids/house/C5.9
+      // blocks above already use, since this audit exercises rendering, never the commands that
+      // would normally lead to this state — with a real, finite, off-the-playable-area position
+      // so v.sync() actually builds and positions a Group through the exact code path a real
+      // session's own render loop (garden-frame.js's own `A.view.sync()`) uses every frame.
+      if (window.GardenGenetics && window.GardenApp.game) {
+        const s = window.GardenApp.game.s;
+        const f = window.GardenGenetics.founders[0];
+        s.cultivars.push({
+          id: "audit-c5.11-cultivar",
+          name: "Test C5.11",
+          parentIds: [],
+          traits: f.traits,
+        });
+        s.rainelles.push({
+          id: "audit-c5.11-rainelle",
+          cultivarId: "audit-c5.11-cultivar",
+          name: "",
+          geste: null,
+          job: null,
+          bourgeon: null,
+          founder: false,
+          x: 205,
+          z: 216,
+        });
+        v.sync();
+      }
+
       // Sample a few times of day: a defect that only shows under one lighting angle (the
       // terrain-normal bug was exactly this — it read fine at some sun angles) must not hide.
       const times = [50, 300, 600, 900, 1150];
@@ -171,11 +207,29 @@ const TRANSPARENT_ALLOWLIST = [
         }
       });
 
-      return { suspiciousTransparent, badNormals, nanMeshes, materialCount: seen.size };
+      // Epic C5.11: confirms sync()'s new branch actually ran through the real wiring — a Group
+      // was built and cached in `v.rainelleModels` (never rebuilt: same object both times sync()
+      // runs again below via the "times" loop's own frame() calls, none of which touch sync()
+      // themselves) and positioned at the exact world coordinates this test set on the Rainelle.
+      const rm = v.rainelleModels.get("audit-c5.11-rainelle");
+      const wiring = rm
+        ? {
+            found: true,
+            inScene: rm.group.parent === v.scene,
+            position: rm.group.position.toArray(),
+          }
+        : { found: false };
+
+      return { suspiciousTransparent, badNormals, nanMeshes, materialCount: seen.size, wiring };
     });
 
     if (consoleErrors.length)
       throw new Error("Console errors during scene render:\n" + consoleErrors.join("\n"));
+
+    assert.equal(audit.wiring.found, true, "C5.11: sync() never built a Group for the live-state Rainelle");
+    assert.equal(audit.wiring.inScene, true, "C5.11: the Rainelle's Group was never added to the real scene");
+    assert.equal(audit.wiring.position[0], 205, "C5.11: the Rainelle's Group x does not match its rainelle.x");
+    assert.equal(audit.wiring.position[2], 216, "C5.11: the Rainelle's Group z does not match its rainelle.z");
 
     assert.deepEqual(audit.nanMeshes, [], "Meshes with non-finite vertex positions: " + audit.nanMeshes.join(", "));
     assert.deepEqual(

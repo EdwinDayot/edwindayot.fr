@@ -117,6 +117,36 @@
         this.campaignHouseAccueilStatus
       )
         this.buildCampaignHouse();
+      // Epic C5.11: a Rainelle joins the real scene the first time it has a real position
+      // (garden-state.js's tickRainelleMovement/RainelleMovement.ensurePosition — never guessed
+      // here). The Group itself (render-rainelles.js, C5.9) is built once per Rainelle id and
+      // cached in `this.rainelleModels`, exactly the "refreshed on position change, never rebuilt
+      // every frame" pattern buildCampaignHouse just above already uses for its own one field;
+      // only `.position`/`.rotation` are touched on every sync call below, never the geometry.
+      const RenderRainelles = window.GardenRenderRainelles;
+      if (RenderRainelles)
+        for (const r of s.rainelles) {
+          if (!Number.isFinite(r.x) || !Number.isFinite(r.z)) continue;
+          let rm = this.rainelleModels.get(r.id);
+          if (!rm) {
+            const cultivar = s.cultivars.find((c) => c.id === r.cultivarId);
+            if (!cultivar) continue; // no cultivar to draw foliage from yet — nothing to add
+            const group = RenderRainelles.buildRainelleGroup(r, cultivar);
+            this.scene.add(group);
+            rm = { group, x: r.x, z: r.z };
+            this.rainelleModels.set(r.id, rm);
+            this.batchDirty = true;
+          }
+          const y = Terrain.terrainHeight(r.x, r.z);
+          if (r.x !== rm.x || r.z !== rm.z) {
+            // Face the direction actually walked this step — a Rainelle standing still (already
+            // on its target cell) keeps whatever heading it last had, never snaps to a default.
+            rm.group.rotation.y = Math.atan2(r.x - rm.x, r.z - rm.z);
+            rm.x = r.x;
+            rm.z = r.z;
+          }
+          rm.group.position.set(r.x, y, r.z);
+        }
       const signature = JSON.stringify([
         s.links,
         s.entities.map((e) => [e.id, e.x, e.z, e.stored]),

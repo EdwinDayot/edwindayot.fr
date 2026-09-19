@@ -38,6 +38,11 @@
       this.network = false;
       this.time = 0;
       this.models = new Map();
+      // Epic C5.11: one entry per Rainelle id, id -> the Group render-rainelles.js (C5.9) built
+      // for it — same "build once, cache, reposition every sync" pattern as `this.models` above,
+      // kept separate since a Rainelle is never one of `s.entities` (see rainelles.js's own header
+      // comment on why the campaign layer's arrays stay disjoint from the free garden's).
+      this.rainelleModels = new Map();
       this.zoneModels = [];
       this.nodes = new Map();
       this.routes = [];

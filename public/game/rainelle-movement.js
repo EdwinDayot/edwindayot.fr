@@ -234,12 +234,30 @@
     return { positions, waitCounts: nextWait };
   }
 
+  // Epic C5.11: assigns a real starting position to a Rainelle whose x/z are still null — either
+  // just born (rainelles.js's createRainelle always starts null) or loaded from a save written
+  // before this epic (same optional-field migration posture already used for job/bourgeon, see
+  // rainelles.js's own header comment). Never touches a Rainelle that already has a position:
+  // mutating one mid-route here would silently teleport her instead of letting resolveStep move
+  // her one cell at a time. Deliberately reuses targetPosition(..., LOCATIONS.HABITAT) rather than
+  // a second nearestHabitat/FALLBACK_POSITION lookup — with a positionless rainelle, that function
+  // already falls back to FALLBACK_POSITION as its `from` (see targetPosition's own code above),
+  // so it already returns exactly "the nearest registered habitat, or the vetted fallback" — the
+  // backlog's own words for this epic's "position de naissance ou d'un habitat déjà enregistré".
+  function ensurePosition(s, rainelle) {
+    if (Number.isFinite(rainelle.x) && Number.isFinite(rainelle.z)) return;
+    const { x, z } = targetPosition(s, rainelle, LOCATIONS.HABITAT);
+    rainelle.x = x;
+    rainelle.z = z;
+  }
+
   const api = {
     MAX_WAIT_STEPS,
     FALLBACK_POSITION,
     targetPosition,
     routeTo,
     resolveStep,
+    ensurePosition,
   };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenRainelleMovement = api;
