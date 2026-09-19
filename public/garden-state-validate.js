@@ -38,6 +38,12 @@
     typeof module !== "undefined"
       ? require("./game/campaign-house.js")
       : root.GardenCampaignHouse;
+  // Epic C1.5: read here to validate a pinned trait (AXES/founders), both on s.campaignPin
+  // itself and on an optional pin attached to a pending campaignPot entry below.
+  const Genetics =
+    typeof module !== "undefined"
+      ? require("./game/botany-genetics.js")
+      : root.GardenGenetics;
   // Epic C2.6c: only read here for its CYCLE_SECONDS bound on a persisted rainelle.job.remaining
   // (see campaign-automation.js's own header comment on that constant) — never for validate()'s
   // own control flow, so this stays a pure sibling of the Cultivars/Rainelles/Stations reads
@@ -303,6 +309,17 @@
         Math.max(...s.cultivars.map((c) => Number(c.id.slice(1))))
     )
       throw Error("Identifiants de cultivar invalides.");
+    // Epic C1.5: a pending pair may carry an optional pin, {axis, speciesId}, consumed from
+    // s.campaignPin by sowPot (garden-state-cmd-f.js) — same validity rule as s.campaignPin
+    // itself below, plus the constraint sowPot already enforces at the moment it attaches one
+    // (speciesId must actually be one of that pair's own a/b).
+    const validPendingPin = (p) =>
+      p.pin === undefined ||
+      (typeof p.pin === "object" &&
+        p.pin !== null &&
+        Genetics.AXES.includes(p.pin.axis) &&
+        Genetics.founders.some((f) => f.id === p.pin.speciesId) &&
+        (p.pin.speciesId === p.a || p.pin.speciesId === p.b));
     if (
       s.campaignPot !== undefined &&
       (typeof s.campaignPot !== "object" ||
@@ -312,10 +329,23 @@
         !Array.isArray(s.campaignPot.pending) ||
         s.campaignPot.pending.length > s.campaignPot.capacity ||
         s.campaignPot.pending.some(
-          (p) => !p || typeof p.a !== "string" || typeof p.b !== "string",
+          (p) =>
+            !p ||
+            typeof p.a !== "string" ||
+            typeof p.b !== "string" ||
+            !validPendingPin(p),
         ))
     )
       throw Error("Pot invalide.");
+    // Epic C1.5: the single trait pinned for the next sowPot, or none.
+    if (
+      s.campaignPin !== undefined &&
+      s.campaignPin !== null &&
+      (typeof s.campaignPin !== "object" ||
+        !Genetics.AXES.includes(s.campaignPin.axis) ||
+        !Genetics.founders.some((f) => f.id === s.campaignPin.speciesId))
+    )
+      throw Error("Épingle invalide.");
     if (
       s.campaignSeedBox !== undefined &&
       (typeof s.campaignSeedBox !== "object" ||
@@ -400,8 +430,20 @@
             // rainelles.js's own comment) — optional so a pre-epic rainelle still loads.
             (r.bourgeon !== undefined &&
               r.bourgeon !== null &&
-              r.bourgeon !== true),
+              r.bourgeon !== true) ||
+            // Epic C4.6: founder is optional (a pre-epic save has none yet, migrated below) but
+            // must be a boolean when present — see rainelles.js's createRainelle comment.
+            (r.founder !== undefined && typeof r.founder !== "boolean"),
         ))
+    )
+      throw Error("Rainelle invalide.");
+    // Epic C4.6 (design §10, chapitre 6: "un nom qui ne se perdent jamais dans un lot") : at most
+    // one Rainelle can ever carry the founder mark — never a save with two, whether hand-edited
+    // or from a future bug, since createRainelle itself only ever sets it once (s.rainelles.length
+    // === 0, checked before the very first push).
+    if (
+      s.rainelles?.length &&
+      s.rainelles.filter((r) => r.founder === true).length > 1
     )
       throw Error("Rainelle invalide.");
     if (s.rainelleNextId !== undefined && !count(s.rainelleNextId))
@@ -564,6 +606,10 @@
     // Epic C3.1: when present, campaignHouse must already carry all six named spaces (no
     // partial-object migration here — the whole registry is introduced by this epic, so an
     // older save simply lacks the field entirely and gets House.freshHouse() below).
+    // Epic C4.1 adds furnitureMarks to the same object: unlike the six spaces, a save from
+    // before this epic already has a well-formed campaignHouse but simply lacks this one field
+    // (undefined is accepted here, defaulted to null below), same two-level migration already
+    // used for campaignStations.habitats further down.
     if (
       s.campaignHouse !== undefined &&
       (typeof s.campaignHouse !== "object" ||
@@ -577,7 +623,10 @@
             !["delabre", "repare"].includes(space.status) ||
             typeof space.locked !== "boolean"
           );
-        }))
+        }) ||
+        (s.campaignHouse.furnitureMarks !== undefined &&
+          s.campaignHouse.furnitureMarks !== null &&
+          !House.FURNITURE_TREATMENTS.includes(s.campaignHouse.furnitureMarks)))
     )
       throw Error("Maison refuge invalide.");
     // Epic C3.6: when present, campaignTools must be a flat list of unique string ids — no shape
@@ -589,6 +638,16 @@
         new Set(s.campaignTools).size !== s.campaignTools.length)
     )
       throw Error("Outils de campagne invalides.");
+    // Epic C4.1: campaignFlags is a flat, unique list of already-revealed narrative text ids —
+    // same shape check as campaignTools just above, a distinct field/namespace (a tool id and a
+    // text id are never compared against each other).
+    if (
+      s.campaignFlags !== undefined &&
+      (!Array.isArray(s.campaignFlags) ||
+        s.campaignFlags.some((f) => typeof f !== "string") ||
+        new Set(s.campaignFlags).size !== s.campaignFlags.length)
+    )
+      throw Error("Indicateurs narratifs invalides.");
     const result = clone(s);
     result.hotbar ??= [...D.defaultHotbar];
     result.quests ??= { active: [], completed: [] };
@@ -617,9 +676,15 @@
     // readyToProduce just above — a pre-epic rainelle only lacks this one field.
     // Epic C3.4: bourgeon migrates per rainelle, same reasoning as job just above — a pre-epic
     // rainelle only lacks this one field.
-    result.rainelles = (result.rainelles ?? []).map((r) => ({
+    // Epic C4.6: founder defaults from array position (index 0, the oldest surviving entry —
+    // s.rainelles is append-only, nothing ever removes from it, so index 0 of a pre-epic save is
+    // exactly the individual that was in fact created first) only when the field is entirely
+    // absent; a rainelle that already carries a real `founder` (from createRainelle, post-epic)
+    // keeps it untouched by the spread below.
+    result.rainelles = (result.rainelles ?? []).map((r, i) => ({
       job: null,
       bourgeon: null,
+      founder: i === 0,
       ...r,
     }));
     result.rainelleNextId ??= 1;
@@ -656,7 +721,14 @@
       }),
     );
     result.campaignHouse ??= House.freshHouse();
+    // Epic C4.1: a pre-epic save has campaignHouse but no furnitureMarks at all (the object
+    // above only fires when campaignHouse itself is entirely missing) — defaulted here too, same
+    // two-level migration already used for campaignStations.habitats above.
+    result.campaignHouse.furnitureMarks ??= null;
     result.campaignTools ??= [];
+    result.campaignFlags ??= [];
+    // Epic C1.5: a pre-epic save simply has no pin awaiting its next sowPot.
+    result.campaignPin ??= null;
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };

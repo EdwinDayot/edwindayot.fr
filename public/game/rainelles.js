@@ -62,6 +62,12 @@
   // has no separate growth timer of its own before harvest, unlike the nursery entry it becomes
   // once prélevé; see garden-state-cmd-m.js/garden-state-cmd-f.js). `true` rather than an object:
   // there is no state to a bourgeon beyond "present or not" at this stage.
+  // Epic C4.6 (design §10, chapitre 6: "la première Rainelle garde une marque distinctive et un
+  // nom qui ne se perdent jamais dans un lot") : `founder` is computed from s.rainelles.length
+  // *before* the push below, so it is true for the very first individual ever created (whichever
+  // path creates it — the scripted frog encounter, C2.3/C4.4, or a later bourgeon/nursery
+  // resolution, C3.4) and false for every one after, forever (nothing ever removes from
+  // s.rainelles, so "length === 0" can only ever be true once across a save's whole lifetime).
   function createRainelle(s, { cultivarId, name = "" }) {
     const rainelle = {
       id: `r${s.rainelleNextId++}`,
@@ -70,6 +76,7 @@
       geste: null,
       job: null,
       bourgeon: null,
+      founder: s.rainelles.length === 0,
     };
     s.rainelles.push(rainelle);
     return rainelle;

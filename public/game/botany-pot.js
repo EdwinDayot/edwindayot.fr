@@ -18,7 +18,18 @@
    `random` defaults to Math.random but is always overridable, precisely so a test can supply a
    seeded generator and check the per-axis 50/50 property statistically over many draws without
    depending on the platform's real RNG. Depends only on GardenGenetics — nothing here touches a
-   save, a command or the DOM. */
+   save, a command or the DOM.
+
+   Epic C1.5 (design §4: "le carnet permet d'épingler un caractère déjà observé provenant d'un
+   parent... garanti à l'essai suivant, les autres restent variables") adds an optional fourth
+   argument, `pin`: `{axis, speciesId}`. When present, `axis` is drawn from `speciesId`'s own
+   trait instead of a random() call — `speciesId` must be one of idA/idB (the caller, garden-
+   state-cmd-o.js/-f.js, is responsible for only ever attaching a pin whose species is one of the
+   pair actually sown; this function still checks it rather than trusting a stale pin silently).
+   On a reject-and-redraw (an invalid combination), only the non-pinned axes are redrawn — the
+   pinned axis is never re-rolled, which is the whole point of a guarantee; patching only that one
+   axis on success would be the bias `resolvePotDraw`'s un-pinned path already avoids, so the
+   other five axes are still discarded and redrawn together, exactly as before. */
 (function (root) {
   const Genetics =
     typeof module !== "undefined"
@@ -29,13 +40,29 @@
   const AXES = ["port", "feuilles", "fleurs", "palette", "humidite", "fonction"];
   const MAX_ATTEMPTS = 1000;
 
-  function resolvePotDraw(idA, idB, random = Math.random) {
+  function resolvePotDraw(idA, idB, random = Math.random, pin = null) {
     const a = Genetics.founders.find((f) => f.id === idA);
     const b = Genetics.founders.find((f) => f.id === idB);
     if (!a || !b) throw new Error(`unknown founding species: ${idA} / ${idB}`);
+    if (pin) {
+      if (!Genetics.AXES.includes(pin.axis))
+        throw new Error(`resolvePotDraw: unknown pinned axis: ${pin.axis}`);
+      if (pin.speciesId !== idA && pin.speciesId !== idB)
+        throw new Error(
+          `resolvePotDraw: pinned species ${pin.speciesId} is not one of ${idA} / ${idB}`,
+        );
+    }
+    const pinnedFrom = pin && (pin.speciesId === idA ? a : b);
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       const traits = {};
-      for (const axis of AXES) traits[axis] = random() < 0.5 ? a.traits[axis] : b.traits[axis];
+      for (const axis of AXES) {
+        traits[axis] =
+          pin && axis === pin.axis
+            ? pinnedFrom.traits[axis]
+            : random() < 0.5
+              ? a.traits[axis]
+              : b.traits[axis];
+      }
       if (Genetics.traitCombinationValid(traits)) return traits;
     }
     throw new Error(

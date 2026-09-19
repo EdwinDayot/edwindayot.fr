@@ -4,8 +4,8 @@
    neither is added to garden-state.js's `physical` list, which requires a nearby entity.
    Epic C2.2 extends "sleep" with the campaign day/clock bilan (see its own comment below);
    Epic C2.3 further extends it with the scripted frog encounter (see below); Epic C3.4 further
-   extends it with the bourgeon/nursery resolution (see below). sowPot is unchanged by all
-   three. */
+   extends it with the bourgeon/nursery resolution (see below). Epic C1.5 extends sowPot itself
+   (a pending pin consumed once, see below) and passes it through to resolvePotDraw in sleep. */
 (function (root) {
   const Genetics =
     typeof module !== "undefined"
@@ -23,6 +23,10 @@
     typeof module !== "undefined"
       ? require("./game/rainelles.js")
       : root.GardenRainelles;
+  const Narrative =
+    typeof module !== "undefined"
+      ? require("./game/data-narrative.js")
+      : root.GardenNarrative;
   const M = {
     commandSegF(c, ctx, st) {
       const { s, fail } = st;
@@ -35,8 +39,22 @@
           return fail("Ces deux espèces ne peuvent pas être croisées ensemble.");
         if (s.campaignPot.pending.length >= s.campaignPot.capacity)
           return fail("Le pot est déjà occupé pour cette nuit.");
-        s.campaignPot.pending.push({ a: c.a, b: c.b });
-        st.message = "Graines posées dans le pot, prêtes pour la nuit.";
+        const pending = { a: c.a, b: c.b };
+        // Epic C1.5: a pending pin (pinTrait, garden-state-cmd-o.js) is consumed here, once, by
+        // the very next sowPot — "garanti à l'essai suivant" (design §4), not to some later
+        // night. Attached only when it actually names one of these two parents; otherwise this
+        // sowPot fails explicitly rather than silently dropping a pin the player still expects to
+        // apply to a different pair.
+        if (s.campaignPin) {
+          if (s.campaignPin.speciesId !== c.a && s.campaignPin.speciesId !== c.b)
+            return fail("Le caractère épinglé ne vient d’aucun des deux parents choisis.");
+          pending.pin = s.campaignPin;
+          s.campaignPin = null;
+        }
+        s.campaignPot.pending.push(pending);
+        st.message = pending.pin
+          ? "Graines posées dans le pot, caractère épinglé garanti pour cette nuit."
+          : "Graines posées dans le pot, prêtes pour la nuit.";
       } else if (c.type === "sleep") {
         st.taken = true;
         // Resolved and materialised synchronously here, once, at the moment the command runs:
@@ -51,8 +69,8 @@
         // sown this night, the encounter simply carries over (campaignFrogEncounterPending stays
         // true) to the next night that actually resolves a pair, never lost, never duplicated.
         let frogCultivarId = null;
-        for (const { a, b } of s.campaignPot.pending) {
-          const traits = Pot.resolvePotDraw(a, b);
+        for (const { a, b, pin } of s.campaignPot.pending) {
+          const traits = Pot.resolvePotDraw(a, b, undefined, pin || null);
           // Name left empty on purpose: naming the cultivar is C1.4's job (carnet de
           // botanique), not this epic's.
           const cultivar = Cultivars.createCultivar(s, {
@@ -67,6 +85,14 @@
         if (frogCultivarId) {
           Rainelles.createRainelle(s, { cultivarId: frogCultivarId, name: "" });
           s.campaignFrogEncounterPending = false;
+          // Epic C4.4: the "traces mouillées" text (design §10, chapitre 4) only ever fires here,
+          // the exact night the encounter actually resolves into a real Rainelle — never at
+          // triggerFrogEncounter (arming), never on a night that only carries the flag over.
+          const revealed = Narrative.pendingReveal(
+            s.campaignFlags,
+            "frogEncounterResolved",
+          );
+          if (revealed) s.campaignFlags.push(revealed.id);
         }
         // Epic C3.4: every bourgeon harvestBud already deposited resolves here, exactly once,
         // the same "posed, then resolved at the next sleep" pattern as campaignPot.pending just

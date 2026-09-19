@@ -13,12 +13,21 @@
    courte répétition... sans refaire tout le tutoriel" : it reapplies the last *confirmed*
    demonstration (s.campaignLastDemonstration) straight to another Rainelle, no pause/session
    needed — the four-moment flow above is what produces that recorded template in the first
-   place. */
+   place.
+
+   Epic C4.6 (design §10, chapitre 6): demonstrateGesture is the other entry point that can
+   produce Rainelles.MULTIPLY_REFUSAL (garden-state-cmd-j.js's teachGesture is the first) — same
+   one-time narrative reveal fired here, so whichever path the player tries first is the one that
+   shows it. */
 (function (root) {
   const Rainelles =
     typeof module !== "undefined"
       ? require("./game/rainelles.js")
       : root.GardenRainelles;
+  const Narrative =
+    typeof module !== "undefined"
+      ? require("./game/data-narrative.js")
+      : root.GardenNarrative;
   const M = {
     commandSegK(c, ctx, st) {
       const { s, fail } = st;
@@ -40,7 +49,16 @@
         if (s.campaignTeaching.step !== "watching")
           return fail("La démonstration a déjà été faite pour cette leçon.");
         const error = Rainelles.validateGestureFields(c);
-        if (error) return fail(error);
+        if (error) {
+          if (error === Rainelles.MULTIPLY_REFUSAL) {
+            const revealed = Narrative.pendingReveal(
+              s.campaignFlags,
+              "firstMultiplyRefusalSeen",
+            );
+            if (revealed) s.campaignFlags.push(revealed.id);
+          }
+          return fail(error);
+        }
         const geste = Rainelles.normalizeGesture(c);
         const phrase = Rainelles.defaultPhrase(geste);
         const trajectory = Rainelles.plannedTrajectory(geste);

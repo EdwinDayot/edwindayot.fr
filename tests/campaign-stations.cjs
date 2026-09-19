@@ -282,6 +282,11 @@ test("panierTotal sums every resource key in a panier's buffer", () => {
 test("teachGesture/demonstrateGesture behave identically whether campaignStations is empty or populated — unchanged by this epic", () => {
   const run = (populate) => {
     const g = new GardenState(null, 1000);
+    // Epic C4.4: triggerFrogEncounter now refuses until a cultivar already exists ("après les
+    // apprentissages nécessaires", design §10 chapitre 4) — this unrelated warm-up cross
+    // satisfies that real precondition before the scripted encounter itself.
+    g.command({ type: "sowPot", a: "ronce-a-rubans", b: "fraise-timide" });
+    g.command({ type: "sleep" });
     g.command({ type: "triggerFrogEncounter" });
     g.command({ type: "sowPot", a: "ronce-a-rubans", b: "fraise-timide" });
     g.command({ type: "sleep" });

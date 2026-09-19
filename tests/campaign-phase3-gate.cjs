@@ -7,12 +7,16 @@
 // jamais un accès direct à l'état — sur le modèle déjà posé par campaign-phase1-gate.cjs et
 // campaign-phase2-gate.cjs pour les portes précédentes.
 //
-// La partie traverse trois nuits (s.campaignDay avance de 3 par trois vraies commandes "sleep")
+// La partie traverse quatre nuits (s.campaignDay avance de 4 par quatre vraies commandes "sleep")
 // et vérifie, à chaque nuit, qu'aucune commande/récolte/nuit/naissance ne crédite deux fois
-// (design §16). Une sauvegarde JSON aller-retour à mi-parcours est vérifiée strictement
-// identique avant de jouer la troisième nuit sur l'état rechargé lui-même — pas seulement sur
-// l'état original — pour que le round-trip soit une vraie étape du scénario, pas un contrôle à
-// part.
+// (design §16). La toute première est un croisement préalable sans rencontre — depuis l'epic
+// C4.4 ("après les apprentissages nécessaires", design §10 chapitre 4), triggerFrogEncounter
+// refuse tant qu'aucun cultivar n'existe déjà, donc cette nuit-là est désormais un vrai
+// préalable de partie, pas un détail de fixture ; les trois nuits suivantes sont celles
+// d'origine de cette porte de sortie. Une sauvegarde JSON aller-retour à mi-parcours est
+// vérifiée strictement identique avant de jouer la quatrième nuit sur l'état rechargé
+// lui-même — pas seulement sur l'état original — pour que le round-trip soit une vraie étape du
+// scénario, pas un contrôle à part.
 //
 // Limite honnête, comme documenté à chaque epic de cette phase depuis C2.2v : "dormir dans la
 // maison refuge" et la transition de nuit scénarisée (écran de confirmation du pot, caméra vers
@@ -30,10 +34,22 @@ const CampaignAutomation = require("../public/game/campaign-automation.js");
 
 const CYCLE = CampaignAutomation.CYCLE_SECONDS;
 
-test("phase 3 gate — habiter, croiser, organiser, rencontrer ensemble sur trois nuits, avec un aller-retour de sauvegarde à mi-parcours", () => {
+test("phase 3 gate — habiter, croiser, organiser, rencontrer ensemble sur quatre nuits (dont un croisement préalable requis depuis C4.4), avec un aller-retour de sauvegarde à mi-parcours", () => {
   const g = new GardenState(null, 1000);
 
-  // --- Croiser (mise en place) + première Rainelle (rencontre scénarisée, C2.3) : les deux se
+  // --- Nuit 1, croiser (mise en place), avant toute rencontre : depuis l'epic C4.4
+  // ("après les apprentissages nécessaires", design §10 chapitre 4), triggerFrogEncounter refuse
+  // tant qu'aucun cultivar n'existe déjà — ce croisement est donc un vrai préalable désormais,
+  // pas seulement un détail de fixture de test. ---
+  assert.equal(
+    g.command({ type: "sowPot", a: "ronce-a-rubans", b: "fraise-timide" }).ok,
+    true,
+  );
+  assert.equal(g.command({ type: "sleep" }).ok, true);
+  assert.equal(g.s.campaignDay, 2, "une nuit jouée");
+  assert.equal(g.s.cultivars.length, 1, "croiser : un premier cultivar, avant toute rencontre");
+
+  // --- Croiser (deuxième essai) + première Rainelle (rencontre scénarisée, C2.3) : les deux se
   // résolvent à la même nuit, exactement comme campaign-phase1-gate.cjs/campaign-phase2-gate.cjs
   // le rejouent déjà séparément. ---
   assert.equal(g.command({ type: "triggerFrogEncounter" }).ok, true);
@@ -52,11 +68,15 @@ test("phase 3 gate — habiter, croiser, organiser, rencontrer ensemble sur troi
   );
   assert.equal(g.s.campaignHouse.spaces.accueil.status, "repare");
 
-  // --- Nuit 1 : résout le pot (croiser) et fait naître la première Rainelle (rencontre). ---
+  // --- Nuit 2 : résout le pot (croiser) et fait naître la première Rainelle (rencontre). ---
   assert.equal(g.command({ type: "sleep" }).ok, true);
-  assert.equal(g.s.campaignDay, 2, "une nuit jouée");
-  assert.equal(g.s.cultivars.length, 1, "croiser : exactement un cultivar après la première nuit");
-  const cultivar = g.s.cultivars[0];
+  assert.equal(g.s.campaignDay, 3, "deux nuits jouées");
+  assert.equal(
+    g.s.cultivars.length,
+    2,
+    "croiser : un second cultivar après cette nuit (le premier vient du croisement préalable, nuit 1)",
+  );
+  const cultivar = g.s.cultivars[1];
   assert.equal(g.s.rainelles.length, 1, "la première Rainelle naît cette même nuit (C2.3)");
   const first = g.s.rainelles[0];
   assert.equal(first.cultivarId, cultivar.id);
@@ -67,12 +87,12 @@ test("phase 3 gate — habiter, croiser, organiser, rencontrer ensemble sur troi
   assert.equal(g.command({ type: "formBud", id: first.id }).ok, true);
   assert.equal(g.command({ type: "harvestBud", id: first.id }).ok, true);
 
-  // --- Nuit 2 : le bourgeon devient la deuxième Rainelle ; aucune autre naissance ni aucun
-  // second cultivar ne sont crédités cette nuit-là (le pot est vide, aucune graine n'y a été
+  // --- Nuit 3 : le bourgeon devient la deuxième Rainelle ; aucune autre naissance ni aucun
+  // troisième cultivar ne sont crédités cette nuit-là (le pot est vide, aucune graine n'y a été
   // posée depuis la nuit précédente). ---
   assert.equal(g.command({ type: "sleep" }).ok, true);
-  assert.equal(g.s.campaignDay, 3, "deux nuits jouées");
-  assert.equal(g.s.cultivars.length, 1, "un pot vide ne crédite pas un second cultivar");
+  assert.equal(g.s.campaignDay, 4, "trois nuits jouées");
+  assert.equal(g.s.cultivars.length, 2, "un pot vide ne crédite pas un troisième cultivar");
   assert.equal(g.s.rainelles.length, 2, "la deuxième Rainelle naît exactement une fois");
   const second = g.s.rainelles[1];
   assert.equal(second.cultivarId, first.cultivarId);
@@ -123,12 +143,16 @@ test("phase 3 gate — habiter, croiser, organiser, rencontrer ensemble sur troi
     g.command({ type: "quest", action: "accept", questId: "bois-pour-l-hiver" }).ok,
     true,
   );
-  assert.deepEqual(g.s.campaignTools, [], "l'outil n'est jamais accordé à l'acceptation");
+  assert.deepEqual(
+    g.s.campaignTools,
+    ["outil-de-fortune"],
+    "l'outil de quête n'est jamais accordé à l'acceptation (l'outil de fortune de C4.1 est déjà présent dès fresh())",
+  );
   assert.equal(
     g.command({ type: "quest", action: "complete", questId: "bois-pour-l-hiver" }).ok,
     true,
   );
-  assert.deepEqual(g.s.campaignTools, ["hachette"]);
+  assert.deepEqual(g.s.campaignTools, ["outil-de-fortune", "hachette"]);
 
   // --- Organiser, sans intervention : plusieurs cycles de simulation, aucune commande
   // supplémentaire — la chaîne dépose une production dans le panier et l'arrosage maintient
@@ -151,11 +175,11 @@ test("phase 3 gate — habiter, croiser, organiser, rencontrer ensemble sur troi
     "l'état complet doit rester strictement identique après un aller-retour JSON réel à mi-parcours",
   );
 
-  // --- Nuit 3, jouée sur l'état rechargé lui-même (pas sur l'original) : toujours aucun double
+  // --- Nuit 4, jouée sur l'état rechargé lui-même (pas sur l'original) : toujours aucun double
   // crédit (design §16). ---
   assert.equal(reloaded.command({ type: "sleep" }).ok, true);
-  assert.equal(reloaded.s.campaignDay, 4, "trois nuits jouées");
-  assert.equal(reloaded.s.cultivars.length, 1, "toujours un seul cultivar après la troisième nuit");
+  assert.equal(reloaded.s.campaignDay, 5, "quatre nuits jouées");
+  assert.equal(reloaded.s.cultivars.length, 2, "toujours deux cultivars après la quatrième nuit");
   assert.equal(
     reloaded.s.rainelles.length,
     2,
@@ -163,7 +187,7 @@ test("phase 3 gate — habiter, croiser, organiser, rencontrer ensemble sur troi
   );
   assert.deepEqual(
     reloaded.s.campaignTools,
-    ["hachette"],
+    ["outil-de-fortune", "hachette"],
     "l'outil de la quête n'est jamais accordé une deuxième fois",
   );
   assert.equal(
@@ -173,7 +197,7 @@ test("phase 3 gate — habiter, croiser, organiser, rencontrer ensemble sur troi
   );
 
   // --- La chaîne organisée continue de fonctionner sans intervention après le rechargement et
-  // la troisième nuit : "sature proprement puis redémarre" (porte de sortie de la phase 2) reste
+  // la quatrième nuit : "sature proprement puis redémarre" (porte de sortie de la phase 2) reste
   // vrai après un cycle complet de sommeil et un aller-retour de sauvegarde. ---
   const reloadedPanier = Stations.resolveStation(
     reloaded.s.campaignStations,
@@ -183,6 +207,6 @@ test("phase 3 gate — habiter, croiser, organiser, rencontrer ensemble sur troi
   reloaded.step(3 * CYCLE);
   assert.ok(
     (reloadedPanier.buffer[cultivar.id] || 0) >= bufferBefore,
-    "la chaîne continue de fonctionner sans intervention après la troisième nuit",
+    "la chaîne continue de fonctionner sans intervention après la quatrième nuit",
   );
 });

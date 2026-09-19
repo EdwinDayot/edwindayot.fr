@@ -4,7 +4,13 @@
    entity (c.id here is a rainelle id, "r<n>", never an entity id), so neither is added to
    garden-state.js's `physical` list, exactly like sowPot/sleep in -f.js. The actual creation of
    the Rainelle happens in -f.js's "sleep" (the night the encounter resolves against a real pot
-   draw), not here — this file only arms and names it. */
+   draw), not here — this file only arms and names it.
+
+   Epic C4.4 (design §10, chapitre 4, "après les apprentissages nécessaires") : triggerFrogEncounter
+   refuse désormais tant qu'aucun cultivar n'a encore été obtenu au pot — condition minimale et
+   vérifiable pour cette phrase du design, jamais un scénario refait au singulier (aucun flag
+   narratif requis ici, contrairement à data-narrative.js : le pot/l'hybridation sont acquis
+   mécaniquement depuis la phase 1, ce garde-fou se contente de rejouer cet ordre-là). */
 (function (root) {
   const M = {
     commandSegI(c, ctx, st) {
@@ -18,6 +24,8 @@
           return fail("La première Rainelle est déjà née.");
         if (s.campaignFrogEncounterPending)
           return fail("Une grenouille rôde déjà près du pot.");
+        if (s.cultivars.length === 0)
+          return fail("Aucun cultivar obtenu pour l'instant — croise d'abord une paire au pot.");
         s.campaignFrogEncounterPending = true;
         st.message = "Une grenouille rôde près du pot cette nuit.";
       } else if (c.type === "renameRainelle") {

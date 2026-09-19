@@ -6,6 +6,10 @@
     typeof module !== "undefined"
       ? require("./game/quests.js")
       : root.GardenQuests;
+  const Narrative =
+    typeof module !== "undefined"
+      ? require("./game/data-narrative.js")
+      : root.GardenNarrative;
   const M = {
     commandSegE(c, ctx, st) {
       const { s, fail } = st;
@@ -43,8 +47,41 @@
           // above — a named tool joins s.campaignTools only at completion, never at acceptance.
           for (const tool of reward.tools || [])
             if (!s.campaignTools.includes(tool)) s.campaignTools.push(tool);
+          // Épic C4.2: same additive pattern again — a named house space is unlocked (locked:
+          // false) only at completion, never repaired automatically (repairHouseSpace, C3.1,
+          // stays the only way to actually repair it; a missing/unknown space id is ignored
+          // rather than thrown, same defensive posture as the tools/plans loops above).
+          for (const spaceId of reward.unlockHouseSpace || [])
+            if (s.campaignHouse.spaces[spaceId])
+              s.campaignHouse.spaces[spaceId].locked = false;
           if (reward.reputation) s.reputation += reward.reputation;
-          st.message = `${quest.title} · terminée.`;
+          // Épic C4.9: reward.potCapacity generalises the campaign pot's capacity growth (design
+          // §4, "la capacité vient de la progression narrative") to any quest, same additive
+          // non-regression guarantee as the loops above — never lowers an already-higher capacity
+          // if some future quest happened to grant a smaller value.
+          if (reward.potCapacity)
+            s.campaignPot.capacity = Math.max(
+              s.campaignPot.capacity,
+              reward.potCapacity,
+            );
+          // Épic C4.3 (design §10, chapitre 2/3) : déverrouiller la serre révèle la note du pot
+          // qu'elle contient, via le mécanisme générique de C4.1 — un signal fixe (le
+          // déverrouillage réel de "serre"), jamais re-dérivé ici.
+          let revealed = null;
+          if ((reward.unlockHouseSpace || []).includes("serre")) {
+            revealed = Narrative.pendingReveal(s.campaignFlags, "serreUnlocked");
+            if (revealed) s.campaignFlags.push(revealed.id);
+          }
+          // Épic C4.8: reward.narrativeFlag generalises the reveal above — any quest can name a
+          // trigger signal directly, no new hard-coded condition needed per chapter. Additive:
+          // only consulted when the serre case above didn't already reveal something this turn.
+          if (!revealed && reward.narrativeFlag) {
+            revealed = Narrative.pendingReveal(s.campaignFlags, reward.narrativeFlag);
+            if (revealed) s.campaignFlags.push(revealed.id);
+          }
+          st.message = revealed
+            ? `${quest.title} · terminée. Nouvelle page dans le carnet.`
+            : `${quest.title} · terminée.`;
         } else return fail("Action de quête inconnue.");
       }
       return null;

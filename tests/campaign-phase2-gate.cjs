@@ -31,6 +31,14 @@ const { GardenState } = require("./garden-rules-helpers.cjs");
 const Rainelles = require("../public/game/rainelles.js");
 
 function bornRainelle(g) {
+  // Epic C4.4: triggerFrogEncounter now refuses until a cultivar already exists ("après les
+  // apprentissages nécessaires", design §10 chapitre 4) — this unrelated warm-up cross satisfies
+  // that real precondition before the scripted encounter itself.
+  assert.equal(
+    g.command({ type: "sowPot", a: "ronce-a-rubans", b: "fraise-timide" }).ok,
+    true,
+  );
+  assert.equal(g.command({ type: "sleep" }).ok, true);
   assert.equal(g.command({ type: "triggerFrogEncounter" }).ok, true);
   assert.equal(
     g.command({ type: "sowPot", a: "ronce-a-rubans", b: "fraise-timide" }).ok,

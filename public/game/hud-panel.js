@@ -213,6 +213,13 @@
             data: { species: sp.id },
           });
         }
+        // Epic C4.1: once-only narrative texts already revealed (data-narrative.js), listed
+        // read-only — no action, same "no button" posture as an unknown species row above.
+        const Narrative = window.GardenNarrative;
+        for (const flag of m.s.campaignFlags || []) {
+          const entry = Narrative?.TEXTS[flag];
+          if (entry) rows.push({ title: entry.title, detail: entry.text, action: null });
+        }
       } else if (m.panel === "visitor")
         for (const r of m.s.requests)
           rows.push({
