@@ -1302,3 +1302,44 @@ Aucun choix déjà confirmé du design touché (Alma vivante ; nom des Rainelles
 **Aucun code ni test modifié ce déclenchement** — travail de planification seul dans `docs/campagne-backlog.md`, comme prescrit par `orchestration.md`/`execution-continue.md` pour ce cas (phase courante sans epic détaillé restant, porte de sortie non atteinte).
 
 **Pour le prochain déclenchement** : **C4.7** est le seul epic `todo` à dépendances satisfaites de la phase 4 (dépend de C4.6, `fait`) — candidat naturel, épic de schéma/quête pur sans dépendance de rendu.
+
+## Implémentation du 19 septembre 2026 — Épic C4.7 : « Une fleur pour une fenêtre », Anouk (pioche) et Basile (scie), préparables en parallèle
+
+Déclenchement automatisé (routine cloud horaire). **Anti-hallucination faite avant tout le reste** : dernier epic « fait » du backlog était C4.6, commit `6e2e85de060693f31e9a16ae64b34cc55a77d9dc` — `git show --stat 6e2e85d` confirme le commit réel, message et contenu correspondant exactement à l'entrée existante de `campagne-backlog.md` et de ce fichier. `npm ci && npm test` relancés indépendamment → **451/451**, identique au rapport existant. Aucun bandeau de pause en tête de `campagne-backlog.md`. Aucune anomalie : `docs/campagne-anomalies.md` toujours absent (vérifié). Les trois derniers epics consignés (C4.4, C4.5, C4.6) sont tous `fait` : aucune pause anti-emballement à déclencher.
+
+**Choix de l'epic.** Le commit le plus récent de la branche (`b3f8cba`) était une session de planification du Cartographe (détail des epics C4.7 à C4.9, Acte III) — aucune implémentation n'avait encore suivi. **C4.7** est donc le seul epic `todo` de la phase 4 à dépendances satisfaites (dépend de C4.6, `fait`), déjà annoncé comme candidat naturel par l'entrée précédente de ce journal.
+
+**Vérification préalable confirmée avant d'écrire du code, pas devinée** (même discipline que C4.2/C4.3/C4.5) : `public/game/data-buildings.js` porte déjà `visitorId: "anouk"` (`cx: -3.5`, `cz: 20`, `role: "vendor"`) et `visitorId: "basile"` (`cx: -9.5`, `cz: 20`, `role: "vendor"`) — aucune nouvelle entrée `data-buildings.js` nécessaire. Le polygone réel de la zone 0 (`public/game/data-world.js`, pas seulement son rectangle `bounds` qui s'arrête à `z: 19`) atteint le point `[-6, 22]` : `z: 20` pour les deux visiteurs tombe donc dans ce renflement, à l'intérieur de la zone 0 toujours déverrouillée par défaut (`cost: {}`), pas dans la zone 4 qui ne commence qu'à `z: 22`. Aucune plante à fibres ni plantation adaptée au sec n'existe dans le catalogue botanique (`botany-genetics.js`/`data-species.js`, aucune correspondance trouvée) : `cutting:pilea` reste le seul item déjà prouvé livrable dès une partie neuve, même candidat par défaut que `fenetre-de-noe`/`bassines-de-mira` (C4.2/C4.5) — écart honnête documenté dans le commentaire de chaque nouvelle quête plutôt que deviné.
+
+**Livré (implémenté directement par l'orchestrateur, epic de schéma/quête pur, aucune délégation) :**
+- `public/game/data-quests.js` : deux nouvelles quêtes réelles, indépendantes l'une de l'autre (`requires: []` sur les deux, conforme au texte du design « ces deux étapes peuvent être préparées en parallèle ») —
+  - `sentier-d-anouk` (`npcId: "anouk"`, titre « Rouvrir le sentier d'Anouk », objectif `deliver` `cutting:pilea` ×1, `reward: { tools: ["pioche"] }`) ;
+  - `fibres-de-basile` (`npcId: "basile"`, titre « Des fibres pour Basile », objectif `deliver` `cutting:pilea` ×1, `reward: { tools: ["scie"] }`).
+  Même patron additif exact que `hachette` (C3.6) et `pelle` (C4.5) — `reward.tools` existait déjà, aucun changement à `garden-state-cmd-e.js`.
+- Nouveau `tests/campaign-chapter7.cjs` (6 tests) : Anouk/Basile pointent bien vers les bâtiments existants, rôle inchangé ; les deux sont réellement atteignables depuis une sauvegarde neuve (`z < 22`, zone 0 toujours déverrouillée) ; chaque outil n'est accordé qu'à la complétion réelle, jamais à l'acceptation ; une complétion prématurée (livraison non satisfaite) est refusée sans rien accorder ; les deux quêtes sont prouvées indépendantes par trois scénarios (Anouk puis Basile, Basile puis Anouk, acceptation des deux en parallèle suivie de deux complétions), aucune interférence dans aucun des trois.
+- `tests/garden-quests-schema.cjs` : catalogue attendu étendu de 5 à 7 entrées (`bassines-de-mira`, `bois-pour-l-hiver`, `fenetre-de-noe`, `fibres-de-basile`, `first-drip`, `first-harvest`, `sentier-d-anouk`), même mise à jour mécanique déjà faite à chaque chapitre précédent.
+- `package.json` : `tests/campaign-chapter7.cjs` ajouté explicitement à la liste du script `test` (leçon déjà tirée à C2.11).
+
+**Bug de test trouvé et corrigé en écrivant, pas contourné** : la première version du test de vérification de zone utilisait `anouk.cz`/`basile.cz`, un nom de champ qui n'existe que dans la donnée brute de `data-buildings.js` — l'objet bâtiment réellement construit (résolu par le module) expose `x`/`z`, pas `cx`/`cz`. Confirmé par une inspection directe de l'objet (`node -e`) avant de corriger, pas supposé ; le test corrigé (`anouk.z`/`basile.z`) passe et reste une vérification programmatique réelle, pas un contournement de l'assertion.
+
+**Résultat réellement exécuté** : `npm ci` puis `npm test` → **457/457** (451 existants + 6 nouveaux dans `tests/campaign-chapter7.cjs`, zéro régression). Sortie complète :
+
+```
+# tests 457
+# suites 0
+# pass 457
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+```
+
+`/code-review` (skill `code-review`, niveau medium) exécuté sur le diff complet : aucun défaut relevé — changement de données pur, `reward.tools`/`deliver` déjà existants et inchangés, `npcId` vérifiés contre les bâtiments réels, aucune collision de récompense.
+
+**Relecture adverse de ce contenu narratif** (deux titres de quête touchent à la narration, requis par `orchestration.md`/`execution-continue.md`) : le chapitre 7 ouvre l'Acte III (« Les jardins des autres », objectif « réussir quelque chose qui compte pour quelqu'un », design §10) — toujours côté **recevoir/inventer**, §11 (culpabilité/exploitation, tableau des trois leviers) vérifié explicitement non applicable avant l'Acte IV, même constat déjà posé par C4.4/C4.5/C4.6. Les deux titres reprennent le vocabulaire du design (§8 : « rouvrir un accès praticable », « matériau souple pour réparer ses paniers »), aucune invention narrative au-delà. Aucun choix déjà confirmé du design remis en cause (Alma vivante, nom des Rainelles, culpabilisation de fin de campagne).
+
+**Aucun fichier de rendu ou d'interface touché** (aucune entrée `data-buildings.js`, aucun `hud-panel.js`) : `npm run test:browser`/`npm run test:visual` non requis par `execution-continue.md` pour cet epic, ni exécutés.
+
+**Limite honnête, inchangée depuis C3.6/C4.5** : aucune terrasse ni raccourci n'est construit dans le monde (design : « la pioche ouvre un raccourci et les terrasses ») — cet epic prouve seulement l'obtention mécanique des deux outils, sur le même principe « posé, pas encore montré au monde ».
+
+**Cet epic ne ferme aucune porte de phase** (la porte de sortie de la phase 4 exige l'arc complet actes I-III, §15 — chapitres 8 et 9 restent `todo`). **Pour le prochain déclenchement** : **C4.8** (dépend de C4.7, désormais `fait`) devient le candidat naturel — quête de Léa, révélation narrative via le nouveau champ additif générique `reward.narrativeFlag` à implémenter (proposé mais pas encore construit par l'entrée de backlog de C4.8).

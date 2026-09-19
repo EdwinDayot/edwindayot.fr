@@ -88,6 +88,44 @@
       reward: { tools: ["pelle"] },
       requires: [],
     },
+    // Épic C4.7 (design §10, chapitre 7, "Une fleur pour une fenêtre" ; §8, "Sentier des vents").
+    // Same posture already used three times by C4.2/C4.3/C4.5: npcId points at "anouk" — NOT a
+    // new building. data-buildings.js already has visitorId "anouk" (role "vendor", cx:-3.5/
+    // cz:20, inside zone 0's bulge polygon — verified against the real polygon before writing,
+    // not assumed identical to Noé/Iris/Mira: zone0's polygon reaches [-6, 22], so cz:20 near
+    // cx:-3.5 sits inside that bulge, not in zone4 which only starts at z:22), unlocked by
+    // default, and the design's own named-cast table (§10) already casts her as the coteau
+    // resident who wants her path reopened.
+    // Objective item deliberately "cutting:pilea" quantity 1 again, same already-deliverable item
+    // as C4.2/C4.5: design §8 describes the botanical answer as "plantation basse adaptée au sec,
+    // balisage visible" — no dedicated dry-climate species exists in the code today, and inventing
+    // one would be a whole new botanical entry out of scope for a single epic (contrary to
+    // "généraliser plutôt que spécialiser"); the design explicitly allows this ("les détails de
+    // ces rencontres peuvent changer pendant l'écriture", §8's own closing line).
+    "sentier-d-anouk": {
+      npcId: "anouk",
+      title: "Rouvrir le sentier d'Anouk",
+      objective: { type: "deliver", item: "cutting:pilea", quantity: 1 },
+      reward: { tools: ["pioche"] },
+      requires: [],
+    },
+    // Épic C4.7, second quest of the same chapter (design §8, "Verger en terrasses" : "Basile
+    // manque d'un matériau souple pour réparer ses paniers"). npcId points at "basile" — NOT a
+    // new building, same verification: data-buildings.js already has visitorId "basile" (role
+    // "vendor", cx:-9.5/cz:20, same zone0 bulge as anouk above), unlocked by default, already
+    // cast by the design's table as the basket-maker/merchant.
+    // Objective item deliberately "cutting:pilea" quantity 1, same honest reuse as anouk's quest
+    // above: design §8 names "une plante à fibres" which does not exist yet as a species — same
+    // documented gap, not silently narrowed.
+    // Deliberately independent (requires: []), same as anouk's quest: design §10 chapitre 7,
+    // "ces deux étapes peuvent être préparées en parallèle" — no `requires` link between the two.
+    "fibres-de-basile": {
+      npcId: "basile",
+      title: "Des fibres pour Basile",
+      objective: { type: "deliver", item: "cutting:pilea", quantity: 1 },
+      reward: { tools: ["scie"] },
+      requires: [],
+    },
   };
   P.quests = quests;
   if (typeof module !== "undefined") module.exports = { quests };
