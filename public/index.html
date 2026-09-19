@@ -106,6 +106,12 @@
          loaded here anyway, right after its last dependency, to avoid the exact class of missing-
          script bug documented above for campaign-clock.js/rainelles.js/cultivars.js. -->
     <script src="/game/rainelles-status.js" defer></script>
+    <!-- Epic C5.5: campaign-scenes.js reads root.GardenCampaignStations (loaded much earlier
+         above) at its own execution time; nothing reads it back yet (no scene/render wired to it
+         — that is C5.6's and a future render pass's job), same "posed, not wired" gap as
+         rainelles-status.js just above. Loaded here anyway for the same missing-script ordering
+         reason. -->
+    <script src="/game/campaign-scenes.js" defer></script>
     <!-- Epic C1.5: moved here from much further below (its previous position after garden-
          state-cmd-e.js): garden-state-validate.js now also reads root.GardenGenetics (AXES,
          founders, to validate a pinned trait) at script-execution time, the same ordering fix
