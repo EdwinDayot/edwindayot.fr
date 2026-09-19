@@ -61,7 +61,30 @@
    devient jamais un dommage fictif attribué au joueur") — true by construction, since every
    recordX function below is only ever called from a command's *success* path (after a `fail()`
    return has already short-circuited), never from a validation branch; see the test suite for a
-   refused-command regression check. */
+   refused-command regression check.
+
+   Epic C5.4 (design §11, "prise d'eau à fort débit... niveau du bassin commun réduit... restituer
+   une partie du débit [est] une réparation avec un coût réel, jamais une annulation gratuite")
+   fills in `waterWithdrawals`, reserved since C5.1: a per-borne cumulative count of specimens
+   actually watered through that borne while its `priseFortDebit` flag (campaign-stations.js) was
+   on (campaign-automation.js's doArroser, the only writer, via recordWaterWithdrawal below) —
+   same per-id, never-decreasing shape as `births`/`nightlyActivity`, keyed by borne id instead of
+   Rainelle id. A borne without `priseFortDebit` never touches this map (doArroser only calls
+   recordWaterWithdrawal when the borne it resolved is flagged), matching this epic's own exit
+   criterion.
+
+   `bassinCommunLevel` derives the shared level from that cumulative total rather than storing a
+   second, independently-mutated number: level = BASSIN_COMMUN_CAPACITY − Σ(waterWithdrawals),
+   floored at zero. This is deliberate, not a simplification of a "real" stored level — since
+   withdrawals only ever go up (a borne is never un-recorded), the derived level can only ever go
+   down or stay flat, which is exactly "couper la prise arrête la baisse sans la faire remonter
+   instantanément" for free, by construction, rather than a rule `setPriseFortDebit` (garden-
+   state-cmd-q.js) has to enforce separately. BASSIN_COMMUN_CAPACITY reuses the free garden's own
+   citerne capacity (D.recipes.tank.capacity = 160, data-recipes.js) as the closest existing
+   precedent for "how much a shared water reserve holds" — same borrowing already used for
+   DEFAULT_PANIER_CAPACITY at C2.6a — rather than inventing an unrelated number; not imported
+   directly (this file stays dependency-free, same posture already used for ZONE_WORK_RANGE's own
+   borrowed-but-uncoupled precedent in campaign-automation.js). */
 (function (root) {
   function freshMemory() {
     return {
@@ -76,7 +99,8 @@
       // nightlyActivity's cumulative total — see header comment and increase/decreaseOverexertion
       // below.
       overexertion: {},
-      // Reserved for C5.4 (prise d'eau à fort débit) — see header comment.
+      // Epic C5.4: per-borne cumulative count of specimens watered through a `priseFortDebit`
+      // borne — see header comment and recordWaterWithdrawal/bassinCommunLevel below.
       waterWithdrawals: {},
       // Reserved — no epic yet transforms/removes a habitat once registered (C3.3).
       habitatTransformations: [],
@@ -91,6 +115,11 @@
   // compare a Rainelle's current overexertion level against — see the header comment above for
   // why 3 was chosen. Exported so that file never hardcodes its own copy of this number.
   const OVEREXERTION_THRESHOLD = 3;
+
+  // Epic C5.4: the shared bassin commun's total capacity, in the same units as a specimen-
+  // watering count (waterWithdrawals) — see header comment for why 160 was chosen and why it is
+  // not imported from data.js.
+  const BASSIN_COMMUN_CAPACITY = 160;
 
   // Called once per Rainelle that already existed *before* "sleep" resolves any new individual
   // this same night (garden-state-cmd-f.js) — a brand-new individual has not experienced a night
@@ -151,9 +180,32 @@
     if (current > 0) memory.overexertion[rainelleId] = current - 1;
   }
 
+  // Epic C5.4: called from campaign-automation.js's doArroser, once per real watering pass
+  // through a `priseFortDebit` borne, with `amount` the number of specimens actually watered
+  // that pass (day or night alike — doArroser is shared, same posture as C5.3's capacityLimit).
+  // Never called for a borne without the flag, and never for a pass that watered nothing (see
+  // that file's own call site) — a borne "sans prise à fort débit n'y touche jamais", this
+  // epic's own exit criterion.
+  function recordWaterWithdrawal(memory, borneId, amount) {
+    memory.waterWithdrawals[borneId] =
+      (memory.waterWithdrawals[borneId] || 0) + amount;
+  }
+
+  // Epic C5.4: pure derivation, not a stored field — see header comment for why. Floored at
+  // zero: withdrawals can exceed the nominal capacity (nothing here stops a borne from drawing
+  // past it), but the level itself never reads as negative.
+  function bassinCommunLevel(memory) {
+    const total = Object.values(memory.waterWithdrawals).reduce(
+      (n, v) => n + v,
+      0,
+    );
+    return Math.max(0, BASSIN_COMMUN_CAPACITY - total);
+  }
+
   const api = {
     freshMemory,
     OVEREXERTION_THRESHOLD,
+    BASSIN_COMMUN_CAPACITY,
     recordRest,
     recordBirth,
     recordFirstGesture,
@@ -161,6 +213,8 @@
     recordNightlyActivity,
     increaseOverexertion,
     decreaseOverexertion,
+    recordWaterWithdrawal,
+    bassinCommunLevel,
   };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenCampaignMemory = api;

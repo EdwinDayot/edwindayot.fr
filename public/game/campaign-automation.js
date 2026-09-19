@@ -48,7 +48,22 @@
    these two functions): once a Rainelle's overexertion streak (campaign-memory.js) is past
    OVEREXERTION_THRESHOLD, a single cycle moves at most FATIGUED_CAPACITY_PER_CYCLE units instead
    of everything in range/capacity — never zero, per the design's own "elles ne doivent pas annuler
-   immédiatement tout le gain nocturne". See capacityLimit's own comment for the exact rule. */
+   immédiatement tout le gain nocturne". See capacityLimit's own comment for the exact rule.
+
+   Epic C5.4 (design §11, "prise d'eau à fort débit... alimentation stable des cultures
+   exigeantes... niveau du bassin commun réduit") only touches "arroser", the one verb whose
+   geste actually names a borne (`source`) — "récolter"/"transporter" have nothing a water intake
+   could apply to. Two effects, both gated on the resolved borne's `priseFortDebit` flag
+   (campaign-stations.js), never on the Rainelle or the zone: (1) tickArroser's day cycle runs on
+   FAST_CYCLE_SECONDS instead of CYCLE_SECONDS — the same volume per cycle, delivered more often,
+   is a real increase in débit (flow = volume / time) without inventing a second, unexplained
+   per-cycle volume cap where none existed before this epic; (2) doArroser records the withdrawal
+   (campaign-memory.js's recordWaterWithdrawal) whenever it actually waters something through such
+   a borne, day or night alike (doArroser is shared by both call sites, same posture as C5.3's
+   capacityLimit) — never for a borne without the flag, and never for a pass that watered nothing.
+   FAST_CYCLE_SECONDS stays strictly below CYCLE_SECONDS so the existing persisted-job bound in
+   garden-state-validate.js (`finite(r.job.remaining, 0, CampaignAutomation.CYCLE_SECONDS)`) still
+   holds without any change there. */
 (function (root) {
   const C =
     typeof module !== "undefined"
@@ -78,6 +93,13 @@
   // already used between this file's MATURE_STAGE-reading Cultivars calls and cultivars.js's own
   // duplicated botany-hybrids.js constant).
   const CYCLE_SECONDS = 20;
+
+  // Epic C5.4: the "arroser" cycle duration once a borne's `priseFortDebit` is on — half of
+  // CYCLE_SECONDS, chosen as the smallest simple fraction that gives an unmistakable, easily
+  // observable increase in délivrance rate (twice as often, so roughly twice the volume watered
+  // over the same stretch of real/simulated time) while staying strictly below CYCLE_SECONDS (see
+  // header comment on why that bound must hold).
+  const FAST_CYCLE_SECONDS = 10;
 
   // How far from the zone's own position a specimen still counts as "in the zone" for either
   // gesture. Design §5's table only says "petit rayon de travail" for arroser, without a number;
@@ -122,11 +144,16 @@
   // Advances a Rainelle's job by one tick and returns true exactly once, the tick the cycle
   // completes (mirroring automation.js's tickJob: a countdown to zero, then restarted for the
   // next cycle — "sans intervention" means it must restart itself, never stall at zero).
-  function advanceCycle(rainelle) {
-    if (!rainelle.job) rainelle.job = { remaining: CYCLE_SECONDS };
+  // Epic C5.4: `fast` (only ever the resolved borne's own `priseFortDebit`, from tickArroser)
+  // picks FAST_CYCLE_SECONDS instead of CYCLE_SECONDS for a freshly (re)started countdown — a
+  // cycle already mid-count when the flag flips simply finishes at whatever duration it started
+  // with, exactly like every other campaign timer never retroactively rescaled mid-flight.
+  function advanceCycle(rainelle, fast) {
+    const duration = fast ? FAST_CYCLE_SECONDS : CYCLE_SECONDS;
+    if (!rainelle.job) rainelle.job = { remaining: duration };
     rainelle.job.remaining = Math.max(0, rainelle.job.remaining - 1);
     if (rainelle.job.remaining > 0) return false;
-    rainelle.job.remaining = CYCLE_SECONDS;
+    rainelle.job.remaining = duration;
     return true;
   }
 
@@ -158,17 +185,25 @@
         count++;
       }
     }
+    // Epic C5.4: withdrawal is recorded against the borne actually used, only when it is flagged
+    // and only for a pass that really watered something — see header comment and
+    // campaign-memory.js's own recordWaterWithdrawal comment.
+    if (watered && borne.priseFortDebit)
+      Memory.recordWaterWithdrawal(s.campaignMemory, borne.id, count);
     return watered;
   }
 
   function tickArroser(rainelle, s) {
     const geste = rainelle.geste;
+    const borne = resolveKind(s, geste.source, "borne");
+    const zone = resolveKind(s, geste.poste, "zone");
     // Resolved *before* advancing the cycle, exactly as before this split: an unresolved source/
     // poste must never even start the countdown (rainelle.job stays null forever), not just skip
     // the watering once resolved — see the "leaves the Rainelle inactive without throwing" test.
-    if (!resolveKind(s, geste.source, "borne") || !resolveKind(s, geste.poste, "zone"))
-      return;
-    if (!advanceCycle(rainelle)) return;
+    if (!borne || !zone) return;
+    // Epic C5.4: a flagged borne runs this Rainelle's cycle on FAST_CYCLE_SECONDS instead of
+    // CYCLE_SECONDS — see advanceCycle's own comment and this file's header comment.
+    if (!advanceCycle(rainelle, borne.priseFortDebit)) return;
     doArroser(rainelle, s);
   }
 
@@ -349,6 +384,7 @@
 
   const api = {
     CYCLE_SECONDS,
+    FAST_CYCLE_SECONDS,
     ZONE_WORK_RANGE,
     FATIGUED_CAPACITY_PER_CYCLE,
     tickRainelle,

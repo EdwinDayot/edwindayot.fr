@@ -605,6 +605,17 @@
           list.some((st) => st.veilleuse !== undefined && typeof st.veilleuse !== "boolean")
         )
           throw Error("Registre de stations invalide.");
+        // Epic C5.4: priseFortDebit is optional so a pre-epic borne still loads (defaulted to
+        // false below, same posture as a zone's veilleuse at C5.2); when present, it must be a
+        // real boolean, never a truthy stand-in.
+        if (
+          kind === "borne" &&
+          list.some(
+            (st) =>
+              st.priseFortDebit !== undefined && typeof st.priseFortDebit !== "boolean",
+          )
+        )
+          throw Error("Registre de stations invalide.");
         if (!count(s.campaignStations[counter]))
           throw Error("Registre de stations invalide.");
         if (
@@ -670,6 +681,12 @@
     if (s.campaignMemory !== undefined) {
       const M = s.campaignMemory;
       const rainelleIds = new Set((s.rainelles || []).map((r) => r?.id));
+      // Epic C5.4: waterWithdrawals is keyed by borne id, not Rainelle id — same "must resolve
+      // to a real registered entry" discipline as rest/nightlyActivity/overexertion above, just
+      // against campaignStations.bornes instead of s.rainelles.
+      const borneIds = new Set(
+        (s.campaignStations?.bornes || []).map((b) => b?.id),
+      );
       if (
         typeof M !== "object" ||
         M === null ||
@@ -704,8 +721,13 @@
             Object.entries(M.overexertion).some(
               ([id, n]) => !rainelleIds.has(id) || !count(n),
             ))) ||
+        // Epic C5.4: waterWithdrawals is now a real, written field — validated exactly like
+        // rest/nightlyActivity above, keyed against borneIds instead of rainelleIds.
         typeof M.waterWithdrawals !== "object" ||
         M.waterWithdrawals === null ||
+        Object.entries(M.waterWithdrawals).some(
+          ([id, n]) => !borneIds.has(id) || !count(n),
+        ) ||
         !Array.isArray(M.habitatTransformations) ||
         typeof M.unsoldStock !== "object" ||
         M.unsoldStock === null ||
@@ -790,6 +812,11 @@
     // just above — a pre-epic zone only lacks this one field, defaulted off (no free night work).
     result.campaignStations.zones = (result.campaignStations.zones ?? []).map(
       (z) => ({ veilleuse: false, ...z }),
+    );
+    // Epic C5.4: priseFortDebit migrates per borne, same reasoning as a zone's veilleuse just
+    // above — a pre-epic borne only lacks this one field, defaulted off (no free flow boost).
+    result.campaignStations.bornes = (result.campaignStations.bornes ?? []).map(
+      (b) => ({ priseFortDebit: false, ...b }),
     );
     result.campaignHouse ??= House.freshHouse();
     // Epic C4.1: a pre-epic save has campaignHouse but no furnitureMarks at all (the object

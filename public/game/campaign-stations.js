@@ -76,6 +76,13 @@
     // posture as a panier's capacity/min above — a zone never works overnight until a command
     // (setVeilleuse, garden-state-cmd-p.js) explicitly turns it on.
     if (kind === "zone") station.veilleuse = false;
+    // Epic C5.4 (design §11, "prise d'eau à fort débit"): only a borne can carry one — a zone/
+    // panier is never itself the water intake, only the borne a Rainelle's "arroser" geste
+    // resolves as its source (see campaign-automation.js's doArroser/tickArroser). Off by
+    // default, same "no free capability" posture as veilleuse just above — a borne never draws
+    // extra flow until a command (setPriseFortDebit, garden-state-cmd-q.js) explicitly turns it
+    // on, and only ever at the cost of the shared bassin commun (campaign-memory.js).
+    if (kind === "borne") station.priseFortDebit = false;
     if (kind === "habitat") {
       if (!Number.isFinite(capacity) || capacity < MIN_HABITAT_CAPACITY)
         throw Error(

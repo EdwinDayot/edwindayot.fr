@@ -42,7 +42,10 @@ test("registerStation assigns a stable, kind-prefixed id and appends to the righ
   const borne = Stations.registerStation(registry, "borne", { x: 1, z: 2 });
   const zone = Stations.registerStation(registry, "zone", { x: 3, z: 4 });
   const panier = Stations.registerStation(registry, "panier", { x: 5, z: 6 });
-  assert.deepEqual(borne, { id: "b1", x: 1, z: 2 });
+  // Epic C5.4: a borne also carries its `priseFortDebit` flag at creation, off by default
+  // (design §11's "prise d'eau à fort débit" — see campaign-stations.js's own comment on
+  // registerStation).
+  assert.deepEqual(borne, { id: "b1", x: 1, z: 2, priseFortDebit: false });
   // Epic C5.2: a zone also carries its `veilleuse` flag at creation, off by default (design §11's
   // "veilleuses de croissance" — see campaign-stations.js's own comment on registerStation).
   assert.deepEqual(zone, { id: "z1", x: 3, z: 4, veilleuse: false });
