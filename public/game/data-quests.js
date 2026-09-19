@@ -126,6 +126,28 @@
       reward: { tools: ["scie"] },
       requires: [],
     },
+    // Épic C4.8 (design §10, chapitre 8, "La table longue" : "Léa organise un repas collectif.
+    // Le joueur doit alimenter la cuisine pendant un essai court..."). Same posture already used
+    // four times (C4.2/C4.3/C4.5/C4.7): npcId points at "lea" — NOT a new building. data-
+    // buildings.js already has visitorId "lea" (role "trader", cz:7, zone 0, unlocked by default),
+    // already carrying two jardin libre quests (first-harvest/first-drip) — a campaign quest
+    // attaching to the same npcId changes nothing about her existing role/shop, same precedent as
+    // reusing "noe"/"iris"/"mira"/"anouk"/"basile" as-is.
+    // Objective item deliberately "cutting:pilea" quantity 1, same honest reuse as C4.2/C4.5/C4.7:
+    // no dedicated "repas"/feast ingredient exists in the botanical catalog, and inventing one
+    // would be a whole new item out of scope for a single epic (contrary to "généraliser plutôt
+    // que spécialiser"); the design explicitly allows this (§8's closing line).
+    // reward.narrativeFlag is a NEW additive reward field (garden-state-cmd-e.js), generalising
+    // the ad hoc "unlockHouseSpace includes serre" reveal C4.3 hard-coded: any future quest can
+    // reveal a data-narrative.js text at completion by naming its trigger signal here, no new
+    // branch of code required (orchestration.md, "généraliser plutôt que spécialiser").
+    "table-longue-lea": {
+      npcId: "lea",
+      title: "Léa prépare un repas collectif",
+      objective: { type: "deliver", item: "cutting:pilea", quantity: 1 },
+      reward: { narrativeFlag: "leaKitchenStocked" },
+      requires: [],
+    },
   };
   P.quests = quests;
   if (typeof module !== "undefined") module.exports = { quests };

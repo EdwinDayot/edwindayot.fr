@@ -68,6 +68,17 @@
       title: "On ne se fabrique pas tout seul",
       text: "Elle refuse de se transformer elle-même, et refuse de le faire à une autre. Toi, personne ne t’a jamais refusé ce geste.",
     },
+    // Epic C4.8 (design §10, chapitre 8, "La table longue") : révélée quand la quête
+    // "table-longue-lea" (data-quests.js) est réellement complétée — signal générique
+    // reward.narrativeFlag, garden-state-cmd-e.js. La fête, le décor et les tables eux-mêmes ne
+    // sont pas construits par cet epic (voir sa propre entrée de campagne-backlog.md) : ce texte
+    // ne raconte que ce qui est réellement vrai à ce stade, la réserve remplie, pas la fête.
+    "table-longue-approvisionnee": {
+      id: "table-longue-approvisionnee",
+      trigger: "leaKitchenStocked",
+      title: "La table longue",
+      text: "La réserve de la cuisine ne manque plus de rien. Léa peut enfin penser à autre chose qu’au manque.",
+    },
   };
 
   function findByTrigger(signal) {

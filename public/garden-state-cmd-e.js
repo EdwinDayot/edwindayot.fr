@@ -63,6 +63,13 @@
             revealed = Narrative.pendingReveal(s.campaignFlags, "serreUnlocked");
             if (revealed) s.campaignFlags.push(revealed.id);
           }
+          // Épic C4.8: reward.narrativeFlag generalises the reveal above — any quest can name a
+          // trigger signal directly, no new hard-coded condition needed per chapter. Additive:
+          // only consulted when the serre case above didn't already reveal something this turn.
+          if (!revealed && reward.narrativeFlag) {
+            revealed = Narrative.pendingReveal(s.campaignFlags, reward.narrativeFlag);
+            if (revealed) s.campaignFlags.push(revealed.id);
+          }
           st.message = revealed
             ? `${quest.title} · terminée. Nouvelle page dans le carnet.`
             : `${quest.title} · terminée.`;
