@@ -109,6 +109,14 @@
       for (const c of D.caches)
         this.nodes.get(c.id).visible =
           s.unlocked.includes(c.zone) && !s.discovered.includes(c.species);
+      // Epic C2.2v: rebuild the refuge house only when the one field its appearance actually
+      // depends on (repairHouseSpace, garden-state-cmd-l.js) has changed since the last sync —
+      // never every ~0.25s tick like the rest of this method's per-frame reads above.
+      if (
+        s.campaignHouse?.spaces?.accueil?.status !==
+        this.campaignHouseAccueilStatus
+      )
+        this.buildCampaignHouse();
       const signature = JSON.stringify([
         s.links,
         s.entities.map((e) => [e.id, e.x, e.z, e.stored]),

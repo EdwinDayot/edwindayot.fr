@@ -218,8 +218,37 @@
         const Narrative = window.GardenNarrative;
         for (const flag of m.s.campaignFlags || []) {
           const entry = Narrative?.TEXTS[flag];
-          if (entry) rows.push({ title: entry.title, detail: entry.text, action: null });
+          if (entry)
+            rows.push({ title: entry.title, detail: entry.text, action: null });
         }
+      } else if (m.panel === "nightfall") {
+        // Epic C2.2v (design §3: "le jeu propose de préparer ou de confirmer le pot dans un
+        // écran suspendu... il reste possible de ne rien croiser"). Shows whatever sowPot
+        // (C1.3) already put in s.campaignPot.pending, informationally, then offers the one
+        // real action this epic's own mandate scopes for this screen: confirm and sleep.
+        // sowPot itself has no HUD panel/dispatch call site anywhere in the game yet (a
+        // species-picker to *change* the pot from here is a separate, larger feature, not
+        // built by this epic) — "leave it empty" is already true whenever nothing was sown,
+        // which confirming here simply accepts rather than blocking on.
+        const Genetics = window.GardenGenetics,
+          founderName = (id) =>
+            Genetics?.founders.find((f) => f.id === id)?.name || id;
+        if (m.s.campaignPot.pending.length)
+          for (const pair of m.s.campaignPot.pending)
+            rows.push({
+              title: founderName(pair.a) + " × " + founderName(pair.b),
+              detail: "Résultat au réveil, dans le pot.",
+            });
+        else
+          rows.push({
+            title: "Le pot est vide",
+            detail: "Il reste possible de ne rien croiser cette nuit.",
+          });
+        rows.push({
+          title: "La nuit tombe",
+          detail: "Le personnage rejoint la maison refuge.",
+          action: "confirm-night",
+        });
       } else if (m.panel === "visitor")
         for (const r of m.s.requests)
           rows.push({

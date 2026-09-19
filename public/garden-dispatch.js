@@ -109,6 +109,14 @@
       case "go":
         A.go(data.id);
         break;
+      // Epic C2.2v: the "nightfall" panel's single action — proceeds with whatever the pot
+      // holds (possibly nothing, design §3: "il reste possible de ne rien croiser") and calls
+      // the already-implemented sleep command. Closing the panel here (like confirm-cutting's
+      // own A.closePanel() below) also lets garden-frame.js's own nightfall check notice
+      // gameSeconds has been reset to 0 next frame and end the camera transition.
+      case "confirm-night":
+        if (A.execute({ type: "sleep" }).ok) A.closePanel();
+        break;
       case "inspect": {
         const e = data.id
           ? A.target(data.id)

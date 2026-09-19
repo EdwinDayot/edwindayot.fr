@@ -53,7 +53,9 @@
                                   ? "Composter"
                                   : r.action === "rename-cultivar"
                                     ? "Renommer"
-                                    : "Choisir",
+                                    : r.action === "confirm-night"
+                                      ? "Dormir"
+                                      : "Choisir",
               x + pw - 105,
               ry + 18,
               77,

@@ -126,16 +126,30 @@
           ...(kind === "mine" ? [0.045, 0.035, 0.04] : [0.025, 0.055, 0.025]),
         );
     },
+    // Shared by inspect()/endInspection() and beginNightfallTransition()/endNightfallTransition()
+    // below (originally two independent copies of the same capture/restore pair, found
+    // duplicated by /code-review during epic C2.2v and merged here so a future fix to this
+    // logic only has to happen once).
+    snapshotCamera() {
+      return {
+        angle: this.angle,
+        span: this.span,
+        look: this.look.clone(),
+        position: this.camera.position.clone(),
+        overview: this.overview,
+      };
+    },
+    restoreCamera(saved) {
+      this.angle = saved.angle;
+      this.span = saved.span;
+      this.overview = saved.overview;
+      this.look.copy(saved.look);
+      this.camera.position.copy(saved.position);
+      this.camera.lookAt(this.look);
+    },
     inspect(entity) {
       if (!entity || entity.stored) return false;
-      if (!this.inspection)
-        this.previousCamera = {
-          angle: this.angle,
-          span: this.span,
-          look: this.look.clone(),
-          position: this.camera.position.clone(),
-          overview: this.overview,
-        };
+      if (!this.inspection) this.previousCamera = this.snapshotCamera();
       const model = this.models.get(entity.id),
         node = model?.root || this.nodes.get(entity.id);
       if (!node) return false;
@@ -157,12 +171,33 @@
       if (!this.inspection) return;
       const old = this.previousCamera;
       this.inspection = null;
-      this.angle = old.angle;
-      this.span = old.span;
-      this.overview = old.overview;
-      this.look.copy(old.look);
-      this.camera.position.copy(old.position);
-      this.camera.lookAt(this.look);
+      this.restoreCamera(old);
+    },
+    // Epic C2.2v: nightfall's scripted camera transition, a sibling of inspect()/
+    // endInspection() above — same shape (capture the previous camera once via snapshotCamera(),
+    // hand updateCamera a target+span to lerp toward, restore via restoreCamera() on close),
+    // pointed at the refuge house's fixed world position instead of an entity's live bounding
+    // box. Deliberately never touches this.position/game.s.player: the mandate's own instruction
+    // is to build this as a sibling of the inspect() mechanism, which is camera-only, never a
+    // teleport of the player entity — "brings the player character to the refuge house" is the
+    // camera bringing the *view* there, exactly like inspect() frames an entity without moving it.
+    beginNightfallTransition() {
+      if (this.nightfall) return;
+      this.previousNightfallCamera = this.snapshotCamera();
+      const CampaignHouse = window.GardenRenderCampaignHouse,
+        x = CampaignHouse?.CAMPAIGN_HOUSE_X ?? 0,
+        z = CampaignHouse?.CAMPAIGN_HOUSE_Z ?? 0;
+      this.nightfall = {
+        center: new T.Vector3(x, Terrain.terrainHeight(x, z) + 0.9, z),
+        span: 9,
+      };
+      this.routes = [];
+    },
+    endNightfallTransition() {
+      if (!this.nightfall) return;
+      const old = this.previousNightfallCamera;
+      this.nightfall = null;
+      this.restoreCamera(old);
     },
     showPreview(b) {
       this.batchDirty = true;

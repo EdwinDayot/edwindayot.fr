@@ -27,6 +27,30 @@
       this.roofs = [];
       for (const b of D.buildings) this.buildHouse(b);
     },
+    // Epic C2.2v: the refuge house (render-campaign-house.js, C3.2) had a footprint and
+    // materials but no world position and no live call site — this is that call site,
+    // following the exact same "world-build time, called from render.js's world()" pattern as
+    // buildHouses() just above. Kept as a separate method (not folded into buildHouses()) since
+    // the refuge house has no D.buildings row to iterate — window.GardenRenderCampaignHouse is
+    // read lazily here, not as a top-level const, since render-campaign-house.js is a sibling
+    // module loaded by its own <script> tag and this file must not depend on script order (the
+    // exact ordering-bug class index.html's own comments document repeatedly for other pairs).
+    buildCampaignHouse() {
+      const CampaignHouse = window.GardenRenderCampaignHouse;
+      if (!CampaignHouse) return;
+      if (this.campaignHouseGroup) this.scene.remove(this.campaignHouseGroup);
+      const house = this.game.s.campaignHouse;
+      this.campaignHouseGroup = CampaignHouse.buildRefugeHouseGroup(house);
+      const x = CampaignHouse.CAMPAIGN_HOUSE_X,
+        z = CampaignHouse.CAMPAIGN_HOUSE_Z;
+      this.campaignHouseGroup.position.set(x, Terrain.terrainHeight(x, z), z);
+      this.campaignHouseGroup.rotation.y =
+        CampaignHouse.CAMPAIGN_HOUSE_ROTATION_Y;
+      this.scene.add(this.campaignHouseGroup);
+      // Cached so render-flow.js's sync() can rebuild only when this one field actually
+      // changes (repairHouseSpace, garden-state-cmd-l.js) instead of every ~0.25s tick.
+      this.campaignHouseAccueilStatus = house?.spaces?.accueil?.status;
+    },
     // A gable end: rectangle-plus-triangle profile (eave to eave, up to the
     // ridge) extruded to `thickness`, so the wall actually follows the roof
     // pitch instead of a full-height rectangular block the sloped roof
@@ -90,7 +114,13 @@
       // gableGeometry above) instead of a rectangle reaching the ridge
       // height along the whole depth.
       this.shape(group, "box", stone, [0, WALL_H / 2, d2], [b.w, WALL_H, 0.16]);
-      this.shape(group, "box", stone, [-w2, WALL_H / 2, 0], [0.16, WALL_H, b.d]);
+      this.shape(
+        group,
+        "box",
+        stone,
+        [-w2, WALL_H / 2, 0],
+        [0.16, WALL_H, b.d],
+      );
       this.shape(group, "box", stone, [w2, WALL_H / 2, 0], [0.16, WALL_H, b.d]);
       const gable = this.gableGeometry(0.16, d2, WALL_H, b.roofHeight);
       this.shape(group, gable, stone, [-w2, 0, 0]);

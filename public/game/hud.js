@@ -187,6 +187,7 @@
         settings: "À ton rythme",
         reserve: "Les objets rangés",
         nursery: "Choisir une bouture",
+        nightfall: "La nuit tombe",
       };
       this.text(
         titles[m.panel],

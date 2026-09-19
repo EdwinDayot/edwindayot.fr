@@ -8,6 +8,7 @@
     I = GardenIrrigation,
     R = GardenRules,
     S = GardenSave,
+    Clock = GardenCampaignClock,
     $ = (id) => document.getElementById(id);
   A.frame = function frame(now) {
     const raw = (now - A.last) / 1000;
@@ -17,6 +18,38 @@
       if (!A.paused) {
         A.game.step(Math.min(raw, D.OFFLINE_CAP));
         A.saveClock += dt;
+        // Epic C2.2v: campaign-clock.js wired into the live loop. s.campaignClock is plain,
+        // persisted data that commands already write directly (garden-state-cmd-k.js's
+        // beginTeaching/cancelTeaching/confirmTeaching pause/resume it; garden-state-cmd-f.js's
+        // sleep resets gameSeconds to 0 every night) — A.campaignClock is resynced from that
+        // state every frame before ticking, so none of those writes are ever overridden here,
+        // and only its actually-advanced gameSeconds is written back. Design §3: dialogues,
+        // inventaire, construction, carnet et apprentissage pausent le temps — every one of
+        // those already means A.panel or A.build is truthy here (teaching's own pause already
+        // lives on s.campaignClock.paused itself), so gating on those two flags covers the
+        // whole list without a per-panel switch.
+        A.campaignClock.activeSeconds = A.game.s.campaignClock.activeSeconds;
+        A.campaignClock.gameSeconds = A.game.s.campaignClock.gameSeconds;
+        A.campaignClock.paused =
+          A.game.s.campaignClock.paused || !!A.panel || !!A.build;
+        if (A.campaignClock.tick(now))
+          A.game.s.campaignClock.gameSeconds = A.campaignClock.gameSeconds;
+        // Nightfall (design §3, epics C2.2/C2.2v): the in-progress build is cancelled at no
+        // cost, a scripted camera transition brings the view to the refuge house, and the
+        // "nightfall" HUD panel is (re)opened for as long as gameSeconds stays at the day's
+        // cap — it stays open even if the player forces it shut (Escape), since nothing else
+        // in this atomic transition can proceed until "sleep" actually resolves the night.
+        const nightfall =
+          A.game.s.campaignClock.gameSeconds >= Clock.DAY_SECONDS;
+        if (nightfall && !A.nightSequence) {
+          A.nightSequence = true;
+          if (A.build) A.cancelBuild();
+          A.view.beginNightfallTransition();
+        } else if (!nightfall && A.nightSequence) {
+          A.nightSequence = false;
+          A.view.endNightfallTransition();
+        }
+        if (nightfall && A.panel !== "nightfall") A.openPanel("nightfall");
       }
       if (A.saveClock > 5) {
         A.saveClock = 0;

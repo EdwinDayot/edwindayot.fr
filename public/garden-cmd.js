@@ -8,6 +8,7 @@
     I = GardenIrrigation,
     R = GardenRules,
     S = GardenSave,
+    Clock = GardenCampaignClock,
     $ = (id) => document.getElementById(id);
   A.execute = function execute(c) {
     const result = A.game.command(c, { position: A.view.position });
@@ -219,9 +220,15 @@
   };
   A.replaceGame = function replaceGame(next) {
     A.view.endInspection();
+    A.view.endNightfallTransition();
+    A.nightSequence = false;
     A.cancelBuild();
     A.game = next;
     A.view.game = A.game;
+    // Epic C2.2v: an imported/restored save can carry a completely different campaignClock
+    // state (a different day, mid-pause...) — resync the one long-lived instance from it,
+    // the same "mirror the loaded state" posture as A.view.position just below.
+    A.campaignClock = new Clock.CampaignClock(A.game.s.campaignClock);
     A.view.routes = [];
     A.selected = null;
     A.view.selected = null;

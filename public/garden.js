@@ -5,6 +5,7 @@
     I = GardenIrrigation,
     R = GardenRules,
     S = GardenSave,
+    Clock = GardenCampaignClock,
     $ = (id) => document.getElementById(id);
   A.storage = undefined;
   try {
@@ -46,6 +47,15 @@
   A.toastUntil = 0;
   A.importReady = null;
   A.cutting = null;
+  // Epic C2.2v: the one long-lived CampaignClock instance for this session, owning the real
+  // wall-clock reference point (_lastWall) that s.campaignClock itself (plain, persisted data)
+  // never stores — resynced from state every frame in garden-frame.js. Constructed from
+  // whatever save just loaded, exactly like A.view.position mirrors game.s.player above.
+  A.campaignClock = new Clock.CampaignClock(A.game.s.campaignClock);
+  // True for the whole duration of the scripted 23h transition (build-cancel, camera pan, the
+  // "nightfall" HUD panel) — transient app-level state, never persisted (see the epic's own
+  // "no new save field beyond what already exists" instruction).
+  A.nightSequence = false;
   A.last = performance.now();
   A.saveClock = 0;
   A.syncClock = 0;
