@@ -65,6 +65,29 @@
       reward: { unlockHouseSpace: ["serre"] },
       requires: [],
     },
+    // Épic C4.5 (design §10, chapitre 5, "Encore une fois" ; §8, "Lavoir et mare" : "Mira veut
+    // garder claires ses bassines de potière... Pelle ; bassins et nurserie"). Same posture
+    // already used twice by C4.2/C4.3: npcId points at "mira" — NOT a new building. data-
+    // buildings.js already has a visitorId "mira" (role "vendor", position cx:-9.5/cz:11.5,
+    // inside zone 0's bounds, unlocked by default) predating the campaign, and the design's own
+    // named-cast table (§10) already casts her as the village potter — verified before writing
+    // this, not assumed.
+    // Objective item deliberately "cutting:pilea" quantity 1 again, the exact same already-
+    // deliverable item C4.2 used: design §8 describes the botanical answer as "une petite zone de
+    // plantes filtrantes, espèce mère obtenue sur la berge accessible" — no filtering species and
+    // no berge/mare exist in the code today, and inventing one would be a whole new botanical
+    // system out of scope for a single epic (contrary to "généraliser plutôt que spécialiser").
+    // The design explicitly allows this ("les détails de ces rencontres peuvent changer pendant
+    // l'écriture", §8's own closing line). Honest limit, not silently narrowed: this quest proves
+    // only the reward (reward.tools, C3.6's exact pattern) — no "mare" zone/location is unlocked
+    // by it, because none is built by this epic (see campagne-backlog.md's own C4.5 entry).
+    "bassines-de-mira": {
+      npcId: "mira",
+      title: "Garder claires les bassines",
+      objective: { type: "deliver", item: "cutting:pilea", quantity: 1 },
+      reward: { tools: ["pelle"] },
+      requires: [],
+    },
   };
   P.quests = quests;
   if (typeof module !== "undefined") module.exports = { quests };
