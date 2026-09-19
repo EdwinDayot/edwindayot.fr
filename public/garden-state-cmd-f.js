@@ -40,6 +40,10 @@
     typeof module !== "undefined"
       ? require("./game/campaign-automation.js")
       : root.GardenCampaignAutomation;
+  const Scenes =
+    typeof module !== "undefined"
+      ? require("./game/campaign-scenes.js")
+      : root.GardenCampaignScenes;
   const M = {
     commandSegF(c, ctx, st) {
       const { s, fail } = st;
@@ -92,6 +96,13 @@
         // work first keeps this block in the same "captured before any new individual" order as
         // restingIds just above, rather than relying on that incidental fact.
         const workedIds = CampaignAutomation.runNightWork(s);
+        // Epic C5.6 (design §11, scène "la pause qui ne commence pas") : capturé ici, contre le
+        // même instantané pré-mise à jour que capacityLimit lit déjà (campaign-automation.js) —
+        // avant que la boucle increase/decreaseOverexertion plus bas ne fasse avancer le compteur
+        // de cette nuit même. Une Rainelle entrant dans cette nuit déjà sursollicitée par les
+        // nuits précédentes est le sujet de la scène, pas ce que la récupération automatique
+        // d'un point va lui retirer dans un instant.
+        const persistentIds = Scenes.detectPersistentGestures(s, workedIds);
         let frogCultivarId = null;
         for (const { a, b, pin } of s.campaignPot.pending) {
           const traits = Pot.resolvePotDraw(a, b, undefined, pin || null);
@@ -150,6 +161,28 @@
             Memory.recordRest(s.campaignMemory, id);
             Memory.decreaseOverexertion(s.campaignMemory, id);
           }
+        // Epic C5.6: révélé la toute première fois qu'au moins une Rainelle est détectée en
+        // persistance de geste cette nuit — jamais à l'armement d'une veilleuse, seulement au
+        // moment où le fait se produit réellement (même posture que "traces-mouillees" ci-dessus).
+        if (persistentIds.length) {
+          const revealed = Narrative.pendingReveal(
+            s.campaignFlags,
+            "persistentGestureDetected",
+          );
+          if (revealed) s.campaignFlags.push(revealed.id);
+        } else if (Object.keys(s.campaignMemory.nightlyActivity).length) {
+          // Épic C5.6, texte de repli : reconnaît la première nuit sans aucune persistance alors
+          // qu'au moins une veilleuse a déjà réellement produit du travail sur cette partie
+          // (nightlyActivity non vide — le seul fait déjà existant attestant qu'une veilleuse a
+          // servi pour de vrai, voir data-narrative.js's own comment) ; jamais si aucune veilleuse
+          // n'a jamais rien produit, pour ne pas féliciter un joueur qui n'a simplement jamais
+          // touché au mécanisme.
+          const revealed = Narrative.pendingReveal(
+            s.campaignFlags,
+            "attentiveNightRecognized",
+          );
+          if (revealed) s.campaignFlags.push(revealed.id);
+        }
         // Epic C2.2: the atomic night bilan. "sleep" is the single command a scripted 23h
         // transition and a voluntary early bedtime ("dormir plus tôt", design §3) both end up
         // calling — neither reads s.campaignClock.gameSeconds beforehand, so an early sleep

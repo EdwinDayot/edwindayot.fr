@@ -90,7 +90,53 @@
     return LOCATIONS.HABITAT;
   }
 
-  const api = { LOCATIONS, deriveLocation };
+  // Epic C5.6 (design §11, scène de référence "la pause qui ne commence pas" / design ch. 14,
+  // "elle continue son geste devant un poste vide"). A Rainelle is in **persistance de geste**
+  // strictly for C5.2's own case 3 — a *resolved* zone, veilleuse on, no real work this specific
+  // night — never for "aucun geste jamais enseigné" nor "station manquante" (an unresolvable
+  // poste id), which also read as HABITAT under deriveLocation but describe a Rainelle with no
+  // real poste to be seen persisting *at*. deriveLocation's own enum return value cannot
+  // distinguish these three by itself (they collapse to the same HABITAT constant), so this
+  // function first asks deriveLocation for the same verdict it would give (never a second,
+  // independent three-way classification — the check below only ever narrows that HABITAT
+  // answer, never overrides it), then resolves the zone through the exact same `resolveKind`
+  // primitive deriveLocation itself calls, purely to tell "resolved but empty" apart from "never
+  // resolved at all" — not a second lookup mechanism, the identical one, reused. Once a zone
+  // actually resolves and deriveLocation still said HABITAT, its veilleuse being on is already
+  // implied (an off veilleuse would have read REPOS instead), so it needs no separate re-check
+  // here.
+  //
+  // Reading `campaignMemory.overexertion` here, deliberately, is what tells "elle continue le
+  // geste" (design ch. 14's persistence) apart from a Rainelle who simply has never once been
+  // sursollicitée and happens to be idle tonight for want of input (backlog's own dedicated
+  // test case) — the design is explicit that an idle-but-never-fatiguée veilleuse "ne compte pas
+  // comme une nuit de travail" worth narrating as guilt. Read *before* garden-state-cmd-f.js's
+  // own increase/decreaseOverexertion loop runs for this same night (same "as it stood before
+  // tonight's own update" policy already documented by campaign-automation.js's capacityLimit) —
+  // a Rainelle entering the night already fatigued by prior nights of real work is the one this
+  // scene is about, not whatever the automatic, unconditional one-point recovery this same
+  // night's rest branch is about to subtract.
+  function isPersistentGesture(rainelle, s, workedThisNight) {
+    const geste = rainelle.geste;
+    if (!geste) return false;
+    if (deriveLocation(rainelle, s, workedThisNight) !== LOCATIONS.HABITAT) return false;
+    if (geste.verbe !== "arroser" && geste.verbe !== "recolter") return false;
+    if (!resolveKind(s, geste.poste, "zone")) return false; // station manquante: nothing to persist at
+    const overexertion =
+      (s.campaignMemory && s.campaignMemory.overexertion[rainelle.id]) || 0;
+    return overexertion > 0;
+  }
+
+  // Pure: the list of Rainelle ids in persistance de geste this same instant, for
+  // garden-state-cmd-f.js's "sleep" to hand to data-narrative.js's pendingReveal — never mutates
+  // anything, same posture as deriveLocation itself.
+  function detectPersistentGestures(s, workedThisNight) {
+    return s.rainelles
+      .filter((r) => isPersistentGesture(r, s, workedThisNight))
+      .map((r) => r.id);
+  }
+
+  const api = { LOCATIONS, deriveLocation, detectPersistentGestures };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenCampaignScenes = api;
 })(globalThis);
