@@ -55,6 +55,19 @@
       title: "Traces mouillées",
       text: "Au matin, des traces mouillées mènent jusqu’à un arrosoir déplacé.",
     },
+    // Epic C4.6 (design §10, chapitre 6, "On ne se fabrique pas tout seul") : révélée la toute
+    // première fois qu'une tentative d'enseigner le verbe "multiplier" est refusée (teachGesture
+    // ou demonstrateGesture, garden-state-cmd-j.js/-k.js — le refus déjà existant depuis C2.10,
+    // Rainelles.MULTIPLY_REFUSAL), quel que soit le nombre de refus suivants. Le design est
+    // explicite : "le jeu enseigne la manipulation sans certifier sa neutralité morale" — ce texte
+    // constate ce que la Rainelle refuse et ce que le héros découvre pouvoir faire, sans jamais
+    // dire si c'est bien ou mal.
+    "on-ne-se-fabrique-pas-seul": {
+      id: "on-ne-se-fabrique-pas-seul",
+      trigger: "firstMultiplyRefusalSeen",
+      title: "On ne se fabrique pas tout seul",
+      text: "Elle refuse de se transformer elle-même, et refuse de le faire à une autre. Toi, personne ne t’a jamais refusé ce geste.",
+    },
   };
 
   function findByTrigger(signal) {

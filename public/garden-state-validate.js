@@ -430,8 +430,20 @@
             // rainelles.js's own comment) — optional so a pre-epic rainelle still loads.
             (r.bourgeon !== undefined &&
               r.bourgeon !== null &&
-              r.bourgeon !== true),
+              r.bourgeon !== true) ||
+            // Epic C4.6: founder is optional (a pre-epic save has none yet, migrated below) but
+            // must be a boolean when present — see rainelles.js's createRainelle comment.
+            (r.founder !== undefined && typeof r.founder !== "boolean"),
         ))
+    )
+      throw Error("Rainelle invalide.");
+    // Epic C4.6 (design §10, chapitre 6: "un nom qui ne se perdent jamais dans un lot") : at most
+    // one Rainelle can ever carry the founder mark — never a save with two, whether hand-edited
+    // or from a future bug, since createRainelle itself only ever sets it once (s.rainelles.length
+    // === 0, checked before the very first push).
+    if (
+      s.rainelles?.length &&
+      s.rainelles.filter((r) => r.founder === true).length > 1
     )
       throw Error("Rainelle invalide.");
     if (s.rainelleNextId !== undefined && !count(s.rainelleNextId))
@@ -664,9 +676,15 @@
     // readyToProduce just above — a pre-epic rainelle only lacks this one field.
     // Epic C3.4: bourgeon migrates per rainelle, same reasoning as job just above — a pre-epic
     // rainelle only lacks this one field.
-    result.rainelles = (result.rainelles ?? []).map((r) => ({
+    // Epic C4.6: founder defaults from array position (index 0, the oldest surviving entry —
+    // s.rainelles is append-only, nothing ever removes from it, so index 0 of a pre-epic save is
+    // exactly the individual that was in fact created first) only when the field is entirely
+    // absent; a rainelle that already carries a real `founder` (from createRainelle, post-epic)
+    // keeps it untouched by the spread below.
+    result.rainelles = (result.rainelles ?? []).map((r, i) => ({
       job: null,
       bourgeon: null,
+      founder: i === 0,
       ...r,
     }));
     result.rainelleNextId ??= 1;
