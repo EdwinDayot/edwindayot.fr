@@ -148,6 +148,34 @@
       reward: { narrativeFlag: "leaKitchenStocked" },
       requires: [],
     },
+    // Épic C4.9 (design §10, chapitre 9, "Le chemin d'eau"). La propre entrée de backlog de cet
+    // epic proposait deux options seulement (une quête portée par Iris, ou un déclenchement
+    // purement narratif sans npcId) et demandait de trancher avant d'écrire du code — vérification
+    // préalable faite, aucune des deux n'était la meilleure lecture disponible : le tableau §8
+    // ("Lieux et déblocages") nomme un lieu "Galerie de brume" dont la rencontre est "Inès cherche
+    // un feuillage qui recueille les gouttes" et la réponse botanique "installer puis orienter des
+    // plantes en coupe au bon endroit" — vocabulaire quasi identique à la phrase du chapitre 9
+    // elle-même ("installation de feuillages collecteurs dans la galerie de brume"), le même
+    // rapprochement texte-à-texte déjà fait pour Noé/"Cour et serre condamnée" (C4.2), Mira/
+    // "Lavoir et mare" (C4.5), Anouk et Basile/"Sentier des vents" et "Verger en terrasses" (C4.7).
+    // npcId "ines" — vérifiée avant d'écrire, pas devinée : visiteuse déjà réelle du jardin libre
+    // (data-buildings.js, role "vendor", cx:-3.5/cz:13.5, bien à l'intérieur de la zone 0 déjà
+    // déverrouillée par défaut, cz:13.5 < 22 comme anouk/basile), sans quête existante attachée.
+    // Objective item deliberately "cutting:pilea" quantity 1, même écart honnête que C4.2/C4.5/
+    // C4.7 : aucun feuillage collecteur/plante de brume dédié n'existe dans le catalogue
+    // botanique, le design l'autorise explicitement (§8, dernier paragraphe).
+    // reward.potCapacity est un NOUVEAU champ additif générique (garden-state-cmd-e.js), qui
+    // relève s.campaignPot.capacity au lieu de coder en dur "2" quelque part — design §4 : "la
+    // capacité vient de la progression narrative", jamais une régression si une future quête
+    // accordait une valeur inférieure. reward.narrativeFlag réutilise le mécanisme déjà générique
+    // depuis C4.8 pour révéler l'indice de l'étiquette retournée.
+    "brume-d-ines": {
+      npcId: "ines",
+      title: "Inès cherche un feuillage qui recueille les gouttes",
+      objective: { type: "deliver", item: "cutting:pilea", quantity: 1 },
+      reward: { narrativeFlag: "waterPathRestored", potCapacity: 2 },
+      requires: [],
+    },
   };
   P.quests = quests;
   if (typeof module !== "undefined") module.exports = { quests };

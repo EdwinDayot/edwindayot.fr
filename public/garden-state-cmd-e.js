@@ -55,6 +55,15 @@
             if (s.campaignHouse.spaces[spaceId])
               s.campaignHouse.spaces[spaceId].locked = false;
           if (reward.reputation) s.reputation += reward.reputation;
+          // Épic C4.9: reward.potCapacity generalises the campaign pot's capacity growth (design
+          // §4, "la capacité vient de la progression narrative") to any quest, same additive
+          // non-regression guarantee as the loops above — never lowers an already-higher capacity
+          // if some future quest happened to grant a smaller value.
+          if (reward.potCapacity)
+            s.campaignPot.capacity = Math.max(
+              s.campaignPot.capacity,
+              reward.potCapacity,
+            );
           // Épic C4.3 (design §10, chapitre 2/3) : déverrouiller la serre révèle la note du pot
           // qu'elle contient, via le mécanisme générique de C4.1 — un signal fixe (le
           // déverrouillage réel de "serre"), jamais re-dérivé ici.

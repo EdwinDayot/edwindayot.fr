@@ -79,6 +79,18 @@
       title: "La table longue",
       text: "La réserve de la cuisine ne manque plus de rien. Léa peut enfin penser à autre chose qu’au manque.",
     },
+    // Epic C4.9 (design §10, chapitre 9, "Le chemin d'eau") : révélée quand la quête
+    // "brume-d-ines" (data-quests.js) est réellement complétée — signal générique
+    // reward.narrativeFlag, garden-state-cmd-e.js, même mécanisme que C4.8. Le texte reprend la
+    // phrase du design quasiment mot pour mot et s'arrête là où elle s'arrête : "c'est un indice,
+    // pas encore un discours" — aucun nom n'est ajouté ici, aucune explication du passé de Jeanne
+    // au-delà de ce que le design rend déjà visible à ce stade.
+    "chemin-eau-etiquette": {
+      id: "chemin-eau-etiquette",
+      trigger: "waterPathRestored",
+      title: "Le chemin d’eau",
+      text: "Une ancienne étiquette a été retournée. Dessous figure un autre nom de créatrice.",
+    },
   };
 
   function findByTrigger(signal) {
