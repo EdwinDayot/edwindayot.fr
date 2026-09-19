@@ -33,7 +33,15 @@
    never throws. There is no state/blockage system yet to report *why* a Rainelle is idle (C2.8) —
    until then, the only observable difference is that no job ever starts (`rainelle.job` stays
    whatever it already was, never created or advanced), exactly like a Rainelle taught a verb this
-   file doesn't implement yet. */
+   file doesn't implement yet.
+
+   Epic C5.2 adds a second, separate entry point (runNightWork, near the bottom of this file):
+   doArroser/doRecolter are the day-tick versions' real effect split out so "sleep"
+   (garden-state-cmd-f.js) can call either once, directly, for a Rainelle whose zone has its
+   veilleuse on — a genuinely different call site from the ordinary per-second tick() loop above,
+   not a parameter on it, since a resolved night has no seconds to advance a job countdown
+   through. See runNightWork's own comment for verb scope and the memory-recording contract it
+   exists to satisfy. */
 (function (root) {
   const C =
     typeof module !== "undefined"
@@ -92,15 +100,34 @@
   // and be a borne, C2.6a doesn't yet model an arrosoir capacity or the borne being fed), then
   // humidify every specimen within range of the poste (a zone). A cycle with nothing in range
   // still restarts cleanly — there is simply nothing to water this time.
-  function tickArroser(rainelle, s) {
+  //
+  // Split into the real effect (doArroser, returns whether it actually watered anything — Epic
+  // C5.2's runNightWork below calls this directly, once, bypassing the day cycle's countdown
+  // entirely: a night isn't ticked second by second, it is resolved atomically by "sleep") and
+  // the day-tick wrapper (tickArroser, gated by advanceCycle as before, unchanged behaviour).
+  function doArroser(rainelle, s) {
     const geste = rainelle.geste;
     const borne = resolveKind(s, geste.source, "borne");
     const zone = resolveKind(s, geste.poste, "zone");
-    if (!borne || !zone) return;
-    if (!advanceCycle(rainelle)) return;
+    if (!borne || !zone) return false;
+    let watered = false;
     for (const specimen of s.specimens)
-      if (C.distance(zone, specimen) <= ZONE_WORK_RANGE)
+      if (C.distance(zone, specimen) <= ZONE_WORK_RANGE) {
         Cultivars.waterSpecimen(specimen, s.elapsed);
+        watered = true;
+      }
+    return watered;
+  }
+
+  function tickArroser(rainelle, s) {
+    const geste = rainelle.geste;
+    // Resolved *before* advancing the cycle, exactly as before this split: an unresolved source/
+    // poste must never even start the countdown (rainelle.job stays null forever), not just skip
+    // the watering once resolved — see the "leaves the Rainelle inactive without throwing" test.
+    if (!resolveKind(s, geste.source, "borne") || !resolveKind(s, geste.poste, "zone"))
+      return;
+    if (!advanceCycle(rainelle)) return;
+    doArroser(rainelle, s);
   }
 
   // "Récolter": deposit every mature, ready specimen in range of the poste (a zone) into the
@@ -117,15 +144,19 @@
   // strictly in array order (tickRainelle's own caller, garden-state.js's tick()), so two
   // récolteuses sharing a zone/panier in the very same tick can never both count the same unit
   // of headroom — the first to run already updated `panier.buffer` before the second reads it.
-  function tickRecolter(rainelle, s) {
+  //
+  // Same split as doArroser/tickArroser above (Epic C5.2): doRecolter is the real effect, called
+  // directly by runNightWork once per veilleuse-lit night, and returns whether it actually
+  // harvested at least one unit — never true on an empty/out-of-range/already-full pass.
+  function doRecolter(rainelle, s) {
     const geste = rainelle.geste;
     const zone = resolveKind(s, geste.poste, "zone");
     const panier = resolveKind(s, geste.destination, "panier");
-    if (!zone || !panier) return;
-    if (!advanceCycle(rainelle)) return;
+    if (!zone || !panier) return false;
     // Tracked incrementally rather than re-summing Stations.panierTotal(panier) on every
     // specimen: same result, without an O(buffer keys) reduce per specimen visited this cycle.
     let total = Stations.panierTotal(panier);
+    let harvested = false;
     for (const specimen of s.specimens) {
       if (!Cultivars.isMature(specimen) || !specimen.readyToProduce) continue;
       if (C.distance(zone, specimen) > ZONE_WORK_RANGE) continue;
@@ -134,7 +165,17 @@
         (panier.buffer[specimen.cultivarId] || 0) + 1;
       Cultivars.setReadyToProduce(specimen, false);
       total++;
+      harvested = true;
     }
+    return harvested;
+  }
+
+  function tickRecolter(rainelle, s) {
+    const geste = rainelle.geste;
+    if (!resolveKind(s, geste.poste, "zone") || !resolveKind(s, geste.destination, "panier"))
+      return;
+    if (!advanceCycle(rainelle)) return;
+    doRecolter(rainelle, s);
   }
 
   // "Transporter" (design §5, « Panier A » → « Panier B », limite « un trajet et un filtre de
@@ -225,7 +266,46 @@
         Cultivars.setReadyToProduce(specimen, true);
   }
 
-  const api = { CYCLE_SECONDS, ZONE_WORK_RANGE, tickRainelle, updateSpecimenReadiness };
+  // Epic C5.2 (design §11, "veilleuses de croissance... continuent de travailler la nuit"): called
+  // once from "sleep" (garden-state-cmd-f.js), never from the ordinary day tick() loop above — a
+  // night is resolved atomically, not ticked second by second, so this runs each eligible
+  // Rainelle's gesture exactly once, the same real consumption rules doArroser/doRecolter already
+  // enforce for a daytime cycle (capacity/min, range, maturity — nothing here is a free grant).
+  //
+  // Only "arroser"/"recolter" are eligible: both read `geste.poste` as a zone, the only station
+  // kind veilleuse lives on (campaign-stations.js). "Transporter" has no zone in its own geste at
+  // all — its own header comment above notes `geste.poste` is unused for that verb, a pair of
+  // paniers has nothing a veilleuse could be attached to — so a transporteuse never works at
+  // night under this mechanism, whatever it's taught; a documented scope reduction, not an
+  // oversight, against the backlog entry's more casual "Arroser/Récolter/Transporter" phrasing.
+  //
+  // Returns the Set of Rainelle ids that did real, observable work this night (see doArroser's/
+  // doRecolter's own return value) — never merely "had an active veilleuse": an empty source, an
+  // already-full destination, or a Rainelle taught a different/no verb all leave their id out,
+  // exactly the distinction garden-state-cmd-f.js needs to keep `rest` and `nightlyActivity`
+  // mutually exclusive per Rainelle per night (design §11: a veilleuse lit but idle for want of
+  // input never counts as a night of work).
+  function runNightWork(s) {
+    const worked = new Set();
+    for (const rainelle of s.rainelles) {
+      const geste = rainelle.geste;
+      if (!geste || (geste.verbe !== "arroser" && geste.verbe !== "recolter")) continue;
+      const zone = resolveKind(s, geste.poste, "zone");
+      if (!zone || !zone.veilleuse) continue;
+      const didWork =
+        geste.verbe === "arroser" ? doArroser(rainelle, s) : doRecolter(rainelle, s);
+      if (didWork) worked.add(rainelle.id);
+    }
+    return worked;
+  }
+
+  const api = {
+    CYCLE_SECONDS,
+    ZONE_WORK_RANGE,
+    tickRainelle,
+    updateSpecimenReadiness,
+    runNightWork,
+  };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenCampaignAutomation = api;
 })(globalThis);

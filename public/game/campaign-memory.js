@@ -26,13 +26,21 @@
        (beginTeaching/demonstrateGesture/reviseGesturePhrase/cancelTeaching) are steps *toward* a
        gesture command, not the assignment itself, so only the three calls that actually mutate a
        Rainelle's `geste` count here.
+     - nightlyActivity (Epic C5.2, "veilleuses de croissance"): per-Rainelle count of nights it did
+       real, observable night work under an active veilleuse (a specimen actually watered, or at
+       least one unit actually harvested) — never merely for a taught gesture whose zone happens to
+       have its veilleuse on with nothing to act on (design §11: "posséder une veilleuse éteinte ne
+       compte pas comme une nuit de travail", read symmetrically for one that's on but idle). See
+       campaign-automation.js's runNightWork, this field's only writer, and garden-state-cmd-f.js's
+       "sleep", the only call site — mutually exclusive with `rest` for the same Rainelle the same
+       night.
 
    Reserved but unfilled fields for categories that depend on a system this epic does not build
-   (design §11's own list, the rest of it): nightlyActivity (C5.2, veilleuses), waterWithdrawals
-   (C5.4, prise d'eau à fort débit), habitatTransformations, unsoldStock, contractsFed. Present
-   with a neutral, empty default so a later epic only ever fills a shape already named here, never
-   invents a new top-level field for something this file already reserves — never guessed or
-   approximated by this epic, only reserved.
+   (design §11's own list, the rest of it): waterWithdrawals (C5.4, prise d'eau à fort débit),
+   habitatTransformations, unsoldStock, contractsFed. Present with a neutral, empty default so a
+   later epic only ever fills a shape already named here, never invents a new top-level field for
+   something this file already reserves — never guessed or approximated by this epic, only
+   reserved.
 
    A refused command must never move any of these counters (design §11: "une commande refusée ne
    devient jamais un dommage fictif attribué au joueur") — true by construction, since every
@@ -46,7 +54,8 @@
       births: [],
       firstGesture: {},
       manualInterventions: 0,
-      // Reserved for C5.2/C5.3 (nightly work under an active veilleuse) — see header comment.
+      // Epic C5.2: per-Rainelle count of real night work under an active veilleuse — see header
+      // comment and recordNightlyActivity below.
       nightlyActivity: {},
       // Reserved for C5.4 (prise d'eau à fort débit) — see header comment.
       waterWithdrawals: {},
@@ -86,12 +95,25 @@
     memory.manualInterventions += 1;
   }
 
+  // Epic C5.2 (design §11, veilleuses de croissance): called once per Rainelle that actually did
+  // observable night work this "sleep" (a specimen really watered, or at least one unit really
+  // harvested — see campaign-automation.js's runNightWork), never merely for holding a taught
+  // gesture whose zone happens to have its veilleuse on. Mutually exclusive with recordRest for
+  // the same Rainelle on the same night (garden-state-cmd-f.js's own sleep branch): a Rainelle is
+  // either counted as having rested, or as having worked, never both, same per-id counter shape as
+  // recordRest.
+  function recordNightlyActivity(memory, rainelleId) {
+    memory.nightlyActivity[rainelleId] =
+      (memory.nightlyActivity[rainelleId] || 0) + 1;
+  }
+
   const api = {
     freshMemory,
     recordRest,
     recordBirth,
     recordFirstGesture,
     recordManualIntervention,
+    recordNightlyActivity,
   };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenCampaignMemory = api;

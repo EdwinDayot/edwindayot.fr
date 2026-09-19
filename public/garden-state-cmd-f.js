@@ -5,7 +5,10 @@
    Epic C2.2 extends "sleep" with the campaign day/clock bilan (see its own comment below);
    Epic C2.3 further extends it with the scripted frog encounter (see below); Epic C3.4 further
    extends it with the bourgeon/nursery resolution (see below). Epic C1.5 extends sowPot itself
-   (a pending pin consumed once, see below) and passes it through to resolvePotDraw in sleep. */
+   (a pending pin consumed once, see below) and passes it through to resolvePotDraw in sleep.
+   Epic C5.2 further extends "sleep" with campaign-automation.js's runNightWork (veilleuses de
+   croissance, see below) — real work under an active veilleuse and the C5.1 rest counter are now
+   mutually exclusive per Rainelle per night, resolved together in the same block. */
 (function (root) {
   const Genetics =
     typeof module !== "undefined"
@@ -31,6 +34,10 @@
     typeof module !== "undefined"
       ? require("./game/campaign-memory.js")
       : root.GardenCampaignMemory;
+  const CampaignAutomation =
+    typeof module !== "undefined"
+      ? require("./game/campaign-automation.js")
+      : root.GardenCampaignAutomation;
   const M = {
     commandSegF(c, ctx, st) {
       const { s, fail } = st;
@@ -76,6 +83,13 @@
         // veilleuse"): captured before any new individual is created below, so a Rainelle born
         // this same night is never counted as having rested a night it did not live through.
         const restingIds = s.rainelles.map((r) => r.id);
+        // Epic C5.2 (design §11, "veilleuses de croissance"): resolved here, against the same
+        // pre-birth snapshot of s.rainelles, before anything else about tonight is decided — a
+        // Rainelle born this same night has no geste yet (design §5: it "ne copie pas un souvenir
+        // ni une obligation de métier") so it can never be eligible anyway, but resolving night
+        // work first keeps this block in the same "captured before any new individual" order as
+        // restingIds just above, rather than relying on that incidental fact.
+        const workedIds = CampaignAutomation.runNightWork(s);
         let frogCultivarId = null;
         for (const { a, b, pin } of s.campaignPot.pending) {
           const traits = Pot.resolvePotDraw(a, b, undefined, pin || null);
@@ -120,9 +134,13 @@
           Memory.recordBirth(s.campaignMemory, born.id);
         }
         s.campaignNursery = [];
-        // Epic C5.1: every Rainelle that already existed before tonight's resolution above just
-        // rested — true by default, since no veilleuse mechanism exists yet (C5.2).
-        for (const id of restingIds) Memory.recordRest(s.campaignMemory, id);
+        // Epic C5.1/C5.2: every Rainelle that already existed before tonight's resolution either
+        // did real night work under an active veilleuse (workedIds, recorded above by
+        // runNightWork's own effect and here by recordNightlyActivity) or rested — the two are
+        // mutually exclusive per Rainelle per night, never both, never neither.
+        for (const id of restingIds)
+          if (workedIds.has(id)) Memory.recordNightlyActivity(s.campaignMemory, id);
+          else Memory.recordRest(s.campaignMemory, id);
         // Epic C2.2: the atomic night bilan. "sleep" is the single command a scripted 23h
         // transition and a voluntary early bedtime ("dormir plus tôt", design §3) both end up
         // calling — neither reads s.campaignClock.gameSeconds beforehand, so an early sleep

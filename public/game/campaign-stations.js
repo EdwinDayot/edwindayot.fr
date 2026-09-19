@@ -70,6 +70,12 @@
       station.capacity = DEFAULT_PANIER_CAPACITY;
       station.min = DEFAULT_PANIER_MIN;
     }
+    // Epic C5.2 (design §11, "veilleuses de croissance"): only a zone can carry one — a borne/
+    // panier is never itself "on watch", only the zone a Rainelle's poste actually points at
+    // (see campaign-automation.js's runNightWork). Off by default, same "no free capability"
+    // posture as a panier's capacity/min above — a zone never works overnight until a command
+    // (setVeilleuse, garden-state-cmd-p.js) explicitly turns it on.
+    if (kind === "zone") station.veilleuse = false;
     if (kind === "habitat") {
       if (!Number.isFinite(capacity) || capacity < MIN_HABITAT_CAPACITY)
         throw Error(

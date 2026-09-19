@@ -597,6 +597,14 @@
           list.some((st) => !finite(st.capacity, Stations.MIN_HABITAT_CAPACITY, Infinity))
         )
           throw Error("Registre de stations invalide.");
+        // Epic C5.2: veilleuse is optional so a pre-epic zone still loads (defaulted to false
+        // below, same posture as a panier's buffer/capacity/min at C2.6c/C2.8); when present, it
+        // must be a real boolean, never a truthy stand-in (0/1/"true"/etc.).
+        if (
+          kind === "zone" &&
+          list.some((st) => st.veilleuse !== undefined && typeof st.veilleuse !== "boolean")
+        )
+          throw Error("Registre de stations invalide.");
         if (!count(s.campaignStations[counter]))
           throw Error("Registre de stations invalide.");
         if (
@@ -652,12 +660,13 @@
         new Set(s.campaignFlags).size !== s.campaignFlags.length)
     )
       throw Error("Indicateurs narratifs invalides.");
-    // Epic C5.1: campaignMemory is a bounded journal (campaign-memory.js), never an arbitrary
-    // object — rest/firstGesture only ever key an id that actually resolves to a real
-    // s.rainelles entry (never a stale/hand-edited reference), births is a flat unique list of
-    // such ids, manualInterventions a bare count, and the five reserved fields (no epic writes
-    // real values into them yet, see campaign-memory.js's own header comment) are only type-
-    // checked against their fresh() shape so a future epic's first real write still loads.
+    // Epic C5.1/C5.2: campaignMemory is a bounded journal (campaign-memory.js), never an
+    // arbitrary object — rest/firstGesture/nightlyActivity only ever key an id that actually
+    // resolves to a real s.rainelles entry (never a stale/hand-edited reference), births is a
+    // flat unique list of such ids, manualInterventions a bare count, and the four still-reserved
+    // fields (no epic writes real values into them yet, see campaign-memory.js's own header
+    // comment) are only type-checked against their fresh() shape so a future epic's first real
+    // write still loads.
     if (s.campaignMemory !== undefined) {
       const M = s.campaignMemory;
       const rainelleIds = new Set((s.rainelles || []).map((r) => r?.id));
@@ -678,8 +687,13 @@
           ([id, verbe]) => !rainelleIds.has(id) || !Rainelles.VERBS.includes(verbe),
         ) ||
         !count(M.manualInterventions) ||
+        // Epic C5.2: nightlyActivity is now a real, written field — validated exactly like rest
+        // just above (same per-Rainelle-id-to-count shape, same recordX call-site discipline).
         typeof M.nightlyActivity !== "object" ||
         M.nightlyActivity === null ||
+        Object.entries(M.nightlyActivity).some(
+          ([id, n]) => !rainelleIds.has(id) || !count(n),
+        ) ||
         typeof M.waterWithdrawals !== "object" ||
         M.waterWithdrawals === null ||
         !Array.isArray(M.habitatTransformations) ||
@@ -761,6 +775,11 @@
         min: Stations.DEFAULT_PANIER_MIN,
         ...p,
       }),
+    );
+    // Epic C5.2: veilleuse migrates per zone, same reasoning as a panier's buffer/capacity/min
+    // just above — a pre-epic zone only lacks this one field, defaulted off (no free night work).
+    result.campaignStations.zones = (result.campaignStations.zones ?? []).map(
+      (z) => ({ veilleuse: false, ...z }),
     );
     result.campaignHouse ??= House.freshHouse();
     // Epic C4.1: a pre-epic save has campaignHouse but no furnitureMarks at all (the object
