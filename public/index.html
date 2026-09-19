@@ -188,6 +188,12 @@
          dependency at load time beyond THREE, so its only ordering requirement is loading after
          /vendor/three.min.js (line 28), same as botany-hybrids.js above. -->
     <script src="/game/render-campaign-house.js" defer></script>
+    <!-- Epic C5.9: Rainelle body rendering, kept apart from render-campaign-house.js/botany-
+         hybrids.js (a creature body, not a plant skeleton or a building) but depending on
+         botany-hybrids.js at script-execution time (root.GardenBotanyHybrids, reused for its
+         leaf-organ library) — loads after it, same ordering requirement as every module here that
+         reads another root.Garden* object at its own execution time. -->
+    <script src="/game/render-rainelles.js" defer></script>
     <script src="/game/render-scene.js" defer></script>
     <script src="/game/render-items.js" defer></script>
     <script src="/game/render-flow.js" defer></script>

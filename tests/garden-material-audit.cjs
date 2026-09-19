@@ -78,6 +78,37 @@ const TRANSPARENT_ALLOWLIST = [
         v.scene.add(repare);
       }
 
+      // Epic C5.9 (docs/campagne-backlog.md): Rainelle bodies, exercised through this exact
+      // live-page scene graph for the same reason as the hybrids/house blocks above — this audit
+      // is the real gate for a rendering epic, never a screenshot a model merely looks at.
+      // Several cultivars, plus two individuals of the SAME cultivar side by side (to exercise
+      // the shared-geometry/distinct-mark guarantee against the real scene graph, not just the
+      // Node-only unit tests). Positioned far off the playable area.
+      if (window.GardenGenetics && window.GardenRenderRainelles) {
+        const founders = window.GardenGenetics.founders;
+        founders.forEach((f, i) => {
+          const rainelle = window.GardenRenderRainelles.buildRainelleGroup(
+            { id: "audit-r-" + f.id },
+            { id: f.id, traits: f.traits },
+          );
+          rainelle.position.set(200 + i * 1.2, 0, 210);
+          v.scene.add(rainelle);
+        });
+        const twin = founders[0];
+        const twinA = window.GardenRenderRainelles.buildRainelleGroup(
+          { id: "audit-twin-a" },
+          { id: twin.id, traits: twin.traits },
+        );
+        twinA.position.set(200, 0, 213);
+        v.scene.add(twinA);
+        const twinB = window.GardenRenderRainelles.buildRainelleGroup(
+          { id: "audit-twin-b" },
+          { id: twin.id, traits: twin.traits },
+        );
+        twinB.position.set(201.2, 0, 213);
+        v.scene.add(twinB);
+      }
+
       // Sample a few times of day: a defect that only shows under one lighting angle (the
       // terrain-normal bug was exactly this — it read fine at some sun angles) must not hide.
       const times = [50, 300, 600, 900, 1150];

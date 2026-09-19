@@ -385,6 +385,15 @@
     STAGE_COUNT,
     MATURE_STAGE,
     buildSpecimenGroup,
+    // Exposed for epic C5.9 (docs/campagne-backlog.md): render-rainelles.js attaches foliage
+    // organs from a Rainelle's own cultivar onto a body this module knows nothing about (a
+    // creature, not a plant skeleton) — reusing this exact organ library rather than a second one
+    // is the whole point of the epic's own criterion ("réutilisant la bibliothèque d'organes déjà
+    // posée par botany-hybrids.js, jamais une seconde bibliothèque dupliquée"). organMaterial is
+    // exposed too so both modules share the SAME cached MeshStandardMaterial instances for a
+    // given (color, roughness, emissive) triple, never two materials for one visual color.
+    organMaterial,
+    buildLeafOrgan,
   };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenBotanyHybrids = api;
