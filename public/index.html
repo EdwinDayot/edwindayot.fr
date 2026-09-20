@@ -131,6 +131,14 @@
          long after every script has loaded, so this file's own position only has to satisfy its
          own dependencies, not hud-panel-rows.js's. -->
     <script src="/game/campaign-observation.js" defer></script>
+    <!-- Epic C2.5v-a: campaign-teaching-trajectory.js reads root.GardenConstruction and
+         root.GardenCampaignStations (both loaded much earlier above) at its own
+         script-execution time — no reader exists yet (C2.5v-b's job, same "posed, not wired"
+         posture already used by rainelle-movement.js before C5.11 and by campaign-stations.js's
+         own registerStation before any command called it), loaded here anyway right after its
+         last real dependency to avoid the exact class of missing-script ordering bug documented
+         throughout this file. -->
+    <script src="/game/campaign-teaching-trajectory.js" defer></script>
     <!-- Epic C1.5: moved here from much further below (its previous position after garden-
          state-cmd-e.js): garden-state-validate.js now also reads root.GardenGenetics (AXES,
          founders, to validate a pinned trait) at script-execution time, the same ordering fix
