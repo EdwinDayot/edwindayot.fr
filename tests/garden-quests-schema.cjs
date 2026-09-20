@@ -50,7 +50,7 @@ test("The quest-giver role is registered and self-contained, even though no visi
   assert.notEqual(context, null, "existing roles are unaffected");
 });
 
-test("D.quests carries the two free-garden starter entries plus C3.6's campaign tool quest, C4.2's house-unlock quest, C4.5's second tool quest, C4.7's two parallel tool quests, C4.8's narrative-flag quest and C4.9's narrative-flag-plus-potCapacity quest, not the full 6-10 quest ladder (Épic 2.2, separate task)", () => {
+test("D.quests carries the two free-garden starter entries plus C3.6's campaign tool quest, C4.2's house-unlock quest, C4.5's second tool quest, C4.7's two parallel tool quests, C4.8's narrative-flag quest, C4.9's narrative-flag-plus-potCapacity quest and C6.1's chapter-10 narrative-flag quest, not the full 6-10 quest ladder (Épic 2.2, separate task)", () => {
   assert.deepEqual(Object.keys(D.quests).sort(), [
     "bassines-de-mira",
     "bois-pour-l-hiver",
@@ -59,6 +59,7 @@ test("D.quests carries the two free-garden starter entries plus C3.6's campaign 
     "fibres-de-basile",
     "first-drip",
     "first-harvest",
+    "occasion-de-basile",
     "sentier-d-anouk",
     "table-longue-lea",
   ]);
@@ -69,4 +70,5 @@ test("D.quests carries the two free-garden starter entries plus C3.6's campaign 
     assert.ok(Array.isArray(quest.requires));
   }
   assert.deepEqual(D.quests["first-drip"].requires, ["first-harvest"]);
+  assert.deepEqual(D.quests["occasion-de-basile"].requires, ["brume-d-ines"]);
 });

@@ -136,6 +136,21 @@
       title: "Le geste qui s’arrête",
       text: "Elle s’assied près de l’eau. Le geste ne reprend pas.",
     },
+    // Epic C6.1 (design §10, Acte IV, chapitre 10 "La bonne occasion") : révélée quand la quête
+    // "occasion-de-basile" (data-quests.js) est réellement complétée — signal générique
+    // reward.narrativeFlag, garden-state-cmd-e.js, même mécanisme que C4.8/C4.9. Le texte reprend
+    // quasiment mot pour mot la phrase du design ("Ces solutions fonctionnent. Le joueur peut
+    // refuser, étaler la production ou intensifier. La progression principale ne demande pas
+    // d'exploiter pour avancer.") : il nomme les deux leviers déjà réels en moteur (C5.2/C5.4) et
+    // affirme explicitement l'absence d'obligation, comme le critère de sortie de l'epic l'exige —
+    // aucun jugement porté sur le joueur à ce stade (design §11 : la relecture potentiellement
+    // coupable est un chantier de l'Acte V, chapitre 13, pas de ce chapitre 10).
+    "la-bonne-occasion": {
+      id: "la-bonne-occasion",
+      trigger: "commercialSeriesProposed",
+      title: "La bonne occasion",
+      text: "Basile propose une série commerciale. Il montre les veilleuses de croissance et une prise d’eau à fort débit : ces solutions fonctionnent. Rien n’oblige à les activer — refuser, étaler la production ou intensifier restent trois choix ouverts.",
+    },
   };
 
   function findByTrigger(signal) {
