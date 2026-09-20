@@ -39,8 +39,17 @@
     // guarantee design §14 asks for ("permettre de raccourcir une scène"). No-ops when no scene
     // is playing, same guard shape as endInspection() above.
     A.view.endGestureScene();
+    // Epic C2.5v-b: closing the "teaching" screen any other way than the dedicated Confirmer/
+    // Annuler buttons (Échap, the × button, opening a different panel) must not strand
+    // s.campaignTeaching mid-review with the campaign clock paused forever — same "no dead end"
+    // guarantee endGestureScene/endInspection above already give every other panel. A no-op once
+    // confirmTeaching/cancelTeaching has already cleared it: garden-dispatch.js's own
+    // "confirm-teaching"/"cancel-teaching" call this function AFTER their own command already ran.
+    if (A.panel === "teaching" && A.game.s.campaignTeaching)
+      A.execute({ type: "cancelTeaching" });
     A.panel = "";
     A.cutting = null;
+    A.teachingDraft = null;
     A.resetInput();
     A.canvas.focus({ preventScroll: true });
     A.selectSlot(A.activeSlot);
@@ -227,6 +236,14 @@
     A.view.endInspection();
     A.view.endNightfallTransition();
     A.view.endGestureScene();
+    // Epic C2.5v-b: an imported/restored save can carry a completely different campaignStations
+    // registry (different ids resolving to different real positions) than the one the current
+    // overlay, if any, was built from — reset it explicitly rather than trust sync()'s own
+    // "rebuild only when draft.trajectory's id list changes" cache key, which could otherwise
+    // coincidentally match across two unrelated games (station ids are assigned from the same
+    // deterministic per-registry counters, b0/z0/pn0... in both).
+    A.view.resetTeachingTrajectory();
+    A.teachingDraft = null;
     A.nightSequence = false;
     A.cancelBuild();
     A.game = next;

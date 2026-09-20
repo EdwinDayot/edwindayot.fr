@@ -47,6 +47,14 @@
       // id -> { kind, group } — same "build once, cache, reposition/update every sync" pattern as
       // `this.rainelleModels` just above.
       this.stationModels = new Map();
+      // Epic C2.5v-b: a single overlay Group for the "reviewing" teaching draft's resolved
+      // trajectory (never one per station like rainelleModels/stationModels above — there is at
+      // most one lesson in review at a time, garden-state-cmd-k.js's own "une leçon est déjà en
+      // cours" guard). `teachingTrajectoryKey` is the JSON of the last trajectory id list the
+      // Group was built from, so sync() rebuilds only on a real change, same posture as
+      // buildCampaignHouse's own campaignHouseAccueilStatus field.
+      this.teachingTrajectoryModel = null;
+      this.teachingTrajectoryKey = null;
       this.zoneModels = [];
       this.nodes = new Map();
       this.routes = [];

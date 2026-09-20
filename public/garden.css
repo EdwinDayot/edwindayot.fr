@@ -32,10 +32,12 @@ canvas {
   z-index: 2;
   outline: none;
 }
-/* Epic C1.4: the one free-text field the Canvas HUD needs (renaming a cultivar). Ordinary HTML,
-   shown only for the duration of a rename — same "Canvas doesn't do this well" principle as the
-   system file picker (see docs/garden-structure.md). */
-#cultivar-rename-input {
+/* Epic C1.4: the free-text field the Canvas HUD needs (renaming a cultivar). Ordinary HTML, shown
+   only for the duration of a rename — same "Canvas doesn't do this well" principle as the system
+   file picker (see docs/garden-structure.md). Epic C2.5v-b extends this to a second element
+   (#campaign-text-input, index.html) sharing this same class — teaching-field/phrase edits reuse
+   the identical look rather than inventing a second style for the same kind of overlay input. */
+.hud-text-input {
   position: absolute;
   z-index: 5;
   top: 50%;

@@ -57,7 +57,21 @@
                                       ? "Dormir"
                                       : r.action === "observation-step"
                                         ? "Avancer"
-                                        : "Choisir",
+                                        : r.action === "begin-teaching"
+                                          ? "Regarde-moi"
+                                          : r.action === "teaching-cycle-verb"
+                                            ? "Choisir un verbe"
+                                            : r.action === "teaching-edit-field"
+                                            ? "Modifier"
+                                            : r.action === "demonstrate-teaching"
+                                              ? "Démontrer"
+                                              : r.action === "revise-phrase-edit"
+                                                ? "Corriger"
+                                                : r.action === "confirm-teaching"
+                                                  ? "Confirmer"
+                                                  : r.action === "cancel-teaching"
+                                                    ? "Annuler"
+                                                    : "Choisir",
               x + pw - 105,
               ry + 18,
               77,

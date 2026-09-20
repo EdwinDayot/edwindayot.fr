@@ -239,6 +239,18 @@
       this.gestureScene = null;
       this.restoreCamera(old);
     },
+    // Epic C2.5v-b: explicit reset for the teaching trajectory overlay (render-flow.js's sync()
+    // otherwise only rebuilds it lazily, keyed on the trajectory's id list) — called by
+    // garden-cmd.js's replaceGame so a freshly imported/restored save never keeps a stale overlay
+    // built from a different campaignStations registry (see replaceGame's own comment on why the
+    // id-list cache key alone isn't a safe guard across two different games).
+    resetTeachingTrajectory() {
+      if (this.teachingTrajectoryModel) {
+        this.scene.remove(this.teachingTrajectoryModel);
+        this.teachingTrajectoryModel = null;
+      }
+      this.teachingTrajectoryKey = null;
+    },
     showPreview(b) {
       this.batchDirty = true;
       if (this.preview) {

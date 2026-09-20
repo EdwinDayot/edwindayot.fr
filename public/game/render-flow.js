@@ -182,6 +182,56 @@
           }
         }
       }
+      // Epic C2.5v-b (design §5's "un essai montre la trajectoire prévue", deferred from C2.5 to
+      // this render epic): while a lesson's draft is in "reviewing" step, its trajectory (C2.5v-a's
+      // resolveTrajectory over draft.trajectory, the very same station-id list demonstrateGesture
+      // captured) is shown as a ground overlay, same transparent-tile family already whitelisted
+      // for "survol de portée" (tests/garden-material-audit.cjs's TRANSPARENT_ALLOWLIST, color
+      // 6d9365/opacityMax 0.15 — see render-campaign-teaching.js's own header comment on why this
+      // reuses that exact entry rather than adding a new one). Rebuilt only when the trajectory's
+      // own id list actually changes (keyed the same "build once, refresh only on real change" way
+      // as buildCampaignHouse/rainelleModels/stationModels above), never every sync() call.
+      const RenderTeaching = window.GardenRenderCampaignTeaching,
+        Trajectory = window.GardenCampaignTeachingTrajectory;
+      if (RenderTeaching && Trajectory) {
+        const teaching = s.campaignTeaching,
+          key =
+            teaching && teaching.step === "reviewing"
+              ? JSON.stringify(teaching.draft.trajectory)
+              : null;
+        if (key !== this.teachingTrajectoryKey) {
+          this.teachingTrajectoryKey = key;
+          if (this.teachingTrajectoryModel) {
+            this.scene.remove(this.teachingTrajectoryModel);
+            this.teachingTrajectoryModel = null;
+          }
+          if (key) {
+            const resolved = Trajectory.resolveTrajectory(s, teaching.draft.trajectory);
+            if (resolved.ok) {
+              // Both the resolved station points AND the walked cells between them: a trajectory
+              // whose steps collapse to a single station (plannedTrajectory's own "same as the one
+              // right before it" filter, rainelles.js) would otherwise resolve to an empty `path`
+              // and show nothing at all — deduplicated by cell so an endpoint shared by a point and
+              // a path cell never gets two overlapping tiles.
+              const cells = new Map();
+              for (const p of [...resolved.points, ...resolved.path])
+                cells.set(`${p.x},${p.z}`, {
+                  x: p.x,
+                  y: Terrain.terrainHeight(p.x, p.z) + 0.02,
+                  z: p.z,
+                });
+              if (cells.size)
+                this.teachingTrajectoryModel = RenderTeaching.buildTrajectoryOverlayGroup([
+                  ...cells.values(),
+                ]);
+            }
+          }
+          if (this.teachingTrajectoryModel) {
+            this.scene.add(this.teachingTrajectoryModel);
+            this.batchDirty = true;
+          }
+        }
+      }
       const signature = JSON.stringify([
         s.links,
         s.entities.map((e) => [e.id, e.x, e.z, e.stored]),

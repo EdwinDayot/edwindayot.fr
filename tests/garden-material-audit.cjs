@@ -171,6 +171,34 @@ const TRANSPARENT_ALLOWLIST = [
         window.__auditStationIds = { activeBorne: activeBorne.id, activeZone: activeZone.id, panier: panier.id, habitat: habitat.id };
       }
 
+      // Epic C2.5v-b (docs/campagne-backlog.md): a "reviewing" teaching draft's real-world
+      // trajectory overlay (C2.5v-a's resolveTrajectory, rendered by
+      // render-campaign-teaching.js/render-flow.js's sync()), exercised through this exact
+      // live-page scene graph, same reason as every block above — this audit is the real gate for
+      // a rendering epic, never a screenshot a model merely looks at. Reuses the exact stations
+      // the C5.13 block just above already registered (real, resolvable ids) instead of a second,
+      // redundant registry. No command sets s.campaignTeaching to "reviewing" outside the real
+      // four-moment flow (garden-state-cmd-k.js) yet, so it is pushed directly into the live save,
+      // same posture every block above already uses for state no command places yet.
+      if (window.__auditStationIds && window.GardenRenderCampaignTeaching && window.GardenApp.game) {
+        const s = window.GardenApp.game.s;
+        const ids = window.__auditStationIds;
+        s.campaignTeaching = {
+          rainelleId: "audit-c5.11-rainelle",
+          step: "reviewing",
+          draft: {
+            verbe: "arroser",
+            poste: ids.activeZone,
+            source: ids.activeBorne,
+            destination: ids.panier,
+            condition: "",
+            phrase: "Test d'audit.",
+            trajectory: [ids.activeBorne, ids.activeZone, ids.panier],
+          },
+        };
+        v.sync();
+      }
+
       // Sample a few times of day: a defect that only shows under one lighting angle (the
       // terrain-normal bug was exactly this — it read fine at some sun angles) must not hide.
       const times = [50, 300, 600, 900, 1150];
@@ -265,7 +293,29 @@ const TRANSPARENT_ALLOWLIST = [
         };
       }
 
-      return { suspiciousTransparent, badNormals, nanMeshes, materialCount: seen.size, wiring, stationWiring };
+      // Epic C2.5v-b: confirms sync()'s new branch actually built and added the trajectory
+      // overlay through the real wiring, same "not just constructible in isolation" confirmation
+      // as C5.13's stationWiring above (isolated construction is already covered by
+      // tests/campaign-teaching-render.cjs).
+      const teachingWiring = v.teachingTrajectoryModel
+        ? {
+            found: true,
+            inScene: v.teachingTrajectoryModel.parent === v.scene,
+            tileCount: v.teachingTrajectoryModel.children.length,
+            hex: v.teachingTrajectoryModel.children[0]?.material.color.getHexString(),
+            opacity: v.teachingTrajectoryModel.children[0]?.material.opacity,
+          }
+        : { found: false };
+
+      return {
+        suspiciousTransparent,
+        badNormals,
+        nanMeshes,
+        materialCount: seen.size,
+        wiring,
+        stationWiring,
+        teachingWiring,
+      };
     });
 
     if (consoleErrors.length)
@@ -280,6 +330,12 @@ const TRANSPARENT_ALLOWLIST = [
     assert.equal(audit.stationWiring.allInScene, true, "C5.13: a station Group was never added to the real scene");
     assert.equal(audit.stationWiring.borneActiveEmissive, 0.35, "C5.13: an active borne's bead is not emissive at the documented signal intensity");
     assert.equal(audit.stationWiring.zoneActiveEmissive, 0.35, "C5.13: an active zone's lamp is not emissive at the documented signal intensity");
+
+    assert.equal(audit.teachingWiring.found, true, "C2.5v-b: sync() never built the teaching trajectory overlay Group");
+    assert.equal(audit.teachingWiring.inScene, true, "C2.5v-b: the trajectory overlay Group was never added to the real scene");
+    assert.ok(audit.teachingWiring.tileCount >= 3, "C2.5v-b: expected at least one tile per resolved station point");
+    assert.equal(audit.teachingWiring.hex, "6d9365", "C2.5v-b: the overlay must reuse the documented 'survol de portée' hex, not an invented tint");
+    assert.ok(audit.teachingWiring.opacity <= 0.15, "C2.5v-b: overlay opacity exceeds the documented allowlist ceiling for color 6d9365");
 
     assert.deepEqual(audit.nanMeshes, [], "Meshes with non-finite vertex positions: " + audit.nanMeshes.join(", "));
     assert.deepEqual(

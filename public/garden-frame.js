@@ -155,6 +155,11 @@
         importReady: !!A.importReady,
         cutting: A.cutting,
         gestureScene: A.view.gestureScene,
+        // Epic C2.5v-b: the "teaching" panel's own client-only scratch (garden-dispatch.js's
+        // "begin-teaching"/"teaching-cycle-verb"/"teaching-edit-field") — same snapshot-per-frame
+        // posture as `cutting` above, never `A` itself, so hud-panel.js only ever reads a plain
+        // value, never mutates app state while drawing.
+        teachingDraft: A.teachingDraft,
         reduced: A.reduced.matches || s.settings.reduced,
         pressed: !!A.press || A.keys.has("act"),
         zone: zone?.name || "Le jardin",

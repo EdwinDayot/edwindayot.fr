@@ -198,6 +198,7 @@
         nightfall: "La nuit tombe",
         observation: "Le mode d'observation",
         "gesture-scene": "Un geste observé",
+        teaching: "« Regarde-moi »",
       };
       this.text(
         titles[m.panel],

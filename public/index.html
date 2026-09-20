@@ -226,6 +226,11 @@
          `window.GardenRenderCampaignStations` inside render-flow.js's sync(), so its only load-time
          requirement is loading after /vendor/three.min.js, same as those two sibling modules. -->
     <script src="/game/render-campaign-stations.js" defer></script>
+    <!-- Epic C2.5v-b: the "reviewing" teaching draft's real-world trajectory overlay, same
+         self-contained-beyond-THREE posture as render-campaign-stations.js just above — read
+         lazily as `window.GardenRenderCampaignTeaching` inside render-flow.js's sync(), so its
+         only load-time requirement is loading after /vendor/three.min.js. -->
+    <script src="/game/render-campaign-teaching.js" defer></script>
     <script src="/game/render-scene.js" defer></script>
     <script src="/game/render-items.js" defer></script>
     <script src="/game/render-flow.js" defer></script>
@@ -296,10 +301,25 @@
       />
       <input
         id="cultivar-rename-input"
+        class="hud-text-input"
         type="text"
         maxlength="40"
         autocomplete="off"
         aria-label="Nouveau nom du cultivar"
+        hidden
+      />
+      <!-- Epic C2.5v-b: a second, generalized instance of C1.4's "HTML for what Canvas doesn't do
+           well" text field above — kept as its own element (never repurposing
+           cultivar-rename-input) so a rename-in-flight and a teaching field/phrase edit can never
+           collide over the same dataset. garden-boot.js sets dataset.kind ("teaching-field" or
+           "teaching-phrase") to decide what committing its value actually does. -->
+      <input
+        id="campaign-text-input"
+        class="hud-text-input"
+        type="text"
+        maxlength="240"
+        autocomplete="off"
+        aria-label="Champ du geste enseigné"
         hidden
       />
     </main>
