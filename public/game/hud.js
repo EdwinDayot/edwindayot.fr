@@ -77,6 +77,14 @@
         this.page = 0;
         this.focus = 0;
         this.lastPanel = m.panel;
+        // Epic C2.9: hud-panel.js's observation rows are memoized on s.elapsed (a real tick
+        // counter) to avoid re-running RainelleMovement.routeTo's grid BFS every animation frame
+        // while the panel sits open — but a command that changes what it shows (teaching a
+        // gesture, registering a station) never itself calls tick(), so elapsed alone would miss
+        // it if the player left this panel and came back before the next tick. Invalidating here,
+        // on every panel change (not just entering "observation"), guarantees a fresh read the
+        // instant this panel becomes visible again, whatever caused the panel switch.
+        this._observationCache = null;
       }
       if (m.panel === "inspection") {
         this.drawInspection(m);
@@ -188,6 +196,7 @@
         reserve: "Les objets rangés",
         nursery: "Choisir une bouture",
         nightfall: "La nuit tombe",
+        observation: "Le mode d'observation",
       };
       this.text(
         titles[m.panel],

@@ -170,6 +170,18 @@
         A.paused = !A.paused;
         A.resetInput();
         break;
+      // Epic C2.9 (design §5, "lancer un cycle pas à pas"): only ever fires while the game is
+      // already paused generally (A.paused, distinct from the campaignClock pause every open
+      // panel already gets for free, garden-frame.js) — the row itself is disabled otherwise
+      // (hud-panel.js's own "observation" rows, disabled: !m.paused), and hit() never dispatches
+      // a disabled button's action (hud-widgets.js), so this guard is redundant-but-explicit
+      // defence, never the only thing stopping a silent double-step. Exactly one call to
+      // A.game.step, for exactly one cycle's worth of simulated seconds — never a loop, never a
+      // second, duplicated cycle-length constant (GardenCampaignAutomation.CYCLE_SECONDS is the
+      // same one campaign-observation.js's own CYCLE_SECONDS re-exports for the row's label).
+      case "observation-step":
+        if (A.paused) A.game.step(GardenCampaignAutomation.CYCLE_SECONDS);
+        break;
       case "rescue":
         A.execute({ type: "rescue" });
         break;

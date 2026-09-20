@@ -136,6 +136,10 @@
     else if (key === "n") A.dispatch("network");
     else if (key === "j") A.openPanel("notebook");
     else if (key === "m") A.openPanel("map");
+    // Epic C2.9 (design §5, "mode d'observation"): same free-text single-letter shortcut
+    // convention as the four panels above, next to the nav button hud-controls.js's own drawNav
+    // already declares ("observation", "O").
+    else if (key === "o") A.openPanel("observation");
   });
   addEventListener("keyup", (e) => {
     const key = e.key.toLowerCase();

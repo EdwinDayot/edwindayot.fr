@@ -122,6 +122,15 @@
          adds a fourth dependency, root.GardenRainelleMovement (MAX_WAIT_STEPS), loaded just above
          for exactly this. -->
     <script src="/game/rainelles-status.js" defer></script>
+    <!-- Epic C2.9: campaign-observation.js reads root.GardenCampaignStations (loaded much
+         earlier above), root.GardenCampaignAutomation, root.GardenRainelleMovement and
+         root.GardenRainellesStatus (all three just above) at its own script-execution time —
+         loaded right after its last dependency, same "load before every reader" discipline
+         already applied to every other campaign module above. hud-panel-rows.js (much further
+         below) reads root.GardenCampaignObservation only inside a function body, at draw time,
+         long after every script has loaded, so this file's own position only has to satisfy its
+         own dependencies, not hud-panel-rows.js's. -->
+    <script src="/game/campaign-observation.js" defer></script>
     <!-- Epic C1.5: moved here from much further below (its previous position after garden-
          state-cmd-e.js): garden-state-validate.js now also reads root.GardenGenetics (AXES,
          founders, to validate a pinned trait) at script-execution time, the same ordering fix

@@ -55,7 +55,9 @@
                                     ? "Renommer"
                                     : r.action === "confirm-night"
                                       ? "Dormir"
-                                      : "Choisir",
+                                      : r.action === "observation-step"
+                                        ? "Avancer"
+                                        : "Choisir",
               x + pw - 105,
               ry + 18,
               77,
