@@ -256,6 +256,31 @@
       title: "Une note d’Alma",
       text: "La serre de Jeanne : après la prochaine commande.",
     },
+    // Epic C6.6 (design §10, chapitre 13 "Le premier non") : révélée la toute première fois
+    // qu'un refus Rainelles.MULTIPLY_REFUSAL déjà existant (C2.10, teachGesture/demonstrateGesture)
+    // survient sur une Rainelle qui porte alors un bourgeon (rainelle.bourgeon === true), une fois
+    // qu'un des trois flags "variete-suivante-*" (C6.5) est déjà présent — jamais avant, id
+    // distinct de "on-ne-se-fabrique-pas-seul" (firstMultiplyRefusalSeen, C4.6) qui a déjà pu être
+    // consommé bien plus tôt et ne doit jamais se reproduire ici. Deux branches mutuellement
+    // exclusives, comme "bilan-matin-*"/"variete-suivante-*" : jamais un score de vertu inventé,
+    // seulement le fait déjà réel de s.campaignMemory.persistentGestureIds (C5.6). Citation
+    // littérale du design pour le mouvement lui-même ("elle ramène le bourgeon près d'elle et se
+    // place devant... c'est le mouvement déjà vu lors de son refus d'automultiplication") et pour
+    // la garde contre l'accusation fabriquée ("sans lui attribuer des violences inexistantes").
+    "premier-non-interrogation": {
+      id: "premier-non-interrogation",
+      trigger: "chapter13FirstNonQuestion",
+      title: "Le premier non",
+      text: "Elle ramène son bourgeon près d’elle et se place devant — le même mouvement que lors de son refus de se laisser multiplier. Ce n’est pas un secret qu’elle révèle ; c’est une limite qui avait peut-être un sens qu’on ne lui avait pas donné. Rien ici ne montre qu’elle ait été trop sollicitée : la question reste ouverte, sans qu’aucune violence ne lui soit attribuée.",
+    },
+    // Même branche que ci-dessus, avec le signe déjà réel de persistance en plus — constat
+    // factuel, jamais une accusation (même posture que "bilan-matin-actif-persistance").
+    "premier-non-signe": {
+      id: "premier-non-signe",
+      trigger: "chapter13FirstNonSign",
+      title: "Le premier non",
+      text: "Elle ramène son bourgeon près d’elle et se place devant — le même mouvement que lors de son refus de se laisser multiplier. Ce n’est pas un secret qu’elle révèle ; c’est une limite qui avait peut-être un sens qu’on ne lui avait pas donné. Au moins une Rainelle a déjà été vue reprenant son geste devant un poste vide : ce fait, déjà réel, ne devient pas une accusation.",
+    },
   };
 
   function findByTrigger(signal) {
@@ -271,7 +296,29 @@
     return entry;
   }
 
-  const api = { TEXTS, findByTrigger, pendingReveal };
+  const VARIETE_SUIVANTE_FLAGS = [
+    "variete-suivante-refus",
+    "variete-suivante-sobre",
+    "variete-suivante-invendus",
+  ];
+
+  // Epic C6.6 (design §10, chapitre 13 "Le premier non"): pure gate + branch choice for the
+  // MULTIPLY_REFUSAL reveal, shared by garden-state-cmd-j.js's teachGesture and
+  // garden-state-cmd-k.js's demonstrateGesture — the two entry points that can produce that
+  // refusal — so the gate ("un flag variete-suivante-* déjà présent", "la Rainelle porte un
+  // bourgeon") and the branch choice (persistentGestureIds, C5.6, jamais un score de vertu
+  // inventé) can never drift between them. Returns null when the gate isn't met yet, else the
+  // signal to pass to pendingReveal.
+  function chapter13Signal(campaignFlags, rainelle, campaignMemory) {
+    if (!rainelle || rainelle.bourgeon !== true) return null;
+    if (!VARIETE_SUIVANTE_FLAGS.some((f) => campaignFlags.includes(f)))
+      return null;
+    return campaignMemory.persistentGestureIds.length > 0
+      ? "chapter13FirstNonSign"
+      : "chapter13FirstNonQuestion";
+  }
+
+  const api = { TEXTS, findByTrigger, pendingReveal, chapter13Signal };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenNarrative = api;
 })(globalThis);
