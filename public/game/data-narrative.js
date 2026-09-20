@@ -151,6 +151,61 @@
       title: "La bonne occasion",
       text: "Basile propose une série commerciale. Il montre les veilleuses de croissance et une prise d’eau à fort débit : ces solutions fonctionnent. Rien n’oblige à les activer — refuser, étaler la production ou intensifier restent trois choix ouverts.",
     },
+    // Epic C6.3 (design §10, chapitre 11 "La nuit où tout continue") : révélée à la toute
+    // première nuit résolue après que "la-bonne-occasion" (C6.1) a été vue — jamais avant (le
+    // levier n'a pas encore été proposé), jamais une seconde fois ensuite (les cinq entrées
+    // "bilan-matin-*" ci-dessous forment une seule famille mutuellement exclusive, voir
+    // garden-state-cmd-f.js's own comment). Branche "sans intensification" : reprend
+    // littéralement la phrase de clôture du chapitre 11 (design §10 : "le chapitre montre les
+    // lieux préservés et la possibilité commerciale refusée").
+    "bilan-matin-preserve": {
+      id: "bilan-matin-preserve",
+      trigger: "chapter11BilanPreserved",
+      title: "Le bilan du matin",
+      text: "Aucune veilleuse ni prise à fort débit n’a été activée cette nuit. Les lieux sont préservés ; la possibilité commerciale a été refusée.",
+    },
+    // Branche "intensification", sans aucun des deux signes déjà mesurables (design §11 :
+    // "bassinCommunLevel... < capacité", "au moins un id dans persistentGestureIds") — le levier
+    // vient d'être activé, rien ne le montre encore ailleurs dans le jardin. Jamais un texte qui
+    // affirme un signe non encore vrai (design §11 : "le jeu ne prétend pas lire les motivations ;
+    // il confronte des actions et leurs résultats").
+    "bilan-matin-actif": {
+      id: "bilan-matin-actif",
+      trigger: "chapter11BilanActive",
+      title: "Le bilan du matin",
+      text: "Le travail a continué sous la fenêtre éteinte de la chambre. Le bilan commercial est excellent.",
+    },
+    // Mêmes quatre mots d'ouverture que "bilan-matin-actif" ci-dessus, avec le signe du bassin
+    // commun en plus — mentionné seulement parce qu'il est vrai à cet instant précis
+    // (bassinCommunLevel(s.campaignMemory) < BASSIN_COMMUN_CAPACITY, campaign-memory.js).
+    "bilan-matin-actif-bassin": {
+      id: "bilan-matin-actif-bassin",
+      trigger: "chapter11BilanActiveBassin",
+      title: "Le bilan du matin",
+      text: "Le travail a continué sous la fenêtre éteinte de la chambre. Le bilan commercial est excellent. Le bassin commun est déjà plus bas qu’avant.",
+    },
+    // Même ouverture, avec le signe de persistance en plus — mentionné seulement parce qu'au
+    // moins une Rainelle figure déjà dans campaignMemory.persistentGestureIds (C5.6/C5.7). Phrasé
+    // au passé composé ("a déjà été vue reprenant"), jamais au présent continu : ce booléen ne
+    // prouve que le fait s'est produit au moins une fois, jamais qu'il est encore en cours à
+    // l'instant de ce bilan (une Rainelle détectée en persistance une nuit peut avoir été réparée,
+    // C5.7, avant que ce texte ne se déclenche) — un présent continu affirmerait un fait non
+    // garanti, contraire à design §11 ("le jeu ne prétend pas lire les motivations ; il confronte
+    // des actions et leurs résultats").
+    "bilan-matin-actif-persistance": {
+      id: "bilan-matin-actif-persistance",
+      trigger: "chapter11BilanActivePersistance",
+      title: "Le bilan du matin",
+      text: "Le travail a continué sous la fenêtre éteinte de la chambre. Le bilan commercial est excellent. Au moins une Rainelle a déjà été vue reprenant son geste devant un poste vide.",
+    },
+    // Même ouverture, les deux signes réunis. Même précaution de temps que ci-dessus pour le
+    // signe de persistance.
+    "bilan-matin-actif-complet": {
+      id: "bilan-matin-actif-complet",
+      trigger: "chapter11BilanActiveComplet",
+      title: "Le bilan du matin",
+      text: "Le travail a continué sous la fenêtre éteinte de la chambre. Le bilan commercial est excellent. Le bassin commun est déjà plus bas qu’avant, et au moins une Rainelle a déjà été vue reprenant son geste devant un poste vide.",
+    },
   };
 
   function findByTrigger(signal) {

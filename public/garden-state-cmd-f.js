@@ -245,6 +245,42 @@
             });
           }
         }
+        // Epic C6.3 (design §10, chapitre 11 "La nuit où tout continue") : évalué une seule fois
+        // par partie, à la toute première nuit résolue après que le texte de C6.1 ("la-bonne-
+        // occasion") a déjà été vu — jamais avant (le levier n'a pas encore été proposé), jamais
+        // une seconde fois ensuite. Les cinq entrées "bilan-matin-*" de data-narrative.js forment
+        // une seule famille mutuellement exclusive : le garde ci-dessous vérifie qu'aucune d'elles
+        // n'a encore été révélée avant d'en choisir une, jamais après (une partie ne repasse
+        // jamais par ce bloc une deuxième fois, contrairement à persistance/réparation qui se
+        // réévaluent chaque nuit).
+        if (
+          s.campaignFlags.includes("la-bonne-occasion") &&
+          !s.campaignFlags.some((f) => f.startsWith("bilan-matin-"))
+        ) {
+          const leverActive =
+            s.campaignStations.zones.some((z) => z.veilleuse) ||
+            s.campaignStations.bornes.some((b) => b.priseFortDebit);
+          let signal;
+          if (!leverActive) {
+            signal = "chapter11BilanPreserved";
+          } else {
+            const bassinLow =
+              Memory.bassinCommunLevel(s.campaignMemory) <
+              Memory.BASSIN_COMMUN_CAPACITY;
+            const hasPersistence =
+              s.campaignMemory.persistentGestureIds.length > 0;
+            signal =
+              bassinLow && hasPersistence
+                ? "chapter11BilanActiveComplet"
+                : bassinLow
+                  ? "chapter11BilanActiveBassin"
+                  : hasPersistence
+                    ? "chapter11BilanActivePersistance"
+                    : "chapter11BilanActive";
+          }
+          const revealed = Narrative.pendingReveal(s.campaignFlags, signal);
+          if (revealed) s.campaignFlags.push(revealed.id);
+        }
         // Epic C2.2: the atomic night bilan. "sleep" is the single command a scripted 23h
         // transition and a voluntary early bedtime ("dormir plus tôt", design §3) both end up
         // calling — neither reads s.campaignClock.gameSeconds beforehand, so an early sleep
