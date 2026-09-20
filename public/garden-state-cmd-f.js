@@ -12,7 +12,10 @@
    the overexertion streak update to that same block (up on a worked night, down on a rested one —
    see campaign-memory.js's own header comment). Epic C5.7 adds the réparation detection
    (campaign-scenes.js's detectRepairedGestures), read *after* that same streak update — see its
-   own comment below for why the order matters. */
+   own comment below for why the order matters. Epic C6.3 adds the chapter 11 "bilan matinal"
+   reveal; Epic C6.5 adds, right after it and gated on the same "la-bonne-occasion" flag, the
+   chapter 12 "variété suivante" reveal and the first of the two "note de Jeanne" reveals (its
+   second half lives in garden-state-cmd-r.js's deliverContract). */
 (function (root) {
   const Genetics =
     typeof module !== "undefined"
@@ -46,6 +49,10 @@
     typeof module !== "undefined"
       ? require("./game/campaign-scenes.js")
       : root.GardenCampaignScenes;
+  const Contracts =
+    typeof module !== "undefined"
+      ? require("./game/campaign-contracts.js")
+      : root.GardenCampaignContracts;
   const M = {
     commandSegF(c, ctx, st) {
       const { s, fail } = st;
@@ -280,6 +287,54 @@
           }
           const revealed = Narrative.pendingReveal(s.campaignFlags, signal);
           if (revealed) s.campaignFlags.push(revealed.id);
+        }
+        // Epic C6.5 (design §10, chapitre 12 "La variété suivante") : évalué à la même toute
+        // première nuit que le bilan du chapitre 11 ci-dessus, même garde littérale du backlog
+        // ("au premier sleep résolu après que le flag narratif de C6.1 a déjà été révélé") — une
+        // famille "variete-suivante-*" séparée et mutuellement exclusive, jamais réévaluée
+        // ensuite (même garde-avant-choix que bilan-matin-* juste au-dessus).
+        if (
+          s.campaignFlags.includes("la-bonne-occasion") &&
+          !s.campaignFlags.some((f) => f.startsWith("variete-suivante-"))
+        ) {
+          // Écart assumé et documenté ici, pas deviné : le critère de sortie de l'epic évoque
+          // "Memory.unsoldStock[cultivarId]", mais campaign-memory.js documente lui-même (C6.4)
+          // que ce champ reste réservé et toujours vide — la vraie réponse dérivée est
+          // Contracts.unsoldStock(s.specimens, cultivarId), exactement comme deliverContract
+          // (garden-state-cmd-r.js) la calcule déjà. Lire littéralement le champ jamais rempli
+          // aurait rendu la branche (c) inatteignable. "Le contrat" désigné par le critère est le
+          // dernier signé (s.campaignContracts n'est jamais vidé — un contrat honoré y reste,
+          // seul son quota atteint le ferme) : à ce stade très amont de l'acte IV, il n'y en a
+          // normalement jamais plus d'un, mais cette lecture reste correcte même si un second a
+          // déjà été signé après que le premier a atteint son quota.
+          const lastContract =
+            s.campaignContracts[s.campaignContracts.length - 1] || null;
+          let signal;
+          if (!lastContract) {
+            signal = "chapter12NoContract";
+          } else {
+            const unsold = Contracts.unsoldStock(
+              s.specimens,
+              lastContract.cultivarId,
+            );
+            signal =
+              unsold > 0 ? "chapter12SuccessInvendus" : "chapter12SuccessSobre";
+          }
+          const varieteRevealed = Narrative.pendingReveal(
+            s.campaignFlags,
+            signal,
+          );
+          if (varieteRevealed) s.campaignFlags.push(varieteRevealed.id);
+          // Design §10, chapitre 12 : « Une ancienne note d'Alma apparaît... Puis une autre, à
+          // une date ultérieure, avec la même phrase. » Première révélation ici, au même sleep
+          // que les trois branches ci-dessus ; la seconde vit dans garden-state-cmd-r.js's
+          // deliverContract, au prochain contrat honoré strictement après celle-ci (jamais ici :
+          // ce même sleep ne peut pas aussi être "ultérieur" à lui-même).
+          const jeanneRevealed = Narrative.pendingReveal(
+            s.campaignFlags,
+            "jeanneGreenhouseNoteFirst",
+          );
+          if (jeanneRevealed) s.campaignFlags.push(jeanneRevealed.id);
         }
         // Epic C2.2: the atomic night bilan. "sleep" is the single command a scripted 23h
         // transition and a voluntary early bedtime ("dormir plus tôt", design §3) both end up

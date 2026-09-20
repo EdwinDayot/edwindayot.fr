@@ -206,6 +206,56 @@
       title: "Le bilan du matin",
       text: "Le travail a continué sous la fenêtre éteinte de la chambre. Le bilan commercial est excellent. Le bassin commun est déjà plus bas qu’avant, et au moins une Rainelle a déjà été vue reprenant son geste devant un poste vide.",
     },
+    // Epic C6.5 (design §10, chapitre 12 "La variété suivante") : révélée à la même toute
+    // première nuit que le bilan du chapitre 11 ci-dessus — même garde littérale du backlog,
+    // "au premier sleep résolu après que le flag narratif de C6.1 a déjà été révélé" (voir
+    // garden-state-cmd-f.js's own comment). Famille "variete-suivante-*" séparée et mutuellement
+    // exclusive, jamais réévaluée ensuite. Branche "aucun contrat jamais signé" : reprend l'image
+    // du design ("les futures demandes s'orientent vers une autre apparence... les commandes déjà
+    // signées gardent leur prix") sans supposer qu'un contrat a jamais existé.
+    "variete-suivante-refus": {
+      id: "variete-suivante-refus",
+      trigger: "chapter12NoContract",
+      title: "La variété suivante",
+      text: "La mode se tourne déjà vers une autre variété ; l’ancienne reste pleinement utile. Aucun contrat commercial n’a jamais été signé : les commandes ordinaires continuent, à prix inchangé.",
+    },
+    // Branche "un contrat a été signé, sans invendu réel mesurable pour son cultivar" — jamais un
+    // texte de félicitations, un simple constat (design §11 : "il confronte des actions et leurs
+    // résultats").
+    "variete-suivante-sobre": {
+      id: "variete-suivante-sobre",
+      trigger: "chapter12SuccessSobre",
+      title: "La variété suivante",
+      text: "La mode se tourne déjà vers une autre variété ; l’ancienne reste pleinement utile. Les commandes déjà signées gardent leur prix. Le contrat signé n’a laissé aucun exemplaire sans preneur.",
+    },
+    // Branche "un contrat a été signé, avec au moins un spécimen réel encore invendu" — nomme le
+    // fait factuellement, jamais une accusation portée sur le joueur (design §11, même posture
+    // déjà appliquée à "bilan-matin-actif-*" pour le chapitre 11).
+    "variete-suivante-invendus": {
+      id: "variete-suivante-invendus",
+      trigger: "chapter12SuccessInvendus",
+      title: "La variété suivante",
+      text: "La mode se tourne déjà vers une autre variété ; l’ancienne reste pleinement utile. Les commandes déjà signées gardent leur prix. Le contrat signé a réussi, mais des exemplaires produits pour l’occasion restent là, vivants, sans preneur.",
+    },
+    // Epic C6.5 : citation littérale du design (§10, chapitre 12 : « Une ancienne note d’Alma
+    // apparaît : "La serre de Jeanne : après la prochaine commande." Puis une autre, à une date
+    // ultérieure, avec la même phrase. »). Deux entrées séparées portant un texte identique,
+    // jamais une seule révélée deux fois — pendingReveal refuse déjà par construction de révéler
+    // un id déjà présent dans campaignFlags. La première se révèle au même sleep que les trois
+    // branches ci-dessus ; la seconde, dans garden-state-cmd-r.js's deliverContract, au prochain
+    // contrat honoré strictement après la première (voir son propre commentaire).
+    "note-jeanne-serre-1": {
+      id: "note-jeanne-serre-1",
+      trigger: "jeanneGreenhouseNoteFirst",
+      title: "Une note d’Alma",
+      text: "La serre de Jeanne : après la prochaine commande.",
+    },
+    "note-jeanne-serre-2": {
+      id: "note-jeanne-serre-2",
+      trigger: "jeanneGreenhouseNoteSecond",
+      title: "Une note d’Alma",
+      text: "La serre de Jeanne : après la prochaine commande.",
+    },
   };
 
   function findByTrigger(signal) {
