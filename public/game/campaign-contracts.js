@@ -82,12 +82,42 @@
     return specimens.filter((sp) => sp.cultivarId === cultivarId).length;
   }
 
+  // Epic C6.8 (design §10, chapitre 16 : « réduire une commande fait perdre la prime
+  // correspondante, sans dette en cascade »). Pure: caller (garden-state-cmd-t.js) applies the
+  // returned quota to the contract object itself, nothing more — pricePerUnit is never touched
+  // here (no renegotiation path exists, consistent with "le prix reste figé" already proven by
+  // C6.4). Refuses a `newQuota` that would not actually reduce anything (>= current quota), and
+  // refuses undoing a delivery that has already really happened (< contractsFed[contract.id] —
+  // "jamais annuler une livraison déjà réellement effectuée"). Also refuses `newQuota < 1`: a
+  // contract's quota is a positive-integer invariant already enforced at signature by
+  // signContract/garden-state-validate.js (never a documented exception for a reduced contract),
+  // so a contract that has never been delivered against (contractsFed 0) can be reduced down to 1
+  // but not to 0 — closing an untouched contract outright is a delete, not a reduction, and is not
+  // this epic's concern (no delete path exists for a contract, same as for a Rainelle). Reducing
+  // exactly to contractsFed[contract.id] (when that is >= 1) is allowed and closes the contract at
+  // once: isContractOpen already reads `contractsFed[id] < quota`, so no separate `closed` flag is
+  // needed to keep that in sync.
+  function reduceContractQuota(contract, contractsFed, newQuota) {
+    if (!(newQuota < contract.quota))
+      return { ok: false, error: "Le nouveau quota ne réduit pas le contrat." };
+    if (newQuota < 1)
+      return { ok: false, error: "Le quota d'un contrat doit rester au moins 1." };
+    const fed = contractsFed[contract.id] || 0;
+    if (newQuota < fed)
+      return {
+        ok: false,
+        error: "Impossible de réduire un contrat sous ce qui a déjà été livré.",
+      };
+    return { ok: true, quota: newQuota };
+  }
+
   const api = {
     isContractOpen,
     activeContract,
     signContract,
     deliverableCount,
     unsoldStock,
+    reduceContractQuota,
   };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenCampaignContracts = api;
