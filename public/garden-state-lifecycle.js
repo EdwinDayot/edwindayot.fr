@@ -176,6 +176,12 @@
       // Epic C5.1: bounded journal of campaign-layer events/aggregates (design §11, "mémoire
       // factuelle bornée") — see campaign-memory.js's own header comment for its shape and why.
       campaignMemory: Memory.freshMemory(),
+      // Epic C6.4 (design §10, chapitre 12): at most one open contract at a time (design/backlog
+      // scope note), but closed contracts are kept rather than removed — a flat history, same
+      // "append-only, never pruned" posture as specimens/cultivars/rainelles above. Empty on a
+      // fresh save — no contract is ever signed automatically.
+      campaignContracts: [],
+      contractNextId: 1,
     };
   }
   function migrate(old, now = Date.now()) {

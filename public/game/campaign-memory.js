@@ -73,6 +73,17 @@
    recordWaterWithdrawal when the borne it resolved is flagged), matching this epic's own exit
    criterion.
 
+   Epic C6.4 (design §10, chapitre 12 : « Les commandes déjà signées gardent leur prix... il doit
+   traverser ses vrais invendus, encore vivants ») fills in `contractsFed` for real: a per-contract-
+   id cumulative count of units actually delivered against it, same never-decreasing, per-id-
+   counter shape as `waterWithdrawals` above (see recordContractDelivery below, called from
+   garden-state-cmd-r.js's deliverContract, the only writer). `unsoldStock`, in contrast, is left
+   reserved and always empty by this epic, never filled: unlike contractsFed it is not a fact a
+   delivery adds to, it is fully derivable from s.specimens itself once delivery is understood to
+   remove the delivered specimen (see campaign-contracts.js's own header comment for why) — the
+   real, derived answer lives there (`unsoldStock(specimens, cultivarId)`), not here, so this file
+   is not left with two different things both named `unsoldStock`.
+
    `bassinCommunLevel` derives the shared level from that cumulative total rather than storing a
    second, independently-mutated number: level = BASSIN_COMMUN_CAPACITY − Σ(waterWithdrawals),
    floored at zero. This is deliberate, not a simplification of a "real" stored level — since
@@ -229,6 +240,16 @@
       memory.persistentGestureIds.push(rainelleId);
   }
 
+  // Epic C6.4: called from garden-state-cmd-r.js's deliverContract, once per successful delivery,
+  // with `amount` the number of specimens that delivery actually moved (already capped by
+  // campaign-contracts.js's deliverableCount — never called with an amount that would push the
+  // total past the contract's own quota, so this never has to re-check that bound itself, same
+  // "the command already decided, this just records" posture as recordWaterWithdrawal above).
+  function recordContractDelivery(memory, contractId, amount) {
+    memory.contractsFed[contractId] =
+      (memory.contractsFed[contractId] || 0) + amount;
+  }
+
   const api = {
     freshMemory,
     OVEREXERTION_THRESHOLD,
@@ -243,6 +264,7 @@
     recordWaterWithdrawal,
     bassinCommunLevel,
     recordPersistentGesture,
+    recordContractDelivery,
   };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenCampaignMemory = api;

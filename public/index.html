@@ -93,6 +93,11 @@
          own comment) — caught this time before shipping, by the same targeted browser check that
          epic's own comment describes running for every campaign module moved here. -->
     <script src="/game/campaign-memory.js" defer></script>
+    <!-- Epic C6.4: campaign-contracts.js has no dependency of its own (pure, over plain
+         contract/specimen data) but is read by garden-state-cmd-r.js further below at that
+         script's own execution time — loaded here anyway, right after campaign-memory.js, to
+         avoid the exact class of missing-script ordering bug documented throughout this file. -->
+    <script src="/game/campaign-contracts.js" defer></script>
     <!-- Epic C2.6c: campaign-automation.js reads root.GardenConstruction (line 38 above),
          root.GardenCampaignStations and root.GardenCultivars (both above) at its own
          script-execution time, and is itself read the same way by garden-state-validate.js
@@ -197,6 +202,9 @@
     <!-- Epic C5.4: garden-state-cmd-q.js reads root.GardenCampaignStations at its own execution
          time, loaded much earlier above (see the C2.6a comment there). -->
     <script src="/garden-state-cmd-q.js" defer></script>
+    <!-- Epic C6.4: garden-state-cmd-r.js reads root.GardenCampaignContracts/root.GardenCampaignMemory
+         at its own execution time, both loaded much earlier above. -->
+    <script src="/garden-state-cmd-r.js" defer></script>
     <script src="/game/save.js" defer></script>
     <script src="/garden-models.js" defer></script>
     <script src="/garden-models-leaf.js" defer></script>

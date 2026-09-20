@@ -399,6 +399,35 @@
         Math.max(...s.specimens.map((sp) => Number(sp.id.slice(2))))
     )
       throw Error("Identifiants de spécimen invalides.");
+    // Epic C6.4: a contract's id must be unique, its cultivarId must resolve to a real cultivar
+    // (same discipline as a specimen's own cultivarId just above), and quota/pricePerUnit must be
+    // the same positive-integer shape garden-state-cmd-r.js's signContract already enforces at
+    // creation — validate() re-checks it rather than trusting a hand-edited save.
+    if (
+      s.campaignContracts !== undefined &&
+      (!Array.isArray(s.campaignContracts) ||
+        new Set(s.campaignContracts.map((ct) => ct?.id)).size !==
+          s.campaignContracts.length ||
+        s.campaignContracts.some(
+          (ct) =>
+            !ct ||
+            !/^ct\d+$/.test(ct.id) ||
+            !s.cultivars?.some((c) => c.id === ct.cultivarId) ||
+            !count(ct.quota) ||
+            ct.quota < 1 ||
+            !count(ct.pricePerUnit) ||
+            ct.pricePerUnit < 1,
+        ))
+    )
+      throw Error("Contrat commercial invalide.");
+    if (s.contractNextId !== undefined && !count(s.contractNextId))
+      throw Error("Contrat commercial invalide.");
+    if (
+      s.campaignContracts?.length &&
+      s.contractNextId <=
+        Math.max(...s.campaignContracts.map((ct) => Number(ct.id.slice(2))))
+    )
+      throw Error("Identifiants de contrat invalides.");
     if (
       s.campaignDay !== undefined &&
       (!count(s.campaignDay) || s.campaignDay < 1)
@@ -700,6 +729,13 @@
       const borneIds = new Set(
         (s.campaignStations?.bornes || []).map((b) => b?.id),
       );
+      // Epic C6.4: contractsFed is keyed by contract id, not Rainelle/borne id — same "must
+      // resolve to a real registered entry" discipline as waterWithdrawals above, plus its value
+      // can never exceed the contract's own fixed quota (garden-state-cmd-r.js's deliverContract
+      // never records more than that, via campaign-contracts.js's deliverableCount).
+      const contractsById = new Map(
+        (s.campaignContracts || []).map((ct) => [ct?.id, ct]),
+      );
       if (
         typeof M !== "object" ||
         M === null ||
@@ -744,8 +780,21 @@
         !Array.isArray(M.habitatTransformations) ||
         typeof M.unsoldStock !== "object" ||
         M.unsoldStock === null ||
-        typeof M.contractsFed !== "object" ||
-        M.contractsFed === null ||
+        // Epic C6.4: contractsFed is now a real, written field, but stays optional here exactly
+        // like overexertion/persistentGestureIds above — reserved with an empty default since
+        // C5.1, so a save can validly carry a campaignMemory that predates this epic's own
+        // migration fill-in. When present: keyed against real contract ids, and additionally
+        // never exceeding the id's own fixed quota (see contractsById just above), same
+        // discipline as waterWithdrawals.
+        (M.contractsFed !== undefined &&
+          (typeof M.contractsFed !== "object" ||
+            M.contractsFed === null ||
+            Object.entries(M.contractsFed).some(
+              ([id, n]) =>
+                !contractsById.has(id) ||
+                !count(n) ||
+                n > contractsById.get(id).quota,
+            ))) ||
         // Epic C5.7: persistentGestureIds is optional here, same reasoning as overexertion above
         // (a save from between C5.1/C5.6 and C5.7 already has campaignMemory but never this
         // field) — the post-clone migration below fills it in. When present, same "flat, unique,
@@ -867,6 +916,13 @@
     // (created between C5.1/C5.6 and C5.7) migrates to an empty list — never guessed from
     // overexertion history that never recorded which Rainelle was actually caught persisting.
     result.campaignMemory.persistentGestureIds ??= [];
+    // Epic C6.4: a save with an existing campaignMemory but no contractsFed field yet (created
+    // before this epic) migrates to an empty map — never guessed from a delivery that was never
+    // recorded. campaignContracts/contractNextId migrate the same "simply absent before this
+    // epic" way as specimens/cultivars did at their own introduction.
+    result.campaignMemory.contractsFed ??= {};
+    result.campaignContracts ??= [];
+    result.contractNextId ??= 1;
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };

@@ -15,8 +15,10 @@
    objet du plant au présentoir" (a présentoir/point of sale). campaign-stations.js's own KINDS
    registry only knows four station kinds — borne, zone, panier, habitat (verified by direct
    reading, not by inference) — and no présentoir/commerce system exists anywhere in the campaign
-   layer; campaign-memory.js reserves `unsoldStock`/`contractsFed` for one but nothing fills them
-   yet, and this is called out explicitly as unbuilt in that file's own header comment. Building
+   layer; campaign-memory.js reserved `unsoldStock`/`contractsFed` for one, and Epic C6.4 has
+   since filled `contractsFed` for real (per-contract delivered counts, campaign-contracts.js) —
+   but still no présentoir/point-of-sale UI exists for this observation view to follow, only a
+   contract/delivery command pair with no world placement. Building
    a présentoir here would mean inventing a whole point-of-sale mechanic inside an epic whose own
    mandate is an observation *view*, exactly the "jamais une refonte simultanée de plusieurs
    systèmes" orchestration forbids — the same reasoning C2.8 itself already used to defer
