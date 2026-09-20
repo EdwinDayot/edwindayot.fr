@@ -281,6 +281,34 @@
       title: "Le premier non",
       text: "Elle ramène son bourgeon près d’elle et se place devant — le même mouvement que lors de son refus de se laisser multiplier. Ce n’est pas un secret qu’elle révèle ; c’est une limite qui avait peut-être un sens qu’on ne lui avait pas donné. Au moins une Rainelle a déjà été vue reprenant son geste devant un poste vide : ce fait, déjà réel, ne devient pas une accusation.",
     },
+    // Epic C6.7 (design §10, chapitre 15 "Alma n'a pas la réponse"): révélée au premier sleep
+    // résolu une fois qu'un des deux flags "premier-non-*" (C6.6) et "note-jeanne-serre-2" (C6.5)
+    // sont tous deux déjà présents et qu'au moins une Rainelle existe (garden-state-cmd-f.js).
+    // Alma découvre une création du héros qu'elle ignorait ; le design est explicite qu'elle ne
+    // peut ni l'expliquer ni absoudre le joueur — jamais un texte qui prétend le contraire.
+    "alma-retour": {
+      id: "alma-retour",
+      trigger: "almaReturnDiscoversRainelles",
+      title: "Alma n’a pas la réponse",
+      text: "Alma revient déjeuner et découvre les Rainelles — une création du héros qu’elle ne connaissait pas. Elle ne peut pas en expliquer la volonté, ni absoudre ce qui a été fait en son absence.",
+    },
+    // Révélée à la même occasion que la précédente, jamais seule : les deux versants factuels
+    // posés côte à côte, sans jugement moral porté par le jeu (design §11, "mémoire factuelle,
+    // sans score de vertu").
+    "reconstitution-jeanne": {
+      id: "reconstitution-jeanne",
+      trigger: "jeanneReconstitutionSeason",
+      title: "Une saison, deux versions",
+      text: "Avec Jeanne, on reconstitue une saison d’expansion de leur ancienne pépinière. Pour Alma, une réussite. Pour Jeanne, la disparition d’un projet qu’elles avaient porté ensemble.",
+    },
+    // Révélée par la commande restoreArchiveLabels (garden-state-cmd-s.js), refusée tant que
+    // "alma-retour" n'a pas encore eu lieu. Citation littérale du design pour la phrase d'Alma.
+    "archives-restaurees": {
+      id: "archives-restaurees",
+      trigger: "archiveLabelsRestored",
+      title: "Les deux noms",
+      text: "Les deux noms reprennent leur place sur les étiquettes. Alma reconnaît : « Au début, je ne savais pas. Ensuite, je savais surtout comment ne plus y penser. »",
+    },
   };
 
   function findByTrigger(signal) {

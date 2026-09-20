@@ -15,7 +15,8 @@
    own comment below for why the order matters. Epic C6.3 adds the chapter 11 "bilan matinal"
    reveal; Epic C6.5 adds, right after it and gated on the same "la-bonne-occasion" flag, the
    chapter 12 "variété suivante" reveal and the first of the two "note de Jeanne" reveals (its
-   second half lives in garden-state-cmd-r.js's deliverContract). */
+   second half lives in garden-state-cmd-r.js's deliverContract). Epic C6.7 adds, right after
+   that, the chapter 15 "retour d'Alma" reveal (see below). */
 (function (root) {
   const Genetics =
     typeof module !== "undefined"
@@ -335,6 +336,31 @@
             "jeanneGreenhouseNoteFirst",
           );
           if (jeanneRevealed) s.campaignFlags.push(jeanneRevealed.id);
+        }
+        // Epic C6.7 (design §10, chapitre 15 "Alma n'a pas la réponse"): at the first sleep once
+        // both upstream conditions hold — one of the two "premier-non-*" flags (C6.6) and
+        // "note-jeanne-serre-2" (C6.5, the second honoured contract) — and at least one Rainelle
+        // exists, reveal both chapter-15 texts together. Not a mutually-exclusive family like
+        // bilan-matin-*/variete-suivante-* above: each entry's own pendingReveal call is already
+        // idempotent (refuses an id already in campaignFlags), so no extra guard-before-choose is
+        // needed — a later sleep with the gate still true simply reveals nothing more, each text
+        // exactly once.
+        if (
+          s.campaignFlags.some((f) => f.startsWith("premier-non-")) &&
+          s.campaignFlags.includes("note-jeanne-serre-2") &&
+          s.rainelles.length > 0
+        ) {
+          const almaRevealed = Narrative.pendingReveal(
+            s.campaignFlags,
+            "almaReturnDiscoversRainelles",
+          );
+          if (almaRevealed) s.campaignFlags.push(almaRevealed.id);
+          const jeanneReconstRevealed = Narrative.pendingReveal(
+            s.campaignFlags,
+            "jeanneReconstitutionSeason",
+          );
+          if (jeanneReconstRevealed)
+            s.campaignFlags.push(jeanneReconstRevealed.id);
         }
         // Epic C2.2: the atomic night bilan. "sleep" is the single command a scripted 23h
         // transition and a voluntary early bedtime ("dormir plus tôt", design §3) both end up
