@@ -122,6 +122,12 @@
       )
         I.invalidate(s);
       const result = { ok: true, kind: c.type, message: st.message, id: e?.id };
+      // Epic C5.14: an optional, additive signal a command segment (today only "sleep",
+      // garden-state-cmd-f.js) can attach to its own `st` — which Rainelle(s) a render layer
+      // should stage a scripted scene for, exactly at the same moment its own narrative text was
+      // revealed. Absent for every other command (unset `st.scenes`), so this changes nothing
+      // about the result shape any existing caller/test already relies on.
+      if (st.scenes) result.scenes = st.scenes;
       this.events.push(result);
       if (this.events.length > 30) this.events.shift();
       return result;

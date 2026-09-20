@@ -195,7 +195,21 @@
             s.campaignFlags,
             "persistentGestureDetected",
           );
-          if (revealed) s.campaignFlags.push(revealed.id);
+          if (revealed) {
+            s.campaignFlags.push(revealed.id);
+            // Epic C5.14 (design §14, mise en scène observable): staged exactly when — never
+            // before, never separately from — the text itself is actually (first-time) revealed,
+            // matching the critère de sortie literally ("la révélation... s'accompagne d'une mise
+            // en scène"). st.scenes is read by garden-state.js's own command() to become
+            // result.scenes, the render layer's only signal (garden-dispatch.js's "confirm-night")
+            // — never a new persisted field, never inferred a second time from state after the
+            // fact (workedThisNight, read above, only ever exists for this one call).
+            st.scenes = st.scenes || [];
+            st.scenes.push({
+              kind: "persistance",
+              rainelleId: Scenes.selectSceneRainelle(persistentIds),
+            });
+          }
         } else if (Object.keys(s.campaignMemory.nightlyActivity).length) {
           // Épic C5.6, texte de repli : reconnaît la première nuit sans aucune persistance alors
           // qu'au moins une veilleuse a déjà réellement produit du travail sur cette partie
@@ -218,7 +232,18 @@
             s.campaignFlags,
             "persistentGestureRepaired",
           );
-          if (revealed) s.campaignFlags.push(revealed.id);
+          if (revealed) {
+            s.campaignFlags.push(revealed.id);
+            // Epic C5.14: same posture as the persistance branch above. Both could in principle
+            // fire the same night (two distinct Rainelles, one entering persistance while another
+            // is repaired) — st.scenes stays an array rather than a single slot so neither is
+            // silently dropped; the render layer (garden-dispatch.js) only ever stages the first.
+            st.scenes = st.scenes || [];
+            st.scenes.push({
+              kind: "reparation",
+              rainelleId: Scenes.selectSceneRainelle(repairedIds),
+            });
+          }
         }
         // Epic C2.2: the atomic night bilan. "sleep" is the single command a scripted 23h
         // transition and a voluntary early bedtime ("dormir plus tôt", design §3) both end up

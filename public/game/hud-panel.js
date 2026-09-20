@@ -249,6 +249,23 @@
           detail: "Le personnage rejoint la maison refuge.",
           action: "confirm-night",
         });
+      } else if (m.panel === "gesture-scene") {
+        // Epic C5.14 (design §11/ch.14, mise en scène observable de la persistance et de la
+        // réparation). Read-only: this panel exists to hold the exact narrative text already
+        // revealed this same night by garden-state-cmd-f.js (C5.6/C5.7, data-narrative.js) on
+        // screen while render-items.js's beginGestureScene() (started by garden-dispatch.js's
+        // "confirm-night", right before this panel opens) keeps the camera framing the Rainelle
+        // concerned — never a second, independent text. No bespoke "skip" button: Échap already
+        // closes any panel (garden-structure.md) and ends the scene the same way
+        // (garden-cmd.js's closePanel calling endGestureScene).
+        const Narrative = window.GardenNarrative;
+        const entry =
+          Narrative?.TEXTS[
+            m.gestureScene?.kind === "reparation"
+              ? "geste-qui-sarrete"
+              : "persistance-geste-vide"
+          ];
+        if (entry) rows.push({ title: entry.title, detail: entry.text });
       } else if (m.panel === "visitor")
         for (const r of m.s.requests)
           rows.push({

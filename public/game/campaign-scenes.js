@@ -172,11 +172,20 @@
       .map((r) => r.id);
   }
 
+  // Epic C5.14 (design §14, mise en scène observable). Which Rainelle gets staged when several
+  // are concerned by the same detection the same night: the first by array order, exactly the
+  // "s.rainelles dans l'ordre du tableau" stable priority C2.8 already documents for
+  // simultaneous claims — never a new sort, never random, never re-decided per call.
+  function selectSceneRainelle(ids) {
+    return ids.length ? ids[0] : null;
+  }
+
   const api = {
     LOCATIONS,
     deriveLocation,
     detectPersistentGestures,
     detectRepairedGestures,
+    selectSceneRainelle,
   };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenCampaignScenes = api;

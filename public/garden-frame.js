@@ -50,6 +50,18 @@
           A.view.endNightfallTransition();
         }
         if (nightfall && A.panel !== "nightfall") A.openPanel("nightfall");
+        // Epic C5.14: a staged gesture scene ends itself after its own brief, fixed duration
+        // (render-items.js's beginGestureScene) and hands control back to the player — the
+        // player can also end it sooner via Échap/closePanel (garden-cmd.js). Guarded the same
+        // way nightfall's own block above is (inside "not paused"), since a paused game already
+        // freezes this.time via view.frame's own dt.
+        if (
+          A.view.gestureScene &&
+          A.view.time - A.view.gestureScene.start > A.view.gestureScene.duration
+        ) {
+          A.view.endGestureScene();
+          if (A.panel === "gesture-scene") A.closePanel();
+        }
       }
       if (A.saveClock > 5) {
         A.saveClock = 0;
@@ -142,6 +154,7 @@
         toastUntil: A.toastUntil,
         importReady: !!A.importReady,
         cutting: A.cutting,
+        gestureScene: A.view.gestureScene,
         reduced: A.reduced.matches || s.settings.reduced,
         pressed: !!A.press || A.keys.has("act"),
         zone: zone?.name || "Le jardin",

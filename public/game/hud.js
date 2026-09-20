@@ -197,6 +197,7 @@
         nursery: "Choisir une bouture",
         nightfall: "La nuit tombe",
         observation: "Le mode d'observation",
+        "gesture-scene": "Un geste observé",
       };
       this.text(
         titles[m.panel],

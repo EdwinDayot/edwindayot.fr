@@ -114,9 +114,22 @@
       // the already-implemented sleep command. Closing the panel here (like confirm-cutting's
       // own A.closePanel() below) also lets garden-frame.js's own nightfall check notice
       // gameSeconds has been reset to 0 next frame and end the camera transition.
-      case "confirm-night":
-        if (A.execute({ type: "sleep" }).ok) A.closePanel();
+      case "confirm-night": {
+        const result = A.execute({ type: "sleep" });
+        if (result.ok) {
+          A.closePanel();
+          // Epic C5.14: result.scenes (garden-state-cmd-f.js/garden-state.js) is the render
+          // layer's only signal that a persistance/réparation scene should be staged this exact
+          // night — never re-derived from state after the fact (see campaign-scenes.js's own
+          // header comment on why workedThisNight cannot be reconstructed safely afterwards).
+          // Only the first entry is ever staged (design: "la caméra ne saute pas d'une Rainelle à
+          // l'autre"); a Rainelle with no visible model yet makes beginGestureScene() a no-op, so
+          // no panel opens for nothing to look at.
+          const scene = result.scenes && result.scenes[0];
+          if (scene && A.view.beginGestureScene(scene)) A.openPanel("gesture-scene");
+        }
         break;
+      }
       case "inspect": {
         const e = data.id
           ? A.target(data.id)

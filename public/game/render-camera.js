@@ -8,11 +8,19 @@
   if (!T || !M || !B || !G) return;
   Object.assign(G.prototype, {
     updateCamera(dt, reduced) {
+      // Epic C5.14: gestureScene ranks between inspection and nightfall — the two can only ever
+      // overlap for a single frame in practice (garden-dispatch.js's "confirm-night" starts a
+      // gesture scene the same synchronous call that resolves "sleep", before garden-frame.js's
+      // own clock check notices gameSeconds reset to 0 and ends nightfall on its own the next
+      // frame), so this ordering just means a queued gesture scene never has to wait a frame
+      // behind nightfall's still-active target.
       const target = this.inspection
         ? this.inspection.center.clone()
-        : this.nightfall
-          ? this.nightfall.center.clone()
-          : new T.Vector3(this.position.x, 0.4, this.position.z - 1.7);
+        : this.gestureScene
+          ? this.gestureScene.center.clone()
+          : this.nightfall
+            ? this.nightfall.center.clone()
+            : new T.Vector3(this.position.x, 0.4, this.position.z - 1.7);
       if (this.inspection) {
         if (this.ratio < 1) target.y -= this.inspection.span * 0.16;
         else
@@ -38,11 +46,13 @@
       this.camera.lookAt(this.look);
       const span = this.inspection
         ? this.inspection.span
-        : this.nightfall
-          ? this.nightfall.span
-          : this.overview
-            ? Math.max(19, 22 / this.ratio)
-            : this.span * (this.ratio < 1 ? 1.12 : 1);
+        : this.gestureScene
+          ? this.gestureScene.span
+          : this.nightfall
+            ? this.nightfall.span
+            : this.overview
+              ? Math.max(19, 22 / this.ratio)
+              : this.span * (this.ratio < 1 ? 1.12 : 1);
       this.camera.top = span / 2;
       this.camera.bottom = -span / 2;
       this.camera.left = (-span * this.ratio) / 2;

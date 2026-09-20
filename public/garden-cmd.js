@@ -34,6 +34,11 @@
   };
   A.closePanel = function closePanel() {
     A.view.endInspection();
+    // Epic C5.14: Échap/the generic panel close already reaches here (garden-boot.js) for every
+    // panel, including "gesture-scene" — no bespoke "skip" button needed, same accessibility
+    // guarantee design §14 asks for ("permettre de raccourcir une scène"). No-ops when no scene
+    // is playing, same guard shape as endInspection() above.
+    A.view.endGestureScene();
     A.panel = "";
     A.cutting = null;
     A.resetInput();
@@ -221,6 +226,7 @@
   A.replaceGame = function replaceGame(next) {
     A.view.endInspection();
     A.view.endNightfallTransition();
+    A.view.endGestureScene();
     A.nightSequence = false;
     A.cancelBuild();
     A.game = next;

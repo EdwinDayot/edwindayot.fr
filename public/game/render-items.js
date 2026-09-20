@@ -199,6 +199,46 @@
       this.nightfall = null;
       this.restoreCamera(old);
     },
+    // Epic C5.14 (design §14, mise en scène observable de la persistance/réparation). A third
+    // sibling of inspect()/beginNightfallTransition() above, same shape again: capture the
+    // previous camera once, hand updateCamera a target+span to lerp toward, restore on close.
+    // Pointed at a Rainelle's own live model group (this.rainelleModels, built by render-flow.js's
+    // sync() since C5.11/C5.13) rather than an entity's bounding box or a fixed world position —
+    // "position/état réels de C5.5/C5.10/C5.11", never a fabricated animation. Called by
+    // garden-dispatch.js's "confirm-night", right after "sleep" hands back a real result.scenes
+    // entry (garden-state-cmd-f.js) — never speculatively, never for a Rainelle with no visible
+    // model yet (frame() only ever creates one once a cultivar exists to draw foliage from,
+    // render-flow.js's own guard). Deliberately never touches this.position/game.s.player, same
+    // reasoning as nightfall: cosmetic camera-only, no teleport.
+    beginGestureScene(scene) {
+      if (this.gestureScene) return false; // one scene at a time — see garden-dispatch.js's own
+      // comment: two reveals the same night is a rare edge case this file simply does not queue.
+      const rm = this.rainelleModels.get(scene.rainelleId);
+      if (!rm) return false;
+      this.previousGestureCamera = this.snapshotCamera();
+      const bounds = new T.Box3().setFromObject(rm.group),
+        center = bounds.getCenter(new T.Vector3()),
+        size = bounds.getSize(new T.Vector3());
+      this.gestureScene = {
+        rainelleId: scene.rainelleId,
+        kind: scene.kind,
+        center,
+        span: Math.max(4, Math.hypot(size.x, size.z) * 3),
+        start: this.time,
+        // Brief and fixed (design §14 accessibility: "permettre de raccourcir une scène... tout
+        // en gardant les conséquences") — garden-frame.js ends it on its own once this elapses,
+        // never blocking on player input; Échap/closePanel (garden-cmd.js) still end it sooner.
+        duration: 3.5,
+      };
+      this.routes = [];
+      return true;
+    },
+    endGestureScene() {
+      if (!this.gestureScene) return;
+      const old = this.previousGestureCamera;
+      this.gestureScene = null;
+      this.restoreCamera(old);
+    },
     showPreview(b) {
       this.batchDirty = true;
       if (this.preview) {
