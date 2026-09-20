@@ -38,6 +38,15 @@
       this.network = false;
       this.time = 0;
       this.models = new Map();
+      // Epic C5.11: one entry per Rainelle id, id -> the Group render-rainelles.js (C5.9) built
+      // for it — same "build once, cache, reposition every sync" pattern as `this.models` above,
+      // kept separate since a Rainelle is never one of `s.entities` (see rainelles.js's own header
+      // comment on why the campaign layer's arrays stay disjoint from the free garden's).
+      this.rainelleModels = new Map();
+      // Epic C5.13: one entry per station id (borne/zone/panier/habitat, campaign-stations.js),
+      // id -> { kind, group } — same "build once, cache, reposition/update every sync" pattern as
+      // `this.rainelleModels` just above.
+      this.stationModels = new Map();
       this.zoneModels = [];
       this.nodes = new Map();
       this.routes = [];
@@ -149,6 +158,7 @@
       this.buildFlora();
       this.buildActors();
       this.buildHouses();
+      this.buildCampaignHouse();
     }
     // y is an offset above the real ground height at (point.x, point.z), not
     // an absolute world Y — every caller already means "N units above where

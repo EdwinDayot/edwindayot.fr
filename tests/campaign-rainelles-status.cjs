@@ -5,12 +5,15 @@ const Rainelles = require("../public/game/rainelles.js");
 const Stations = require("../public/game/campaign-stations.js");
 const Cultivars = require("../public/game/cultivars.js");
 const Status = require("../public/game/rainelles-status.js");
+const Movement = require("../public/game/rainelle-movement.js");
 
 // Epic C2.8 (design §5, "Conditions, réservations et lecture des blocages"): six of the seven
-// named states ("passage bloqué" excluded — see rainelles-status.js's own header comment for
-// why). Every test below checks the `kind` returned (the stable, testable part) and that a
-// non-empty `message` string always comes with it (the "chaque état affiche une phrase
-// d'action" clause) — never the exact wording, which is free to evolve.
+// named states. Every test below checks the `kind` returned (the stable, testable part) and that
+// a non-empty `message` string always comes with it (the "chaque état affiche une phrase
+// d'action" clause) — never the exact wording, which is free to evolve. The seventh state,
+// "passage bloqué", is added by Epic C2.8v-a further below — see rainelles-status.js's own
+// header comment for why it was deferred until now and how its third, optional `waitCounts`
+// parameter works.
 
 function freshRainelle(g) {
   const cultivar = Cultivars.createCultivar(g.s, { name: "Test", traits: {} });
@@ -242,4 +245,108 @@ test("status never throws for any of the six covered states across many random-i
   const g = new GardenState(null, 1000);
   const { rainelle } = freshRainelle(g);
   assert.doesNotThrow(() => Status.status(rainelle, g.s));
+});
+
+// Epic C2.8v-a (design §5/§14, "passage bloqué... une Rainelle bloquée se range à un point
+// d'attente sans devenir un obstacle permanent"). `waitCounts` is the exact {id: steps} shape
+// rainelle-movement.js's own resolveStep produces/consumes (GardenState's `this.rainelleWaitCounts`
+// in real play) — never a new, duplicated shape.
+
+test("passage-bloque: no waitCounts argument at all — every existing two-argument call keeps working identically", () => {
+  const g = new GardenState(null, 1000);
+  const borne = Stations.registerStation(g.s.campaignStations, "borne", { x: 0, z: 0 });
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", { x: 0, z: 0 });
+  const { rainelle } = freshRainelle(g);
+  teach(rainelle, { verbe: "arroser", poste: zone.id, source: borne.id, destination: "x" });
+  // Same call shape every existing caller (garden-state.js's tickRainelleMovement included) uses.
+  assert.equal(Status.status(rainelle, g.s).kind, "au-travail");
+});
+
+test("passage-bloque: a wait count under MAX_WAIT_STEPS is an ordinary short wait, not passage-bloque", () => {
+  const g = new GardenState(null, 1000);
+  const { rainelle } = freshRainelle(g);
+  const waitCounts = { [rainelle.id]: Movement.MAX_WAIT_STEPS - 1 };
+  assert.equal(Status.status(rainelle, g.s, waitCounts).kind, "repos");
+});
+
+test("passage-bloque: a wait count at MAX_WAIT_STEPS overrides an otherwise au-travail gesture", () => {
+  const g = new GardenState(null, 1000);
+  const borne = Stations.registerStation(g.s.campaignStations, "borne", { x: 0, z: 0 });
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", { x: 0, z: 0 });
+  const { rainelle } = freshRainelle(g);
+  teach(rainelle, { verbe: "arroser", poste: zone.id, source: borne.id, destination: "x" });
+  const waitCounts = { [rainelle.id]: Movement.MAX_WAIT_STEPS };
+  const status = Status.status(rainelle, g.s, waitCounts);
+  assert.equal(status.kind, "passage-bloque");
+  assert.equal(typeof status.message, "string");
+  assert.ok(status.message.length > 0);
+});
+
+test("passage-bloque: an unrelated Rainelle's wait count never blocks a different one", () => {
+  const g = new GardenState(null, 1000);
+  const { rainelle } = freshRainelle(g);
+  const waitCounts = { "r999": Movement.MAX_WAIT_STEPS + 5 };
+  assert.equal(Status.status(rainelle, g.s, waitCounts).kind, "repos");
+});
+
+test("passage-bloque: real resolveStep pipeline — reaches passage-bloque at the bound, falls back to normal once a sidestep succeeds, never a permanent state", () => {
+  const g = new GardenState(null, 1000);
+  const cultivar = Cultivars.createCultivar(g.s, { name: "Test", traits: {} });
+  const first = Rainelles.createRainelle(g.s, { cultivarId: cultivar.id, name: "Première" });
+  const second = Rainelles.createRainelle(g.s, { cultivarId: cultivar.id, name: "Deuxième" });
+  first.x = 1.5;
+  first.z = 2;
+  second.x = 2.5;
+  second.z = 2;
+
+  let waitCounts = {};
+  let step = Movement.resolveStep(
+    g.s,
+    [
+      { rainelle: first, route: [{ x: 2, z: 2 }] },
+      { rainelle: second, route: [{ x: 2, z: 2 }] },
+    ],
+    waitCounts,
+  );
+  for (const r of [first, second]) Object.assign(r, step.positions[r.id]);
+  waitCounts = step.waitCounts;
+  assert.equal(Status.status(second, g.s, waitCounts).kind, "repos", "one contested step is an ordinary wait, not passage-bloque yet");
+
+  for (let n = 0; n < 2; n++) {
+    step = Movement.resolveStep(
+      g.s,
+      [
+        { rainelle: first, route: [] },
+        { rainelle: second, route: [{ x: 2, z: 2 }] },
+      ],
+      waitCounts,
+    );
+    for (const r of [first, second]) Object.assign(r, step.positions[r.id]);
+    waitCounts = step.waitCounts;
+  }
+  assert.equal(waitCounts[second.id], Movement.MAX_WAIT_STEPS);
+  assert.equal(
+    Status.status(second, g.s, waitCounts).kind,
+    "passage-bloque",
+    "réellement empêchée d'avancer, la case cible restant occupée",
+  );
+
+  // The bound is now exceeded: the next resolveStep gives second a sidestep instead of leaving
+  // her waiting indefinitely — the wait counter resets, and so must the reported status.
+  step = Movement.resolveStep(
+    g.s,
+    [
+      { rainelle: first, route: [] },
+      { rainelle: second, route: [{ x: 2, z: 2 }] },
+    ],
+    waitCounts,
+  );
+  for (const r of [first, second]) Object.assign(r, step.positions[r.id]);
+  waitCounts = step.waitCounts;
+  assert.equal(waitCounts[second.id], 0);
+  assert.notEqual(
+    Status.status(second, g.s, waitCounts).kind,
+    "passage-bloque",
+    "jamais un passage-bloque permanent une fois le rangement réussi",
+  );
 });

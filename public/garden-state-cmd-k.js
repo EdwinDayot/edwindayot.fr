@@ -28,6 +28,10 @@
     typeof module !== "undefined"
       ? require("./game/data-narrative.js")
       : root.GardenNarrative;
+  const Memory =
+    typeof module !== "undefined"
+      ? require("./game/campaign-memory.js")
+      : root.GardenCampaignMemory;
   const M = {
     commandSegK(c, ctx, st) {
       const { s, fail } = st;
@@ -104,6 +108,12 @@
         };
         s.campaignClock.paused = false;
         s.campaignTeaching = null;
+        // Epic C5.1: same manual-intervention/first-gesture recording as teachGesture's own
+        // success path (garden-state-cmd-j.js) — confirmTeaching is the four-moment flow's own
+        // gesture-assignment command.
+        Memory.recordManualIntervention(s.campaignMemory);
+        if (!r.hadGesture)
+          Memory.recordFirstGesture(s.campaignMemory, rainelle.id, verbe);
         st.message = r.hadGesture
           ? `Ancien geste remplacé : ${verbe}.`
           : `Geste appris : ${verbe}.`;
@@ -129,6 +139,15 @@
             "Aucun geste démontré pour l'instant — montre-le une première fois.",
           );
         const r = Rainelles.applyGesture(rainelle, s.campaignLastDemonstration);
+        // Epic C5.1: same recording as confirmTeaching/teachGesture above — a quick repetition is
+        // still a direct gesture command the player issued.
+        Memory.recordManualIntervention(s.campaignMemory);
+        if (!r.hadGesture)
+          Memory.recordFirstGesture(
+            s.campaignMemory,
+            rainelle.id,
+            s.campaignLastDemonstration.verbe,
+          );
         st.message = r.hadGesture
           ? `Ancien geste remplacé (répétition rapide) : ${s.campaignLastDemonstration.verbe}.`
           : `Geste transmis rapidement : ${s.campaignLastDemonstration.verbe}.`;

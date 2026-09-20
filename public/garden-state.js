@@ -28,6 +28,21 @@
     typeof module !== "undefined"
       ? require("./game/campaign-automation.js")
       : root.GardenCampaignAutomation;
+  // Epic C5.11: the three campaign-layer modules position/movement wiring needs, all already
+  // loaded earlier (see index.html's own ordering comments on each) but never required from here
+  // before this epic, since nothing here read them.
+  const RainellesStatus =
+    typeof module !== "undefined"
+      ? require("./game/rainelles-status.js")
+      : root.GardenRainellesStatus;
+  const CampaignScenes =
+    typeof module !== "undefined"
+      ? require("./game/campaign-scenes.js")
+      : root.GardenCampaignScenes;
+  const RainelleMovement =
+    typeof module !== "undefined"
+      ? require("./game/rainelle-movement.js")
+      : root.GardenRainelleMovement;
   const Quests =
     typeof module !== "undefined"
       ? require("./game/quests.js")
@@ -46,6 +61,13 @@
     constructor(saved, now = Date.now()) {
       this.state = saved ? validate(saved) : fresh(now);
       this.events = [];
+      // Epic C5.11: how many consecutive steps each Rainelle has spent blocked mid-route
+      // (rainelle-movement.js's own resolveStep parameter). Deliberately never part of `this.state`
+      // (never serialized by serialize() below, same "instance-only, not a save field" posture as
+      // `this.events` right above) — rainelle-movement.js's own header comment is explicit that
+      // this bounded wait count is not a persisted save field, only something a real tick loop
+      // keeps across calls within one running session.
+      this.rainelleWaitCounts = {};
       if (!saved)
         for (let i = 0; i < 3; i++)
           this.state.requests.push(this.makeRequest(i));
@@ -100,6 +122,12 @@
       )
         I.invalidate(s);
       const result = { ok: true, kind: c.type, message: st.message, id: e?.id };
+      // Epic C5.14: an optional, additive signal a command segment (today only "sleep",
+      // garden-state-cmd-f.js) can attach to its own `st` — which Rainelle(s) a render layer
+      // should stage a scripted scene for, exactly at the same moment its own narrative text was
+      // revealed. Absent for every other command (unset `st.scenes`), so this changes nothing
+      // about the result shape any existing caller/test already relies on.
+      if (st.scenes) result.scenes = st.scenes;
       this.events.push(result);
       if (this.events.length > 30) this.events.shift();
       return result;
@@ -159,6 +187,53 @@
       // each taught Rainelle gets exactly one tick of its own gesture.
       CampaignAutomation.updateSpecimenReadiness(s);
       for (const r of s.rainelles) CampaignAutomation.tickRainelle(r, s);
+      this.tickRainelleMovement(s);
+    }
+    // Epic C5.11 (design §14): one shared simulation step of Rainelle movement, run right after
+    // the gesture ticks above so a Rainelle's route target reflects work this exact tick already
+    // did. Deliberately its own method, not folded into tick() itself: this is the one place
+    // `this.rainelleWaitCounts` (instance-only, see the constructor's own comment) is read and
+    // replaced, exactly the shape rainelle-movement.js's resolveStep already documents as its
+    // caller's job.
+    //
+    // Live "location" here is deliberately RainellesStatus.status(...).kind === "au-travail",
+    // never CampaignScenes.deriveLocation: that function's own header says any future render layer
+    // must call it, but its POSTE/REPOS/HABITAT split is built entirely around `workedThisNight`,
+    // a Set that only ever exists right after "sleep" resolves one specific night (garden-state-
+    // cmd-f.js) — it does not describe live daytime activity, and campaign-automation.js's own
+    // day-tick (tickArroser/tickRecolter/tickTransporter, called just above) never gates on
+    // `zone.veilleuse` at all (that flag only matters to runNightWork). RainellesStatus.status is
+    // the campaign layer's own live, per-second readout of "is this Rainelle actually working
+    // right now" (C2.8's own purpose, "l'état qu'un joueur verrait réellement") — "au-travail"
+    // exactly matches this epic's own criterion, "pendant un travail réel"; every other status
+    // ("repos", "source-vide", "stock-cible-atteint", "sortie-pleine", "poste-manquant") matches
+    // its own "habitat/repos sinon", and already collapses to the same nearest-habitat target under
+    // rainelle-movement.js's targetPosition regardless of which of the two LOCATIONS constants is
+    // passed, so no finer split is needed here.
+    tickRainelleMovement(s) {
+      const { LOCATIONS } = CampaignScenes;
+      const movers = [];
+      for (const rainelle of s.rainelles) {
+        RainelleMovement.ensurePosition(s, rainelle);
+        const location =
+          RainellesStatus.status(rainelle, s).kind === "au-travail"
+            ? LOCATIONS.POSTE
+            : LOCATIONS.HABITAT;
+        movers.push({ rainelle, route: RainelleMovement.routeTo(s, rainelle, location) });
+      }
+      const { positions, waitCounts } = RainelleMovement.resolveStep(
+        s,
+        movers,
+        this.rainelleWaitCounts,
+      );
+      for (const rainelle of s.rainelles) {
+        const p = positions[rainelle.id];
+        if (p) {
+          rainelle.x = p.x;
+          rainelle.z = p.z;
+        }
+      }
+      this.rainelleWaitCounts = waitCounts;
     }
     step(seconds) {
       if (!Number.isFinite(seconds) || seconds <= 0) return;
@@ -189,7 +264,7 @@
   }
   GardenState.commandSegs = [];
   if (typeof module !== "undefined")
-    for (const k of ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o"]) {
+    for (const k of ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q"]) {
       const M = require("./garden-state-cmd-" + k + ".js");
       Object.assign(GardenState.prototype, M);
       GardenState.commandSegs.push(...Object.values(M));

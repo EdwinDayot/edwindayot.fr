@@ -109,6 +109,27 @@
       case "go":
         A.go(data.id);
         break;
+      // Epic C2.2v: the "nightfall" panel's single action — proceeds with whatever the pot
+      // holds (possibly nothing, design §3: "il reste possible de ne rien croiser") and calls
+      // the already-implemented sleep command. Closing the panel here (like confirm-cutting's
+      // own A.closePanel() below) also lets garden-frame.js's own nightfall check notice
+      // gameSeconds has been reset to 0 next frame and end the camera transition.
+      case "confirm-night": {
+        const result = A.execute({ type: "sleep" });
+        if (result.ok) {
+          A.closePanel();
+          // Epic C5.14: result.scenes (garden-state-cmd-f.js/garden-state.js) is the render
+          // layer's only signal that a persistance/réparation scene should be staged this exact
+          // night — never re-derived from state after the fact (see campaign-scenes.js's own
+          // header comment on why workedThisNight cannot be reconstructed safely afterwards).
+          // Only the first entry is ever staged (design: "la caméra ne saute pas d'une Rainelle à
+          // l'autre"); a Rainelle with no visible model yet makes beginGestureScene() a no-op, so
+          // no panel opens for nothing to look at.
+          const scene = result.scenes && result.scenes[0];
+          if (scene && A.view.beginGestureScene(scene)) A.openPanel("gesture-scene");
+        }
+        break;
+      }
       case "inspect": {
         const e = data.id
           ? A.target(data.id)
@@ -161,6 +182,18 @@
       case "pause":
         A.paused = !A.paused;
         A.resetInput();
+        break;
+      // Epic C2.9 (design §5, "lancer un cycle pas à pas"): only ever fires while the game is
+      // already paused generally (A.paused, distinct from the campaignClock pause every open
+      // panel already gets for free, garden-frame.js) — the row itself is disabled otherwise
+      // (hud-panel.js's own "observation" rows, disabled: !m.paused), and hit() never dispatches
+      // a disabled button's action (hud-widgets.js), so this guard is redundant-but-explicit
+      // defence, never the only thing stopping a silent double-step. Exactly one call to
+      // A.game.step, for exactly one cycle's worth of simulated seconds — never a loop, never a
+      // second, duplicated cycle-length constant (GardenCampaignAutomation.CYCLE_SECONDS is the
+      // same one campaign-observation.js's own CYCLE_SECONDS re-exports for the row's label).
+      case "observation-step":
+        if (A.paused) A.game.step(GardenCampaignAutomation.CYCLE_SECONDS);
         break;
       case "rescue":
         A.execute({ type: "rescue" });

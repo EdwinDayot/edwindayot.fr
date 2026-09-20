@@ -37,11 +37,15 @@
     drawNav(m, l, w, h, c) {
       const { mobile, p, left, rw, size, gap, bw, bx, by } = l;
       const navY = mobile ? 83 : 83,
-        navX = mobile ? w - 58 : w - 217;
+        // Epic C2.9: a fifth nav button (observation) — the desktop offset keeps the same right
+        // margin the previous four-button row already had (w - 217 left 26px past the last of
+        // four 49px-spaced 44px-wide buttons), just shifted left by one more slot's width.
+        navX = mobile ? w - 58 : w - 266;
       [
         ["inventory", "I"],
         ["map", "M"],
         ["notebook", "J"],
+        ["observation", "O"],
         ["settings", "⚙"],
       ].forEach(([id, label], i) =>
         this.button(

@@ -5,7 +5,14 @@
    Epic C2.2 extends "sleep" with the campaign day/clock bilan (see its own comment below);
    Epic C2.3 further extends it with the scripted frog encounter (see below); Epic C3.4 further
    extends it with the bourgeon/nursery resolution (see below). Epic C1.5 extends sowPot itself
-   (a pending pin consumed once, see below) and passes it through to resolvePotDraw in sleep. */
+   (a pending pin consumed once, see below) and passes it through to resolvePotDraw in sleep.
+   Epic C5.2 further extends "sleep" with campaign-automation.js's runNightWork (veilleuses de
+   croissance, see below) — real work under an active veilleuse and the C5.1 rest counter are now
+   mutually exclusive per Rainelle per night, resolved together in the same block. Epic C5.3 adds
+   the overexertion streak update to that same block (up on a worked night, down on a rested one —
+   see campaign-memory.js's own header comment). Epic C5.7 adds the réparation detection
+   (campaign-scenes.js's detectRepairedGestures), read *after* that same streak update — see its
+   own comment below for why the order matters. */
 (function (root) {
   const Genetics =
     typeof module !== "undefined"
@@ -27,6 +34,18 @@
     typeof module !== "undefined"
       ? require("./game/data-narrative.js")
       : root.GardenNarrative;
+  const Memory =
+    typeof module !== "undefined"
+      ? require("./game/campaign-memory.js")
+      : root.GardenCampaignMemory;
+  const CampaignAutomation =
+    typeof module !== "undefined"
+      ? require("./game/campaign-automation.js")
+      : root.GardenCampaignAutomation;
+  const Scenes =
+    typeof module !== "undefined"
+      ? require("./game/campaign-scenes.js")
+      : root.GardenCampaignScenes;
   const M = {
     commandSegF(c, ctx, st) {
       const { s, fail } = st;
@@ -68,6 +87,30 @@
         // encounter only adds a Rainelle carrying that same cultivar's foliage. If nothing was
         // sown this night, the encounter simply carries over (campaignFrogEncounterPending stays
         // true) to the next night that actually resolves a pair, never lost, never duplicated.
+        // Epic C5.1 (design §11, "périodes de repos par Rainelle... vrai par défaut avant toute
+        // veilleuse"): captured before any new individual is created below, so a Rainelle born
+        // this same night is never counted as having rested a night it did not live through.
+        const restingIds = s.rainelles.map((r) => r.id);
+        // Epic C5.2 (design §11, "veilleuses de croissance"): resolved here, against the same
+        // pre-birth snapshot of s.rainelles, before anything else about tonight is decided — a
+        // Rainelle born this same night has no geste yet (design §5: it "ne copie pas un souvenir
+        // ni une obligation de métier") so it can never be eligible anyway, but resolving night
+        // work first keeps this block in the same "captured before any new individual" order as
+        // restingIds just above, rather than relying on that incidental fact.
+        const workedIds = CampaignAutomation.runNightWork(s);
+        // Epic C5.6 (design §11, scène "la pause qui ne commence pas") : capturé ici, contre le
+        // même instantané pré-mise à jour que capacityLimit lit déjà (campaign-automation.js) —
+        // avant que la boucle increase/decreaseOverexertion plus bas ne fasse avancer le compteur
+        // de cette nuit même. Une Rainelle entrant dans cette nuit déjà sursollicitée par les
+        // nuits précédentes est le sujet de la scène, pas ce que la récupération automatique
+        // d'un point va lui retirer dans un instant.
+        const persistentIds = Scenes.detectPersistentGestures(s, workedIds);
+        // Epic C5.7 (design §11, réparation) : capturé ici, avant que persistentIds ne soit
+        // replié plus bas dans ce même champ persisté — "déjà vue en persistance" ne peut donc
+        // jamais désigner cette nuit même (de toute façon impossible : REPOS et la persistance
+        // sont deux verdicts mutuellement exclusifs de deriveLocation pour une même Rainelle),
+        // seulement une nuit strictement antérieure.
+        const previouslyPersistentIds = new Set(s.campaignMemory.persistentGestureIds);
         let frogCultivarId = null;
         for (const { a, b, pin } of s.campaignPot.pending) {
           const traits = Pot.resolvePotDraw(a, b, undefined, pin || null);
@@ -83,7 +126,11 @@
         }
         s.campaignPot.pending = [];
         if (frogCultivarId) {
-          Rainelles.createRainelle(s, { cultivarId: frogCultivarId, name: "" });
+          const born = Rainelles.createRainelle(s, {
+            cultivarId: frogCultivarId,
+            name: "",
+          });
+          Memory.recordBirth(s.campaignMemory, born.id);
           s.campaignFrogEncounterPending = false;
           // Epic C4.4: the "traces mouillées" text (design §10, chapitre 4) only ever fires here,
           // the exact night the encounter actually resolves into a real Rainelle — never at
@@ -100,9 +147,104 @@
         // taught gesture (design §5: "il ne copie pas un souvenir ni une obligation de métier"),
         // sharing the cultivar of the Rainelle that formed its bourgeon (see rainelles.js's own
         // harvestBud comment).
-        for (const bud of s.campaignNursery)
-          Rainelles.createRainelle(s, { cultivarId: bud.cultivarId, name: "" });
+        for (const bud of s.campaignNursery) {
+          const born = Rainelles.createRainelle(s, {
+            cultivarId: bud.cultivarId,
+            name: "",
+          });
+          Memory.recordBirth(s.campaignMemory, born.id);
+        }
         s.campaignNursery = [];
+        // Epic C5.1/C5.2: every Rainelle that already existed before tonight's resolution either
+        // did real night work under an active veilleuse (workedIds, recorded above by
+        // runNightWork's own effect and here by recordNightlyActivity) or rested — the two are
+        // mutually exclusive per Rainelle per night, never both, never neither.
+        // Epic C5.3: the same split also drives the overexertion streak — up on a worked night,
+        // down (floored, progressive) on a rested one, same call sites, same mutual exclusion.
+        for (const id of restingIds)
+          if (workedIds.has(id)) {
+            Memory.recordNightlyActivity(s.campaignMemory, id);
+            Memory.increaseOverexertion(s.campaignMemory, id);
+          } else {
+            Memory.recordRest(s.campaignMemory, id);
+            Memory.decreaseOverexertion(s.campaignMemory, id);
+          }
+        // Epic C5.7 : calculé seulement maintenant, après que la boucle ci-dessus ait fait
+        // avancer overexertion pour cette nuit même — "cessé d'être sursollicitée" doit lire le
+        // niveau d'après-récupération, jamais celui d'avant cette nuit (même politique que
+        // capacityLimit, campaign-automation.js). Utilise previouslyPersistentIds capturé plus
+        // haut, avant que persistentIds ne soit replié dans la mémoire ci-dessous.
+        const repairedIds = Scenes.detectRepairedGestures(
+          s,
+          workedIds,
+          previouslyPersistentIds,
+        );
+        // Épic C5.7 : chaque Rainelle détectée en persistance cette nuit rejoint le registre
+        // borné de campaign-memory.js, une fois, jamais dupliquée — après le calcul de
+        // repairedIds ci-dessus, pour qu'une Rainelle nouvellement détectée en persistance cette
+        // nuit même ne puisse jamais aussi compter, cette même nuit, comme sa propre réparation
+        // (déjà impossible par construction, deriveLocation étant à valeur unique, mais cet ordre
+        // rend cette garantie explicite plutôt qu'accidentelle).
+        for (const id of persistentIds)
+          Memory.recordPersistentGesture(s.campaignMemory, id);
+        // Epic C5.6: révélé la toute première fois qu'au moins une Rainelle est détectée en
+        // persistance de geste cette nuit — jamais à l'armement d'une veilleuse, seulement au
+        // moment où le fait se produit réellement (même posture que "traces-mouillees" ci-dessus).
+        if (persistentIds.length) {
+          const revealed = Narrative.pendingReveal(
+            s.campaignFlags,
+            "persistentGestureDetected",
+          );
+          if (revealed) {
+            s.campaignFlags.push(revealed.id);
+            // Epic C5.14 (design §14, mise en scène observable): staged exactly when — never
+            // before, never separately from — the text itself is actually (first-time) revealed,
+            // matching the critère de sortie literally ("la révélation... s'accompagne d'une mise
+            // en scène"). st.scenes is read by garden-state.js's own command() to become
+            // result.scenes, the render layer's only signal (garden-dispatch.js's "confirm-night")
+            // — never a new persisted field, never inferred a second time from state after the
+            // fact (workedThisNight, read above, only ever exists for this one call).
+            st.scenes = st.scenes || [];
+            st.scenes.push({
+              kind: "persistance",
+              rainelleId: Scenes.selectSceneRainelle(persistentIds),
+            });
+          }
+        } else if (Object.keys(s.campaignMemory.nightlyActivity).length) {
+          // Épic C5.6, texte de repli : reconnaît la première nuit sans aucune persistance alors
+          // qu'au moins une veilleuse a déjà réellement produit du travail sur cette partie
+          // (nightlyActivity non vide — le seul fait déjà existant attestant qu'une veilleuse a
+          // servi pour de vrai, voir data-narrative.js's own comment) ; jamais si aucune veilleuse
+          // n'a jamais rien produit, pour ne pas féliciter un joueur qui n'a simplement jamais
+          // touché au mécanisme.
+          const revealed = Narrative.pendingReveal(
+            s.campaignFlags,
+            "attentiveNightRecognized",
+          );
+          if (revealed) s.campaignFlags.push(revealed.id);
+        }
+        // Epic C5.7 : indépendant des deux révélations ci-dessus (states différents, jamais les
+        // mêmes cette même nuit pour la même Rainelle — voir campaign-scenes.js's own comment sur
+        // l'exclusion mutuelle REPOS/persistance — mais deux Rainelles distinctes pourraient en
+        // théorie déclencher persistance et réparation la même nuit chacune de son côté).
+        if (repairedIds.length) {
+          const revealed = Narrative.pendingReveal(
+            s.campaignFlags,
+            "persistentGestureRepaired",
+          );
+          if (revealed) {
+            s.campaignFlags.push(revealed.id);
+            // Epic C5.14: same posture as the persistance branch above. Both could in principle
+            // fire the same night (two distinct Rainelles, one entering persistance while another
+            // is repaired) — st.scenes stays an array rather than a single slot so neither is
+            // silently dropped; the render layer (garden-dispatch.js) only ever stages the first.
+            st.scenes = st.scenes || [];
+            st.scenes.push({
+              kind: "reparation",
+              rainelleId: Scenes.selectSceneRainelle(repairedIds),
+            });
+          }
+        }
         // Epic C2.2: the atomic night bilan. "sleep" is the single command a scripted 23h
         // transition and a voluntary early bedtime ("dormir plus tôt", design §3) both end up
         // calling — neither reads s.campaignClock.gameSeconds beforehand, so an early sleep

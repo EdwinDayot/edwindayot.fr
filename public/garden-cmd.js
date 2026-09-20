@@ -8,6 +8,7 @@
     I = GardenIrrigation,
     R = GardenRules,
     S = GardenSave,
+    Clock = GardenCampaignClock,
     $ = (id) => document.getElementById(id);
   A.execute = function execute(c) {
     const result = A.game.command(c, { position: A.view.position });
@@ -33,6 +34,11 @@
   };
   A.closePanel = function closePanel() {
     A.view.endInspection();
+    // Epic C5.14: Échap/the generic panel close already reaches here (garden-boot.js) for every
+    // panel, including "gesture-scene" — no bespoke "skip" button needed, same accessibility
+    // guarantee design §14 asks for ("permettre de raccourcir une scène"). No-ops when no scene
+    // is playing, same guard shape as endInspection() above.
+    A.view.endGestureScene();
     A.panel = "";
     A.cutting = null;
     A.resetInput();
@@ -219,9 +225,16 @@
   };
   A.replaceGame = function replaceGame(next) {
     A.view.endInspection();
+    A.view.endNightfallTransition();
+    A.view.endGestureScene();
+    A.nightSequence = false;
     A.cancelBuild();
     A.game = next;
     A.view.game = A.game;
+    // Epic C2.2v: an imported/restored save can carry a completely different campaignClock
+    // state (a different day, mid-pause...) — resync the one long-lived instance from it,
+    // the same "mirror the loaded state" posture as A.view.position just below.
+    A.campaignClock = new Clock.CampaignClock(A.game.s.campaignClock);
     A.view.routes = [];
     A.selected = null;
     A.view.selected = null;

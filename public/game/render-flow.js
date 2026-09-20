@@ -109,6 +109,79 @@
       for (const c of D.caches)
         this.nodes.get(c.id).visible =
           s.unlocked.includes(c.zone) && !s.discovered.includes(c.species);
+      // Epic C2.2v: rebuild the refuge house only when the one field its appearance actually
+      // depends on (repairHouseSpace, garden-state-cmd-l.js) has changed since the last sync —
+      // never every ~0.25s tick like the rest of this method's per-frame reads above.
+      if (
+        s.campaignHouse?.spaces?.accueil?.status !==
+        this.campaignHouseAccueilStatus
+      )
+        this.buildCampaignHouse();
+      // Epic C5.11: a Rainelle joins the real scene the first time it has a real position
+      // (garden-state.js's tickRainelleMovement/RainelleMovement.ensurePosition — never guessed
+      // here). The Group itself (render-rainelles.js, C5.9) is built once per Rainelle id and
+      // cached in `this.rainelleModels`, exactly the "refreshed on position change, never rebuilt
+      // every frame" pattern buildCampaignHouse just above already uses for its own one field;
+      // only `.position`/`.rotation` are touched on every sync call below, never the geometry.
+      const RenderRainelles = window.GardenRenderRainelles;
+      if (RenderRainelles)
+        for (const r of s.rainelles) {
+          if (!Number.isFinite(r.x) || !Number.isFinite(r.z)) continue;
+          let rm = this.rainelleModels.get(r.id);
+          if (!rm) {
+            const cultivar = s.cultivars.find((c) => c.id === r.cultivarId);
+            if (!cultivar) continue; // no cultivar to draw foliage from yet — nothing to add
+            const group = RenderRainelles.buildRainelleGroup(r, cultivar);
+            this.scene.add(group);
+            rm = { group, x: r.x, z: r.z };
+            this.rainelleModels.set(r.id, rm);
+            this.batchDirty = true;
+          }
+          const y = Terrain.terrainHeight(r.x, r.z);
+          if (r.x !== rm.x || r.z !== rm.z) {
+            // Face the direction actually walked this step — a Rainelle standing still (already
+            // on its target cell) keeps whatever heading it last had, never snaps to a default.
+            rm.group.rotation.y = Math.atan2(r.x - rm.x, r.z - rm.z);
+            rm.x = r.x;
+            rm.z = r.z;
+          }
+          rm.group.position.set(r.x, y, r.z);
+        }
+      // Epic C5.13: every borne/zone/panier/habitat in the registry (campaign-stations.js) gets a
+      // Group built once per station id and cached in `this.stationModels` — the exact
+      // "build once, reposition/update on real change, never rebuild every frame" pattern
+      // `this.rainelleModels`/`this.models` already use above. Positions in the registry never
+      // change after registration (no relocation command exists for any station kind today), so
+      // this only ever sets `.position` once per new id; `updateStationGroup` below still runs
+      // every sync() call but is a no-op unless a borne's `priseFortDebit`/a zone's `veilleuse`
+      // actually flipped since the group was last built.
+      const RenderStations = window.GardenRenderCampaignStations;
+      if (RenderStations && s.campaignStations) {
+        const liveIds = new Set();
+        for (const kind of ["borne", "zone", "panier", "habitat"]) {
+          const collection = kind === "borne" ? "bornes" : kind === "zone" ? "zones" : kind === "panier" ? "paniers" : "habitats";
+          for (const station of s.campaignStations[collection] || []) {
+            liveIds.add(station.id);
+            let sm = this.stationModels.get(station.id);
+            if (!sm) {
+              const group = RenderStations.buildStationGroup(kind, station);
+              group.position.set(station.x, Terrain.terrainHeight(station.x, station.z), station.z);
+              this.scene.add(group);
+              sm = { kind, group };
+              this.stationModels.set(station.id, sm);
+              this.batchDirty = true;
+            }
+            RenderStations.updateStationGroup(kind, station, sm.group);
+          }
+        }
+        for (const [id, sm] of this.stationModels) {
+          if (!liveIds.has(id)) {
+            this.scene.remove(sm.group);
+            this.stationModels.delete(id);
+            this.batchDirty = true;
+          }
+        }
+      }
       const signature = JSON.stringify([
         s.links,
         s.entities.map((e) => [e.id, e.x, e.z, e.stored]),

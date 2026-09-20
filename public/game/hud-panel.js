@@ -218,8 +218,54 @@
         const Narrative = window.GardenNarrative;
         for (const flag of m.s.campaignFlags || []) {
           const entry = Narrative?.TEXTS[flag];
-          if (entry) rows.push({ title: entry.title, detail: entry.text, action: null });
+          if (entry)
+            rows.push({ title: entry.title, detail: entry.text, action: null });
         }
+      } else if (m.panel === "nightfall") {
+        // Epic C2.2v (design §3: "le jeu propose de préparer ou de confirmer le pot dans un
+        // écran suspendu... il reste possible de ne rien croiser"). Shows whatever sowPot
+        // (C1.3) already put in s.campaignPot.pending, informationally, then offers the one
+        // real action this epic's own mandate scopes for this screen: confirm and sleep.
+        // sowPot itself has no HUD panel/dispatch call site anywhere in the game yet (a
+        // species-picker to *change* the pot from here is a separate, larger feature, not
+        // built by this epic) — "leave it empty" is already true whenever nothing was sown,
+        // which confirming here simply accepts rather than blocking on.
+        const Genetics = window.GardenGenetics,
+          founderName = (id) =>
+            Genetics?.founders.find((f) => f.id === id)?.name || id;
+        if (m.s.campaignPot.pending.length)
+          for (const pair of m.s.campaignPot.pending)
+            rows.push({
+              title: founderName(pair.a) + " × " + founderName(pair.b),
+              detail: "Résultat au réveil, dans le pot.",
+            });
+        else
+          rows.push({
+            title: "Le pot est vide",
+            detail: "Il reste possible de ne rien croiser cette nuit.",
+          });
+        rows.push({
+          title: "La nuit tombe",
+          detail: "Le personnage rejoint la maison refuge.",
+          action: "confirm-night",
+        });
+      } else if (m.panel === "gesture-scene") {
+        // Epic C5.14 (design §11/ch.14, mise en scène observable de la persistance et de la
+        // réparation). Read-only: this panel exists to hold the exact narrative text already
+        // revealed this same night by garden-state-cmd-f.js (C5.6/C5.7, data-narrative.js) on
+        // screen while render-items.js's beginGestureScene() (started by garden-dispatch.js's
+        // "confirm-night", right before this panel opens) keeps the camera framing the Rainelle
+        // concerned — never a second, independent text. No bespoke "skip" button: Échap already
+        // closes any panel (garden-structure.md) and ends the scene the same way
+        // (garden-cmd.js's closePanel calling endGestureScene).
+        const Narrative = window.GardenNarrative;
+        const entry =
+          Narrative?.TEXTS[
+            m.gestureScene?.kind === "reparation"
+              ? "geste-qui-sarrete"
+              : "persistance-geste-vide"
+          ];
+        if (entry) rows.push({ title: entry.title, detail: entry.text });
       } else if (m.panel === "visitor")
         for (const r of m.s.requests)
           rows.push({
@@ -234,7 +280,87 @@
             },
             disabled: (m.s.inventory[r.item] || 0) < r.quantity,
           });
-      else if (m.panel === "reserve") {
+      else if (m.panel === "observation") {
+        // Epic C2.9 (design §5, "Le mode d'observation montre chemins, transferts et cadence par
+        // journée. Il permet de suivre un objet du plant au présentoir et de lancer un cycle pas
+        // à pas."). See campaign-observation.js's own header comment for the documented scope
+        // gap (no présentoir/point-of-sale station kind exists yet — "sa dernière station réelle"
+        // stands in for "le présentoir"). Every row here is read-only: building this list, even
+        // repeatedly across draws, never mutates m.s (proven in tests/campaign-observation.cjs),
+        // and opening this panel is already paused like any other panel (garden-frame.js's own
+        // generic `!!A.panel` gate) — nothing below advances the simulation itself.
+        //
+        // Memoized on `s.elapsed` (garden-state.js's own per-tick counter, incremented exactly
+        // once per real simulation tick, never touched by drawing): draw() runs every animation
+        // frame regardless of pause state (garden-frame.js), but observedPaths recomputes a real
+        // grid BFS per positioned Rainelle (RainelleMovement.routeTo -> GardenConstruction.path) —
+        // routeTo's own "no caching" design assumes a caller on the tick itself, not one redrawn
+        // at 60Hz. `s.elapsed` is unchanged between two frames of the same tick (in particular the
+        // whole time this panel sits open while the game is paused, its main use case for
+        // stepping), so recomputing only when it actually moves loses no accuracy and matches
+        // rainelle-movement.js's own recomputation cadence instead of outpacing it.
+        if (!this._observationCache || this._observationCache.elapsed !== m.s.elapsed) {
+          const Observation = window.GardenCampaignObservation;
+          const KIND_LABELS = { borne: "Borne", zone: "Zone", panier: "Panier" };
+          const obsRows = [];
+          for (const path of Observation.observedPaths(m.s))
+            obsRows.push({
+              title: `${path.rainelleId} — ${path.location === "poste" ? "en route vers son poste" : "en route vers l'habitat"}`,
+              detail: `${path.statusMessage} Prochaine cellule : ${
+                path.route.length
+                  ? `(${path.route[0].x}, ${path.route[0].z}) · ${path.route.length} pas restants`
+                  : "déjà arrivée."
+              }`,
+            });
+          for (const transfer of Observation.observedTransfers(m.s)) {
+            const who = transfer.rainelles.length
+              ? transfer.rainelles
+                  .map((r) => `${r.rainelleId} (${r.role} · ${r.status})`)
+                  .join(", ")
+              : "Aucune Rainelle assignée.";
+            const state =
+              transfer.kind === "panier"
+                ? `Stock : ${transfer.total}/${transfer.capacity} (seuil ${transfer.min}).`
+                : transfer.kind === "zone"
+                  ? `Veilleuse : ${transfer.veilleuse ? "allumée" : "éteinte"}.`
+                  : `Prise à fort débit : ${transfer.priseFortDebit ? "activée" : "désactivée"}.`;
+            obsRows.push({
+              title: `${KIND_LABELS[transfer.kind]} ${transfer.id}`,
+              detail: `${state} ${who}`,
+            });
+          }
+          for (const cadence of Observation.observedCadence(m.s))
+            obsRows.push({
+              title: `${cadence.rainelleId} — cadence`,
+              detail: `${cadence.nightlyActivity} nuit(s) de travail réel sur ${cadence.campaignDay} jour(s) · ${cadence.perDay.toFixed(2)} nuit(s)/jour.`,
+            });
+          for (const zone of m.s.campaignStations.zones) {
+            const chain = Observation.resolveChainEnd(m.s, zone.id);
+            if (chain.ok && chain.chain.length)
+              obsRows.push({
+                title: `Chaîne depuis la zone ${zone.id}`,
+                detail: `${[zone.id, ...chain.chain].join(" → ")} · dernière station réelle : ${chain.endId}.`,
+              });
+          }
+          if (!obsRows.length)
+            obsRows.push({
+              title: "Rien à observer pour l'instant",
+              detail: "Enseigne un geste ou pose une station pour voir apparaître des chemins.",
+            });
+          this._observationCache = { elapsed: m.s.elapsed, rows: obsRows };
+        }
+        // The step button's own enabled state depends on `m.paused`, which can change without
+        // `s.elapsed` moving (pausing itself never ticks) — kept out of the cached rows so toggling
+        // pause updates it immediately rather than waiting for the next tick's cache miss.
+        rows.push(...this._observationCache.rows, {
+          title: `Cycle pas à pas (${window.GardenCampaignObservation.CYCLE_SECONDS} s)`,
+          detail: m.paused
+            ? "Avance la simulation d'exactement un cycle."
+            : "Mets le jeu en pause pour avancer pas à pas.",
+          action: "observation-step",
+          disabled: !m.paused,
+        });
+      } else if (m.panel === "reserve") {
         for (const e of m.s.entities.filter((e) => e.stored))
           rows.push({
             title: D.recipes[e.type].name,

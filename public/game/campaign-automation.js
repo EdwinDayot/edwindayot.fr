@@ -33,7 +33,37 @@
    never throws. There is no state/blockage system yet to report *why* a Rainelle is idle (C2.8) —
    until then, the only observable difference is that no job ever starts (`rainelle.job` stays
    whatever it already was, never created or advanced), exactly like a Rainelle taught a verb this
-   file doesn't implement yet. */
+   file doesn't implement yet.
+
+   Epic C5.2 adds a second, separate entry point (runNightWork, near the bottom of this file):
+   doArroser/doRecolter are the day-tick versions' real effect split out so "sleep"
+   (garden-state-cmd-f.js) can call either once, directly, for a Rainelle whose zone has its
+   veilleuse on — a genuinely different call site from the ordinary per-second tick() loop above,
+   not a parameter on it, since a resolved night has no seconds to advance a job countdown
+   through. See runNightWork's own comment for verb scope and the memory-recording contract it
+   exists to satisfy.
+
+   Epic C5.3 (design §11, "des limites physiologiques finissent par réduire la capacité") adds
+   capacityLimit, read by both doArroser and doRecolter (day and night alike, since both share
+   these two functions): once a Rainelle's overexertion streak (campaign-memory.js) is past
+   OVEREXERTION_THRESHOLD, a single cycle moves at most FATIGUED_CAPACITY_PER_CYCLE units instead
+   of everything in range/capacity — never zero, per the design's own "elles ne doivent pas annuler
+   immédiatement tout le gain nocturne". See capacityLimit's own comment for the exact rule.
+
+   Epic C5.4 (design §11, "prise d'eau à fort débit... alimentation stable des cultures
+   exigeantes... niveau du bassin commun réduit") only touches "arroser", the one verb whose
+   geste actually names a borne (`source`) — "récolter"/"transporter" have nothing a water intake
+   could apply to. Two effects, both gated on the resolved borne's `priseFortDebit` flag
+   (campaign-stations.js), never on the Rainelle or the zone: (1) tickArroser's day cycle runs on
+   FAST_CYCLE_SECONDS instead of CYCLE_SECONDS — the same volume per cycle, delivered more often,
+   is a real increase in débit (flow = volume / time) without inventing a second, unexplained
+   per-cycle volume cap where none existed before this epic; (2) doArroser records the withdrawal
+   (campaign-memory.js's recordWaterWithdrawal) whenever it actually waters something through such
+   a borne, day or night alike (doArroser is shared by both call sites, same posture as C5.3's
+   capacityLimit) — never for a borne without the flag, and never for a pass that watered nothing.
+   FAST_CYCLE_SECONDS stays strictly below CYCLE_SECONDS so the existing persisted-job bound in
+   garden-state-validate.js (`finite(r.job.remaining, 0, CampaignAutomation.CYCLE_SECONDS)`) still
+   holds without any change there. */
 (function (root) {
   const C =
     typeof module !== "undefined"
@@ -47,6 +77,10 @@
     typeof module !== "undefined"
       ? require("./cultivars.js")
       : root.GardenCultivars;
+  const Memory =
+    typeof module !== "undefined"
+      ? require("./campaign-memory.js")
+      : root.GardenCampaignMemory;
 
   // How long one watering/harvest cycle takes, in simulated seconds (s.elapsed, never the wall
   // clock — same convention as every other campaign timer). No existing value in the codebase
@@ -59,6 +93,13 @@
   // already used between this file's MATURE_STAGE-reading Cultivars calls and cultivars.js's own
   // duplicated botany-hybrids.js constant).
   const CYCLE_SECONDS = 20;
+
+  // Epic C5.4: the "arroser" cycle duration once a borne's `priseFortDebit` is on — half of
+  // CYCLE_SECONDS, chosen as the smallest simple fraction that gives an unmistakable, easily
+  // observable increase in délivrance rate (twice as often, so roughly twice the volume watered
+  // over the same stretch of real/simulated time) while staying strictly below CYCLE_SECONDS (see
+  // header comment on why that bound must hold).
+  const FAST_CYCLE_SECONDS = 10;
 
   // How far from the zone's own position a specimen still counts as "in the zone" for either
   // gesture. Design §5's table only says "petit rayon de travail" for arroser, without a number;
@@ -77,14 +118,42 @@
     return r.ok && r.kind === kind ? r.station : null;
   }
 
+  // Epic C5.3 (design §11, "des limites physiologiques finissent par réduire la capacité"): the
+  // volume a single doArroser/doRecolter call may move once a Rainelle's overexertion streak
+  // (campaign-memory.js) has gone past OVEREXERTION_THRESHOLD — a "limite de volume par cycle",
+  // the option this epic's own backlog entry names as one of the two acceptable choices (the
+  // other, a job-duration multiplier, does not apply here: a resolved night has no seconds for a
+  // multiplier to stretch, see this file's own header comment on runNightWork). Never zero (design
+  // §11, "elles ne doivent pas annuler immédiatement tout le gain nocturne") — a single unit still
+  // gets through every cycle, however sursollicitée.
+  const FATIGUED_CAPACITY_PER_CYCLE = 1;
+
+  // Returns how many specimens/units a single doArroser/doRecolter call may act on this cycle for
+  // this Rainelle: unlimited under the threshold (today's behaviour, unchanged), capped once past
+  // it. Reads the streak as it stood *before* tonight's own update (garden-state-cmd-f.js applies
+  // increaseOverexertion/decreaseOverexertion only after runNightWork has already run), so a
+  // Rainelle is never penalised the very night its streak first crosses the threshold — only on
+  // the nights after.
+  function capacityLimit(s, rainelleId) {
+    const level = (s.campaignMemory && s.campaignMemory.overexertion[rainelleId]) || 0;
+    return level > Memory.OVEREXERTION_THRESHOLD
+      ? FATIGUED_CAPACITY_PER_CYCLE
+      : Infinity;
+  }
+
   // Advances a Rainelle's job by one tick and returns true exactly once, the tick the cycle
   // completes (mirroring automation.js's tickJob: a countdown to zero, then restarted for the
   // next cycle — "sans intervention" means it must restart itself, never stall at zero).
-  function advanceCycle(rainelle) {
-    if (!rainelle.job) rainelle.job = { remaining: CYCLE_SECONDS };
+  // Epic C5.4: `fast` (only ever the resolved borne's own `priseFortDebit`, from tickArroser)
+  // picks FAST_CYCLE_SECONDS instead of CYCLE_SECONDS for a freshly (re)started countdown — a
+  // cycle already mid-count when the flag flips simply finishes at whatever duration it started
+  // with, exactly like every other campaign timer never retroactively rescaled mid-flight.
+  function advanceCycle(rainelle, fast) {
+    const duration = fast ? FAST_CYCLE_SECONDS : CYCLE_SECONDS;
+    if (!rainelle.job) rainelle.job = { remaining: duration };
     rainelle.job.remaining = Math.max(0, rainelle.job.remaining - 1);
     if (rainelle.job.remaining > 0) return false;
-    rainelle.job.remaining = CYCLE_SECONDS;
+    rainelle.job.remaining = duration;
     return true;
   }
 
@@ -92,15 +161,50 @@
   // and be a borne, C2.6a doesn't yet model an arrosoir capacity or the borne being fed), then
   // humidify every specimen within range of the poste (a zone). A cycle with nothing in range
   // still restarts cleanly — there is simply nothing to water this time.
+  //
+  // Split into the real effect (doArroser, returns whether it actually watered anything — Epic
+  // C5.2's runNightWork below calls this directly, once, bypassing the day cycle's countdown
+  // entirely: a night isn't ticked second by second, it is resolved atomically by "sleep") and
+  // the day-tick wrapper (tickArroser, gated by advanceCycle as before, unchanged behaviour).
+  function doArroser(rainelle, s) {
+    const geste = rainelle.geste;
+    const borne = resolveKind(s, geste.source, "borne");
+    const zone = resolveKind(s, geste.poste, "zone");
+    if (!borne || !zone) return false;
+    // Epic C5.3: capped once this Rainelle's overexertion streak is past the threshold — see
+    // capacityLimit's own comment. Infinity under the threshold, so this loop is unchanged from
+    // before this epic in the common case.
+    const limit = capacityLimit(s, rainelle.id);
+    let watered = false;
+    let count = 0;
+    for (const specimen of s.specimens) {
+      if (count >= limit) break;
+      if (C.distance(zone, specimen) <= ZONE_WORK_RANGE) {
+        Cultivars.waterSpecimen(specimen, s.elapsed);
+        watered = true;
+        count++;
+      }
+    }
+    // Epic C5.4: withdrawal is recorded against the borne actually used, only when it is flagged
+    // and only for a pass that really watered something — see header comment and
+    // campaign-memory.js's own recordWaterWithdrawal comment.
+    if (watered && borne.priseFortDebit)
+      Memory.recordWaterWithdrawal(s.campaignMemory, borne.id, count);
+    return watered;
+  }
+
   function tickArroser(rainelle, s) {
     const geste = rainelle.geste;
     const borne = resolveKind(s, geste.source, "borne");
     const zone = resolveKind(s, geste.poste, "zone");
+    // Resolved *before* advancing the cycle, exactly as before this split: an unresolved source/
+    // poste must never even start the countdown (rainelle.job stays null forever), not just skip
+    // the watering once resolved — see the "leaves the Rainelle inactive without throwing" test.
     if (!borne || !zone) return;
-    if (!advanceCycle(rainelle)) return;
-    for (const specimen of s.specimens)
-      if (C.distance(zone, specimen) <= ZONE_WORK_RANGE)
-        Cultivars.waterSpecimen(specimen, s.elapsed);
+    // Epic C5.4: a flagged borne runs this Rainelle's cycle on FAST_CYCLE_SECONDS instead of
+    // CYCLE_SECONDS — see advanceCycle's own comment and this file's header comment.
+    if (!advanceCycle(rainelle, borne.priseFortDebit)) return;
+    doArroser(rainelle, s);
   }
 
   // "Récolter": deposit every mature, ready specimen in range of the poste (a zone) into the
@@ -117,16 +221,25 @@
   // strictly in array order (tickRainelle's own caller, garden-state.js's tick()), so two
   // récolteuses sharing a zone/panier in the very same tick can never both count the same unit
   // of headroom — the first to run already updated `panier.buffer` before the second reads it.
-  function tickRecolter(rainelle, s) {
+  //
+  // Same split as doArroser/tickArroser above (Epic C5.2): doRecolter is the real effect, called
+  // directly by runNightWork once per veilleuse-lit night, and returns whether it actually
+  // harvested at least one unit — never true on an empty/out-of-range/already-full pass.
+  function doRecolter(rainelle, s) {
     const geste = rainelle.geste;
     const zone = resolveKind(s, geste.poste, "zone");
     const panier = resolveKind(s, geste.destination, "panier");
-    if (!zone || !panier) return;
-    if (!advanceCycle(rainelle)) return;
+    if (!zone || !panier) return false;
+    // Epic C5.3: a second, independent ceiling alongside the panier's own capacity below — see
+    // capacityLimit's own comment. Infinity under the threshold, unchanged from before this epic.
+    const limit = capacityLimit(s, rainelle.id);
     // Tracked incrementally rather than re-summing Stations.panierTotal(panier) on every
     // specimen: same result, without an O(buffer keys) reduce per specimen visited this cycle.
     let total = Stations.panierTotal(panier);
+    let harvested = false;
+    let count = 0;
     for (const specimen of s.specimens) {
+      if (count >= limit) break;
       if (!Cultivars.isMature(specimen) || !specimen.readyToProduce) continue;
       if (C.distance(zone, specimen) > ZONE_WORK_RANGE) continue;
       if (total >= panier.capacity) break;
@@ -134,7 +247,18 @@
         (panier.buffer[specimen.cultivarId] || 0) + 1;
       Cultivars.setReadyToProduce(specimen, false);
       total++;
+      count++;
+      harvested = true;
     }
+    return harvested;
+  }
+
+  function tickRecolter(rainelle, s) {
+    const geste = rainelle.geste;
+    if (!resolveKind(s, geste.poste, "zone") || !resolveKind(s, geste.destination, "panier"))
+      return;
+    if (!advanceCycle(rainelle)) return;
+    doRecolter(rainelle, s);
   }
 
   // "Transporter" (design §5, « Panier A » → « Panier B », limite « un trajet et un filtre de
@@ -225,7 +349,48 @@
         Cultivars.setReadyToProduce(specimen, true);
   }
 
-  const api = { CYCLE_SECONDS, ZONE_WORK_RANGE, tickRainelle, updateSpecimenReadiness };
+  // Epic C5.2 (design §11, "veilleuses de croissance... continuent de travailler la nuit"): called
+  // once from "sleep" (garden-state-cmd-f.js), never from the ordinary day tick() loop above — a
+  // night is resolved atomically, not ticked second by second, so this runs each eligible
+  // Rainelle's gesture exactly once, the same real consumption rules doArroser/doRecolter already
+  // enforce for a daytime cycle (capacity/min, range, maturity — nothing here is a free grant).
+  //
+  // Only "arroser"/"recolter" are eligible: both read `geste.poste` as a zone, the only station
+  // kind veilleuse lives on (campaign-stations.js). "Transporter" has no zone in its own geste at
+  // all — its own header comment above notes `geste.poste` is unused for that verb, a pair of
+  // paniers has nothing a veilleuse could be attached to — so a transporteuse never works at
+  // night under this mechanism, whatever it's taught; a documented scope reduction, not an
+  // oversight, against the backlog entry's more casual "Arroser/Récolter/Transporter" phrasing.
+  //
+  // Returns the Set of Rainelle ids that did real, observable work this night (see doArroser's/
+  // doRecolter's own return value) — never merely "had an active veilleuse": an empty source, an
+  // already-full destination, or a Rainelle taught a different/no verb all leave their id out,
+  // exactly the distinction garden-state-cmd-f.js needs to keep `rest` and `nightlyActivity`
+  // mutually exclusive per Rainelle per night (design §11: a veilleuse lit but idle for want of
+  // input never counts as a night of work).
+  function runNightWork(s) {
+    const worked = new Set();
+    for (const rainelle of s.rainelles) {
+      const geste = rainelle.geste;
+      if (!geste || (geste.verbe !== "arroser" && geste.verbe !== "recolter")) continue;
+      const zone = resolveKind(s, geste.poste, "zone");
+      if (!zone || !zone.veilleuse) continue;
+      const didWork =
+        geste.verbe === "arroser" ? doArroser(rainelle, s) : doRecolter(rainelle, s);
+      if (didWork) worked.add(rainelle.id);
+    }
+    return worked;
+  }
+
+  const api = {
+    CYCLE_SECONDS,
+    FAST_CYCLE_SECONDS,
+    ZONE_WORK_RANGE,
+    FATIGUED_CAPACITY_PER_CYCLE,
+    tickRainelle,
+    updateSpecimenReadiness,
+    runNightWork,
+  };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenCampaignAutomation = api;
 })(globalThis);

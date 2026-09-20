@@ -82,18 +82,55 @@
          require() resolves cultivars.js correctly regardless of require-call order, only a
          browser's deferred <script> order can. -->
     <script src="/game/cultivars.js" defer></script>
+    <!-- Epic C5.1: campaign-memory.js's freshMemory/recordRest/recordBirth/recordFirstGesture/
+         recordManualIntervention are read by garden-state-lifecycle.js/garden-state-validate.js
+         further below and by garden-state-cmd-f.js/-j.js/-k.js further below still, same ordering
+         requirement already applied to every other pure campaign module above (no dependency of
+         its own). Epic C5.3 moved this load earlier still, from just after campaign-automation.js
+         to just before it: campaign-automation.js now reads root.GardenCampaignMemory
+         (OVEREXERTION_THRESHOLD) at its own script-execution time too, the exact class of
+         missing-script ordering bug already fixed once for cultivars.js above (see that script's
+         own comment) — caught this time before shipping, by the same targeted browser check that
+         epic's own comment describes running for every campaign module moved here. -->
+    <script src="/game/campaign-memory.js" defer></script>
     <!-- Epic C2.6c: campaign-automation.js reads root.GardenConstruction (line 38 above),
-         root.GardenCampaignStations and root.GardenCultivars (both just above) at its own
+         root.GardenCampaignStations and root.GardenCultivars (both above) at its own
          script-execution time, and is itself read the same way by garden-state-validate.js
          (CYCLE_SECONDS) and garden-state.js (tickRainelle/updateSpecimenReadiness) below — so it
-         must load after its three dependencies and before both. -->
+         must load after its dependencies and before both. Epic C5.3 adds a fourth dependency,
+         root.GardenCampaignMemory (OVEREXERTION_THRESHOLD), loaded just above for exactly this. -->
     <script src="/game/campaign-automation.js" defer></script>
+    <!-- Epic C5.5: campaign-scenes.js reads root.GardenCampaignStations (loaded much earlier
+         above) at its own execution time. Epic C2.8v-a moved this load earlier still, from just
+         after rainelles-status.js to just before it: rainelle-movement.js (next below) needs it,
+         and rainelles-status.js now needs rainelle-movement.js in turn — the same "load before
+         every reader" discipline already applied to campaign-memory.js above. -->
+    <script src="/game/campaign-scenes.js" defer></script>
+    <!-- Epic C5.10: rainelle-movement.js reads root.GardenConstruction (loaded much earlier
+         above), root.GardenCampaignStations and root.GardenCampaignScenes (LOCATIONS, just
+         above) at its own execution time. Epic C2.8v-a moved this load earlier still, from just
+         after campaign-scenes.js/before rainelles-status.js's own former position to just before
+         rainelles-status.js: that file now reads root.GardenRainelleMovement (MAX_WAIT_STEPS) at
+         its own script-execution time too, the exact class of missing-script ordering bug already
+         fixed for cultivars.js/campaign-memory.js above. -->
+    <script src="/game/rainelle-movement.js" defer></script>
     <!-- Epic C2.8: pure diagnostics over rainelles.js/campaign-stations.js/cultivars.js/
          campaign-automation.js, none of which read it back (no HUD wired to it yet, same
          "posed, not wired" gap already left for rainelles.js's own phrase/trajectory helpers) —
          loaded here anyway, right after its last dependency, to avoid the exact class of missing-
-         script bug documented above for campaign-clock.js/rainelles.js/cultivars.js. -->
+         script bug documented above for campaign-clock.js/rainelles.js/cultivars.js. Epic C2.8v-a
+         adds a fourth dependency, root.GardenRainelleMovement (MAX_WAIT_STEPS), loaded just above
+         for exactly this. -->
     <script src="/game/rainelles-status.js" defer></script>
+    <!-- Epic C2.9: campaign-observation.js reads root.GardenCampaignStations (loaded much
+         earlier above), root.GardenCampaignAutomation, root.GardenRainelleMovement and
+         root.GardenRainellesStatus (all three just above) at its own script-execution time —
+         loaded right after its last dependency, same "load before every reader" discipline
+         already applied to every other campaign module above. hud-panel-rows.js (much further
+         below) reads root.GardenCampaignObservation only inside a function body, at draw time,
+         long after every script has loaded, so this file's own position only has to satisfy its
+         own dependencies, not hud-panel-rows.js's. -->
+    <script src="/game/campaign-observation.js" defer></script>
     <!-- Epic C1.5: moved here from much further below (its previous position after garden-
          state-cmd-e.js): garden-state-validate.js now also reads root.GardenGenetics (AXES,
          founders, to validate a pinned trait) at script-execution time, the same ordering fix
@@ -146,6 +183,12 @@
     <!-- Epic C1.5: garden-state-cmd-o.js reads root.GardenGenetics at its own execution time,
          loaded much earlier above (see the C1.5 comment there). -->
     <script src="/garden-state-cmd-o.js" defer></script>
+    <!-- Epic C5.2: garden-state-cmd-p.js reads root.GardenCampaignStations at its own execution
+         time, loaded much earlier above (see the C2.6a comment there). -->
+    <script src="/garden-state-cmd-p.js" defer></script>
+    <!-- Epic C5.4: garden-state-cmd-q.js reads root.GardenCampaignStations at its own execution
+         time, loaded much earlier above (see the C2.6a comment there). -->
+    <script src="/garden-state-cmd-q.js" defer></script>
     <script src="/game/save.js" defer></script>
     <script src="/garden-models.js" defer></script>
     <script src="/garden-models-leaf.js" defer></script>
@@ -164,6 +207,17 @@
          dependency at load time beyond THREE, so its only ordering requirement is loading after
          /vendor/three.min.js (line 28), same as botany-hybrids.js above. -->
     <script src="/game/render-campaign-house.js" defer></script>
+    <!-- Epic C5.9: Rainelle body rendering, kept apart from render-campaign-house.js/botany-
+         hybrids.js (a creature body, not a plant skeleton or a building) but depending on
+         botany-hybrids.js at script-execution time (root.GardenBotanyHybrids, reused for its
+         leaf-organ library) — loads after it, same ordering requirement as every module here that
+         reads another root.Garden* object at its own execution time. -->
+    <script src="/game/render-rainelles.js" defer></script>
+    <!-- Epic C5.13: campaign stations rendering (bornes/zones/paniers/habitats), self-contained
+         beyond THREE like render-campaign-house.js/render-rainelles.js above — read lazily as
+         `window.GardenRenderCampaignStations` inside render-flow.js's sync(), so its only load-time
+         requirement is loading after /vendor/three.min.js, same as those two sibling modules. -->
+    <script src="/game/render-campaign-stations.js" defer></script>
     <script src="/game/render-scene.js" defer></script>
     <script src="/game/render-items.js" defer></script>
     <script src="/game/render-flow.js" defer></script>

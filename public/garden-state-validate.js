@@ -38,6 +38,10 @@
     typeof module !== "undefined"
       ? require("./game/campaign-house.js")
       : root.GardenCampaignHouse;
+  const Memory =
+    typeof module !== "undefined"
+      ? require("./game/campaign-memory.js")
+      : root.GardenCampaignMemory;
   // Epic C1.5: read here to validate a pinned trait (AXES/founders), both on s.campaignPin
   // itself and on an optional pin attached to a pending campaignPot entry below.
   const Genetics =
@@ -52,6 +56,17 @@
     typeof module !== "undefined"
       ? require("./game/campaign-automation.js")
       : root.GardenCampaignAutomation;
+  // Epic C5.10: a Rainelle's x/z are optional (null until C5.11 assigns a real position,
+  // rainelles.js's own createRainelle comment) — the only two valid shapes are "both absent/null"
+  // (no position yet) and "both finite world coordinates" (same -64..64 bound already used for
+  // s.entities/s.player/specimens/stations elsewhere in this file), never one axis set without
+  // the other.
+  function badRainellePosition(x, z) {
+    const xEmpty = x === undefined || x === null;
+    const zEmpty = z === undefined || z === null;
+    if (xEmpty !== zEmpty) return true;
+    return !xEmpty && (!finite(x, -64, 64) || !finite(z, -64, 64));
+  }
   function validate(s) {
     s = migrateLandscape(s);
     if (
@@ -433,7 +448,9 @@
               r.bourgeon !== true) ||
             // Epic C4.6: founder is optional (a pre-epic save has none yet, migrated below) but
             // must be a boolean when present — see rainelles.js's createRainelle comment.
-            (r.founder !== undefined && typeof r.founder !== "boolean"),
+            (r.founder !== undefined && typeof r.founder !== "boolean") ||
+            // Epic C5.10: x/z are optional (see badRainellePosition's own comment).
+            badRainellePosition(r.x, r.z),
         ))
     )
       throw Error("Rainelle invalide.");
@@ -593,6 +610,25 @@
           list.some((st) => !finite(st.capacity, Stations.MIN_HABITAT_CAPACITY, Infinity))
         )
           throw Error("Registre de stations invalide.");
+        // Epic C5.2: veilleuse is optional so a pre-epic zone still loads (defaulted to false
+        // below, same posture as a panier's buffer/capacity/min at C2.6c/C2.8); when present, it
+        // must be a real boolean, never a truthy stand-in (0/1/"true"/etc.).
+        if (
+          kind === "zone" &&
+          list.some((st) => st.veilleuse !== undefined && typeof st.veilleuse !== "boolean")
+        )
+          throw Error("Registre de stations invalide.");
+        // Epic C5.4: priseFortDebit is optional so a pre-epic borne still loads (defaulted to
+        // false below, same posture as a zone's veilleuse at C5.2); when present, it must be a
+        // real boolean, never a truthy stand-in.
+        if (
+          kind === "borne" &&
+          list.some(
+            (st) =>
+              st.priseFortDebit !== undefined && typeof st.priseFortDebit !== "boolean",
+          )
+        )
+          throw Error("Registre de stations invalide.");
         if (!count(s.campaignStations[counter]))
           throw Error("Registre de stations invalide.");
         if (
@@ -648,6 +684,82 @@
         new Set(s.campaignFlags).size !== s.campaignFlags.length)
     )
       throw Error("Indicateurs narratifs invalides.");
+    // Epic C5.1/C5.2/C5.3: campaignMemory is a bounded journal (campaign-memory.js), never an
+    // arbitrary object — rest/firstGesture/nightlyActivity/overexertion only ever key an id that
+    // actually resolves to a real s.rainelles entry (never a stale/hand-edited reference), births
+    // is a flat unique list of such ids, manualInterventions a bare count, and the four still-
+    // reserved fields (no epic writes real values into them yet, see campaign-memory.js's own
+    // header comment) are only type-checked against their fresh() shape so a future epic's first
+    // real write still loads.
+    if (s.campaignMemory !== undefined) {
+      const M = s.campaignMemory;
+      const rainelleIds = new Set((s.rainelles || []).map((r) => r?.id));
+      // Epic C5.4: waterWithdrawals is keyed by borne id, not Rainelle id — same "must resolve
+      // to a real registered entry" discipline as rest/nightlyActivity/overexertion above, just
+      // against campaignStations.bornes instead of s.rainelles.
+      const borneIds = new Set(
+        (s.campaignStations?.bornes || []).map((b) => b?.id),
+      );
+      if (
+        typeof M !== "object" ||
+        M === null ||
+        typeof M.rest !== "object" ||
+        M.rest === null ||
+        Object.entries(M.rest).some(
+          ([id, n]) => !rainelleIds.has(id) || !count(n),
+        ) ||
+        !Array.isArray(M.births) ||
+        M.births.some((id) => typeof id !== "string" || !rainelleIds.has(id)) ||
+        new Set(M.births).size !== M.births.length ||
+        typeof M.firstGesture !== "object" ||
+        M.firstGesture === null ||
+        Object.entries(M.firstGesture).some(
+          ([id, verbe]) => !rainelleIds.has(id) || !Rainelles.VERBS.includes(verbe),
+        ) ||
+        !count(M.manualInterventions) ||
+        // Epic C5.2: nightlyActivity is now a real, written field — validated exactly like rest
+        // just above (same per-Rainelle-id-to-count shape, same recordX call-site discipline).
+        typeof M.nightlyActivity !== "object" ||
+        M.nightlyActivity === null ||
+        Object.entries(M.nightlyActivity).some(
+          ([id, n]) => !rainelleIds.has(id) || !count(n),
+        ) ||
+        // Epic C5.3: overexertion is optional here (undefined) so a save from between C5.1 and
+        // C5.3 — campaignMemory already present, this field simply never added yet — still
+        // validates; the post-clone migration below fills it in. When present, same per-Rainelle-
+        // id-to-count shape as rest/nightlyActivity above.
+        (M.overexertion !== undefined &&
+          (typeof M.overexertion !== "object" ||
+            M.overexertion === null ||
+            Object.entries(M.overexertion).some(
+              ([id, n]) => !rainelleIds.has(id) || !count(n),
+            ))) ||
+        // Epic C5.4: waterWithdrawals is now a real, written field — validated exactly like
+        // rest/nightlyActivity above, keyed against borneIds instead of rainelleIds.
+        typeof M.waterWithdrawals !== "object" ||
+        M.waterWithdrawals === null ||
+        Object.entries(M.waterWithdrawals).some(
+          ([id, n]) => !borneIds.has(id) || !count(n),
+        ) ||
+        !Array.isArray(M.habitatTransformations) ||
+        typeof M.unsoldStock !== "object" ||
+        M.unsoldStock === null ||
+        typeof M.contractsFed !== "object" ||
+        M.contractsFed === null ||
+        // Epic C5.7: persistentGestureIds is optional here, same reasoning as overexertion above
+        // (a save from between C5.1/C5.6 and C5.7 already has campaignMemory but never this
+        // field) — the post-clone migration below fills it in. When present, same "flat, unique,
+        // must resolve to a real Rainelle id" shape as births.
+        (M.persistentGestureIds !== undefined &&
+          (!Array.isArray(M.persistentGestureIds) ||
+            M.persistentGestureIds.some(
+              (id) => typeof id !== "string" || !rainelleIds.has(id),
+            ) ||
+            new Set(M.persistentGestureIds).size !==
+              M.persistentGestureIds.length))
+      )
+        throw Error("Mémoire de campagne invalide.");
+    }
     const result = clone(s);
     result.hotbar ??= [...D.defaultHotbar];
     result.quests ??= { active: [], completed: [] };
@@ -681,10 +793,15 @@
     // exactly the individual that was in fact created first) only when the field is entirely
     // absent; a rainelle that already carries a real `founder` (from createRainelle, post-epic)
     // keeps it untouched by the spread below.
+    // Epic C5.10: x/z migrate per rainelle to `null` (no position yet), same reasoning as job/
+    // bourgeon just above — a pre-epic rainelle only lacks these two fields, never guessed from
+    // a habitat/spawn coordinate here (that real assignment is C5.11's own job).
     result.rainelles = (result.rainelles ?? []).map((r, i) => ({
       job: null,
       bourgeon: null,
       founder: i === 0,
+      x: null,
+      z: null,
       ...r,
     }));
     result.rainelleNextId ??= 1;
@@ -720,6 +837,16 @@
         ...p,
       }),
     );
+    // Epic C5.2: veilleuse migrates per zone, same reasoning as a panier's buffer/capacity/min
+    // just above — a pre-epic zone only lacks this one field, defaulted off (no free night work).
+    result.campaignStations.zones = (result.campaignStations.zones ?? []).map(
+      (z) => ({ veilleuse: false, ...z }),
+    );
+    // Epic C5.4: priseFortDebit migrates per borne, same reasoning as a zone's veilleuse just
+    // above — a pre-epic borne only lacks this one field, defaulted off (no free flow boost).
+    result.campaignStations.bornes = (result.campaignStations.bornes ?? []).map(
+      (b) => ({ priseFortDebit: false, ...b }),
+    );
     result.campaignHouse ??= House.freshHouse();
     // Epic C4.1: a pre-epic save has campaignHouse but no furnitureMarks at all (the object
     // above only fires when campaignHouse itself is entirely missing) — defaulted here too, same
@@ -729,6 +856,17 @@
     result.campaignFlags ??= [];
     // Epic C1.5: a pre-epic save simply has no pin awaiting its next sowPot.
     result.campaignPin ??= null;
+    // Epic C5.1: a pre-epic save simply has no journal yet — fresh, empty, exactly what a new
+    // save would already have (never reconstructed from history that was never recorded).
+    result.campaignMemory ??= Memory.freshMemory();
+    // Epic C5.3: a save with an existing campaignMemory but no overexertion field yet (created
+    // between C5.1 and C5.3) migrates to an empty streak map — never guessed from nightlyActivity
+    // history that was never recorded as a streak.
+    result.campaignMemory.overexertion ??= {};
+    // Epic C5.7: a save with an existing campaignMemory but no persistentGestureIds field yet
+    // (created between C5.1/C5.6 and C5.7) migrates to an empty list — never guessed from
+    // overexertion history that never recorded which Rainelle was actually caught persisting.
+    result.campaignMemory.persistentGestureIds ??= [];
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };

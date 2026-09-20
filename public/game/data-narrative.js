@@ -91,6 +91,51 @@
       title: "Le chemin d’eau",
       text: "Une ancienne étiquette a été retournée. Dessous figure un autre nom de créatrice.",
     },
+    // Epic C5.6 (design §10, chapitre 14 "La pause qui ne commence pas" ; design §11, scène de
+    // référence du même nom) : révélée la toute première fois qu'une nuit résolue
+    // (garden-state-cmd-f.js's "sleep") détecte au moins une Rainelle en persistance de geste
+    // (campaign-scenes.js's detectPersistentGestures) — jamais à l'armement d'une veilleuse,
+    // seulement au moment où le fait se produit réellement. Texte repris quasi mot pour mot de
+    // l'exemple donné par le backlog lui-même pour cet epic : un constat factuel (« elle refait
+    // le geste », « le panier est vide »), jamais une accusation portée sur le joueur ni un
+    // diagnostic plaqué sur la Rainelle (design §11 : « le jeu ne prétend pas lire les
+    // motivations ; il confronte des actions et leurs résultats »).
+    "persistance-geste-vide": {
+      id: "persistance-geste-vide",
+      trigger: "persistentGestureDetected",
+      title: "Le geste qui continue",
+      text: "Elle refait le geste. Le panier est vide.",
+    },
+    // Epic C5.6 : révélée la première fois qu'une nuit résolue ne détecte aucune Rainelle en
+    // persistance de geste alors qu'au moins une veilleuse a déjà réellement produit du travail
+    // sur cette partie (campaignMemory.nightlyActivity non vide — le seul fait déjà existant
+    // qui atteste qu'une veilleuse a été utilisée pour de vrai, plutôt que d'ajouter un nouveau
+    // champ pour la seule occasion de ce texte). Même esprit que le texte de repli du design pour
+    // le chapitre 13 : reconnaît un joueur attentif sans lui attribuer une vertu qu'aucun fait ne
+    // prouve par ailleurs (design §11 : « une commande refusée ne devient jamais un dommage
+    // fictif attribué au joueur », lu ici à l'identique dans l'autre sens : l'absence de dommage
+    // devient un fait reconnaissable, pas supposé).
+    "nuit-attentive-reconnue": {
+      id: "nuit-attentive-reconnue",
+      trigger: "attentiveNightRecognized",
+      title: "Une communauté qui sait s’arrêter",
+      text: "Aucun geste ne se répète devant un poste vide. La communauté sait déjà s’arrêter.",
+    },
+    // Epic C5.7 (design §11, "réparation... coût réel" ; design ch. 14, "elle interrompt une
+    // première fois le geste, sans redevenir instantanément disponible") : révélée la toute
+    // première fois qu'une Rainelle déjà vue en persistance de geste (C5.6) repasse à repos réel
+    // après avoir cessé d'être sursollicitée — jamais au moment où le joueur coupe la veilleuse,
+    // seulement quand le fait se produit réellement, une ou plusieurs nuits plus tard
+    // (campaign-scenes.js's detectRepairedGestures, appelé depuis garden-state-cmd-f.js's
+    // "sleep"). Texte factuel, jamais un texte de félicitations adressé au joueur (design §11 :
+    // "le résultat de la réparation n'appartient pas entièrement au joueur") : il constate un
+    // arrêt, pas une guérison ni un pardon accordé.
+    "geste-qui-sarrete": {
+      id: "geste-qui-sarrete",
+      trigger: "persistentGestureRepaired",
+      title: "Le geste qui s’arrête",
+      text: "Elle s’assied près de l’eau. Le geste ne reprend pas.",
+    },
   };
 
   function findByTrigger(signal) {
