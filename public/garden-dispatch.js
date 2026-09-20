@@ -195,6 +195,27 @@
       case "observation-step":
         if (A.paused) A.game.step(GardenCampaignAutomation.CYCLE_SECONDS);
         break;
+      // Epic C6.2: the only real point of entry to setVeilleuse/setPriseFortDebit (C5.2/C5.4) —
+      // both commands already existed and were already reachable from GardenState.command()
+      // directly (every test since C5.2/C5.4 calls them that way), but no dispatch case ever
+      // called either one, so a player had no way to actually flip either flag. Unlike "setting"
+      // above (which recomputes the flip here, `!A.game.s.settings[data.key]`), `data.active` is
+      // computed once by the row itself at draw time (hud-panel.js, `!zone.veilleuse`/
+      // `!borne.priseFortDebit`) and forwarded as-is — this file only relays it to the command.
+      case "toggle-veilleuse":
+        A.execute({
+          type: "setVeilleuse",
+          zoneId: data.zoneId,
+          active: data.active,
+        });
+        break;
+      case "toggle-prise-fort-debit":
+        A.execute({
+          type: "setPriseFortDebit",
+          borneId: data.borneId,
+          active: data.active,
+        });
+        break;
       // Epic C2.5v-b (C2.5's own screen/trajectory/camera, deferred from C2.5 — see
       // garden-state-cmd-k.js's header comment): the real trigger the mandate requires, wired
       // exactly like "confirm-night"'s own beginGestureScene call site just below in this file —

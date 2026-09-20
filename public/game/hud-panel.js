@@ -404,6 +404,35 @@
             data: { id: r.id },
             disabled: !!m.s.campaignTeaching,
           });
+        // Epic C6.2: the transfer rows built into the cache below already display veilleuse/
+        // priseFortDebit (design §5's "un mode d'observation en lecture seule" — C2.9), but no
+        // command ever reached them (verified: no setVeilleuse/setPriseFortDebit call site in
+        // this file before this epic) — the exact same "moteur posé avant l'écran qui l'atteint"
+        // gap C2.5v-b already closed for teaching. Kept out of the elapsed-memoized cache below
+        // for the same reason as the Rainelle rows just above: setVeilleuse/setPriseFortDebit
+        // (garden-state-cmd-p.js/-q.js) never advance s.elapsed themselves (only a real tick
+        // does), so a row cached on s.elapsed would keep showing the pre-click label until the
+        // next tick landed instead of reflecting the click immediately.
+        for (const zone of m.s.campaignStations.zones)
+          rows.push({
+            title: `Zone ${zone.id} — veilleuse`,
+            detail: zone.veilleuse
+              ? "Allumée : la zone continue de travailler la nuit."
+              : "Éteinte : la zone se repose la nuit.",
+            action: "toggle-veilleuse",
+            data: { zoneId: zone.id, active: !zone.veilleuse },
+            buttonLabel: zone.veilleuse ? "Éteindre" : "Allumer",
+          });
+        for (const borne of m.s.campaignStations.bornes)
+          rows.push({
+            title: `Borne ${borne.id} — prise à fort débit`,
+            detail: borne.priseFortDebit
+              ? "Activée : le débit augmente au prix du bassin commun."
+              : "Désactivée : débit normal, le bassin commun ne baisse pas pour cette borne.",
+            action: "toggle-prise-fort-debit",
+            data: { borneId: borne.id, active: !borne.priseFortDebit },
+            buttonLabel: borne.priseFortDebit ? "Éteindre" : "Allumer",
+          });
         if (!this._observationCache || this._observationCache.elapsed !== m.s.elapsed) {
           const Observation = window.GardenCampaignObservation;
           const KIND_LABELS = { borne: "Borne", zone: "Zone", panier: "Panier" };
