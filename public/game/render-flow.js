@@ -147,6 +147,41 @@
           }
           rm.group.position.set(r.x, y, r.z);
         }
+      // Epic C5.13: every borne/zone/panier/habitat in the registry (campaign-stations.js) gets a
+      // Group built once per station id and cached in `this.stationModels` — the exact
+      // "build once, reposition/update on real change, never rebuild every frame" pattern
+      // `this.rainelleModels`/`this.models` already use above. Positions in the registry never
+      // change after registration (no relocation command exists for any station kind today), so
+      // this only ever sets `.position` once per new id; `updateStationGroup` below still runs
+      // every sync() call but is a no-op unless a borne's `priseFortDebit`/a zone's `veilleuse`
+      // actually flipped since the group was last built.
+      const RenderStations = window.GardenRenderCampaignStations;
+      if (RenderStations && s.campaignStations) {
+        const liveIds = new Set();
+        for (const kind of ["borne", "zone", "panier", "habitat"]) {
+          const collection = kind === "borne" ? "bornes" : kind === "zone" ? "zones" : kind === "panier" ? "paniers" : "habitats";
+          for (const station of s.campaignStations[collection] || []) {
+            liveIds.add(station.id);
+            let sm = this.stationModels.get(station.id);
+            if (!sm) {
+              const group = RenderStations.buildStationGroup(kind, station);
+              group.position.set(station.x, Terrain.terrainHeight(station.x, station.z), station.z);
+              this.scene.add(group);
+              sm = { kind, group };
+              this.stationModels.set(station.id, sm);
+              this.batchDirty = true;
+            }
+            RenderStations.updateStationGroup(kind, station, sm.group);
+          }
+        }
+        for (const [id, sm] of this.stationModels) {
+          if (!liveIds.has(id)) {
+            this.scene.remove(sm.group);
+            this.stationModels.delete(id);
+            this.batchDirty = true;
+          }
+        }
+      }
       const signature = JSON.stringify([
         s.links,
         s.entities.map((e) => [e.id, e.x, e.z, e.stored]),

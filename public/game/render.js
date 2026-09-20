@@ -43,6 +43,10 @@
       // kept separate since a Rainelle is never one of `s.entities` (see rainelles.js's own header
       // comment on why the campaign layer's arrays stay disjoint from the free garden's).
       this.rainelleModels = new Map();
+      // Epic C5.13: one entry per station id (borne/zone/panier/habitat, campaign-stations.js),
+      // id -> { kind, group } — same "build once, cache, reposition/update every sync" pattern as
+      // `this.rainelleModels` just above.
+      this.stationModels = new Map();
       this.zoneModels = [];
       this.nodes = new Map();
       this.routes = [];

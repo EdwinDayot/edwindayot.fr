@@ -145,6 +145,32 @@ const TRANSPARENT_ALLOWLIST = [
         v.sync();
       }
 
+      // Epic C5.13 (docs/campagne-backlog.md): the campaign stations registry (bornes/zones/
+      // paniers/habitats, campaign-stations.js) rendered through this exact live-page scene
+      // graph, same reason as every block above — this audit is the real gate for a rendering
+      // epic, never a screenshot a model merely looks at. No command places a station in a real
+      // save yet (verified, see this module's own header), so stations are pushed directly into
+      // the live save's registry, same posture the C5.11 block above already uses for its own
+      // synthetic cultivar/Rainelle. One of each kind, PLUS a second borne/zone with their signal
+      // flag (priseFortDebit/veilleuse) turned on, to exercise the emissive-signal branch against
+      // the real scene graph, not just the Node-only unit tests
+      // (tests/campaign-station-render.cjs). Positioned far off the playable area.
+      if (window.GardenCampaignStations && window.GardenRenderCampaignStations && window.GardenApp.game) {
+        const s = window.GardenApp.game.s;
+        const Stations = window.GardenCampaignStations;
+        s.campaignStations ??= { bornes: [], zones: [], paniers: [], borneNextId: 1, zoneNextId: 1, panierNextId: 1, habitats: [], habitatNextId: 1 };
+        Stations.registerStation(s.campaignStations, "borne", { x: 240, z: 200 });
+        const activeBorne = Stations.registerStation(s.campaignStations, "borne", { x: 241, z: 200 });
+        activeBorne.priseFortDebit = true;
+        Stations.registerStation(s.campaignStations, "zone", { x: 240, z: 202 });
+        const activeZone = Stations.registerStation(s.campaignStations, "zone", { x: 242.5, z: 202 });
+        activeZone.veilleuse = true;
+        const panier = Stations.registerStation(s.campaignStations, "panier", { x: 240, z: 205 });
+        const habitat = Stations.registerStation(s.campaignStations, "habitat", { x: 241, z: 207, capacity: 2 });
+        v.sync();
+        window.__auditStationIds = { activeBorne: activeBorne.id, activeZone: activeZone.id, panier: panier.id, habitat: habitat.id };
+      }
+
       // Sample a few times of day: a defect that only shows under one lighting angle (the
       // terrain-normal bug was exactly this — it read fine at some sun angles) must not hide.
       const times = [50, 300, 600, 900, 1150];
@@ -220,7 +246,26 @@ const TRANSPARENT_ALLOWLIST = [
           }
         : { found: false };
 
-      return { suspiciousTransparent, badNormals, nanMeshes, materialCount: seen.size, wiring };
+      // Epic C5.13: same confirmation as C5.11's wiring block just above, for the stations
+      // registered further up — a Group was actually built by sync() through the real
+      // v.stationModels cache and added to the scene, not just constructible in isolation (that
+      // part is already covered by tests/campaign-station-render.cjs).
+      let stationWiring = { found: false };
+      if (window.__auditStationIds) {
+        const ids = window.__auditStationIds;
+        const borneSm = v.stationModels.get(ids.activeBorne);
+        const zoneSm = v.stationModels.get(ids.activeZone);
+        const panierSm = v.stationModels.get(ids.panier);
+        const habitatSm = v.stationModels.get(ids.habitat);
+        stationWiring = {
+          found: !!(borneSm && zoneSm && panierSm && habitatSm),
+          allInScene: [borneSm, zoneSm, panierSm, habitatSm].every((sm) => sm && sm.group.parent === v.scene),
+          borneActiveEmissive: borneSm && borneSm.group.userData.bead.material.emissiveIntensity,
+          zoneActiveEmissive: zoneSm && zoneSm.group.userData.lamp.material.emissiveIntensity,
+        };
+      }
+
+      return { suspiciousTransparent, badNormals, nanMeshes, materialCount: seen.size, wiring, stationWiring };
     });
 
     if (consoleErrors.length)
@@ -230,6 +275,11 @@ const TRANSPARENT_ALLOWLIST = [
     assert.equal(audit.wiring.inScene, true, "C5.11: the Rainelle's Group was never added to the real scene");
     assert.equal(audit.wiring.position[0], 205, "C5.11: the Rainelle's Group x does not match its rainelle.x");
     assert.equal(audit.wiring.position[2], 216, "C5.11: the Rainelle's Group z does not match its rainelle.z");
+
+    assert.equal(audit.stationWiring.found, true, "C5.13: sync() never built a Group for one of the four registered stations");
+    assert.equal(audit.stationWiring.allInScene, true, "C5.13: a station Group was never added to the real scene");
+    assert.equal(audit.stationWiring.borneActiveEmissive, 0.35, "C5.13: an active borne's bead is not emissive at the documented signal intensity");
+    assert.equal(audit.stationWiring.zoneActiveEmissive, 0.35, "C5.13: an active zone's lamp is not emissive at the documented signal intensity");
 
     assert.deepEqual(audit.nanMeshes, [], "Meshes with non-finite vertex positions: " + audit.nanMeshes.join(", "));
     assert.deepEqual(

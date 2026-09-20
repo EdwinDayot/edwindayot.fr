@@ -213,6 +213,11 @@
          leaf-organ library) — loads after it, same ordering requirement as every module here that
          reads another root.Garden* object at its own execution time. -->
     <script src="/game/render-rainelles.js" defer></script>
+    <!-- Epic C5.13: campaign stations rendering (bornes/zones/paniers/habitats), self-contained
+         beyond THREE like render-campaign-house.js/render-rainelles.js above — read lazily as
+         `window.GardenRenderCampaignStations` inside render-flow.js's sync(), so its only load-time
+         requirement is loading after /vendor/three.min.js, same as those two sibling modules. -->
+    <script src="/game/render-campaign-stations.js" defer></script>
     <script src="/game/render-scene.js" defer></script>
     <script src="/game/render-items.js" defer></script>
     <script src="/game/render-flow.js" defer></script>
