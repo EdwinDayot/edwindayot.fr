@@ -6,12 +6,22 @@
    left untouched by this command, same posture as signContract/deliverContract never
    renegotiating it. Not a world entity command (no c.id — a contract is addressed by
    c.contractId, same posture as signContract/deliverContract), so not added to garden-state.js's
-   `physical` list. */
+   `physical` list.
+
+   Epic C6.9 (design §10, chapitre 16 ; §11, tableau des trois leviers) adds the narrative reveal
+   of this lever's "coût réel" : gated on "archives-restaurees" (C6.7, séquencement acte VI) and
+   on Memory.contractsFed[contract.id] > 0 (a real production already under way, not a contract
+   never delivered against) — checked before the mutation, though reduceContractQuota never
+   touches contractsFed itself, so the order cannot matter. */
 (function (root) {
   const Contracts =
     typeof module !== "undefined"
       ? require("./game/campaign-contracts.js")
       : root.GardenCampaignContracts;
+  const Narrative =
+    typeof module !== "undefined"
+      ? require("./game/data-narrative.js")
+      : root.GardenNarrative;
   const { count } =
     typeof module !== "undefined"
       ? require("./garden-state-util.js")
@@ -25,6 +35,7 @@
         if (!contract) return fail("Contrat inconnu.");
         if (!count(c.quota) || c.quota < 0)
           return fail("Nouveau quota invalide.");
+        const fedBefore = s.campaignMemory.contractsFed[contract.id] || 0;
         const result = Contracts.reduceContractQuota(
           contract,
           s.campaignMemory.contractsFed,
@@ -33,6 +44,13 @@
         if (!result.ok) return fail(result.error);
         contract.quota = result.quota;
         st.message = `Contrat réduit à ${result.quota} unité(s).`;
+        if (s.campaignFlags.includes("archives-restaurees") && fedBefore > 0) {
+          const revealed = Narrative.pendingReveal(
+            s.campaignFlags,
+            "contractQuotaReducedWithCost",
+          );
+          if (revealed) s.campaignFlags.push(revealed.id);
+        }
       }
       return null;
     },

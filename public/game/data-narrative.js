@@ -309,6 +309,37 @@
       title: "Les deux noms",
       text: "Les deux noms reprennent leur place sur les étiquettes. Alma reconnaît : « Au début, je ne savais pas. Ensuite, je savais surtout comment ne plus y penser. »",
     },
+    // Epic C6.9 (design §10, chapitre 16 "Ce qu'on accepte de perdre" ; §11, tableau des trois
+    // leviers, colonne "réparation avec coût réel"). Révélée depuis garden-state-cmd-t.js, gardée
+    // sur "archives-restaurees" (C6.7, ancrage de séquencement de l'acte VI) et sur
+    // Memory.contractsFed[contract.id] > 0 au moment de la réduction (une vraie production déjà en
+    // cours, pas un contrat jamais entamé) — jamais une accusation rétroactive, seulement la prime
+    // perdue, exactement "sans dette en cascade" lu littéralement (design §10).
+    "levier-contrat-reduit": {
+      id: "levier-contrat-reduit",
+      trigger: "contractQuotaReducedWithCost",
+      title: "Une commande réduite",
+      text: "Le contrat est réduit : la prime des unités qui ne seront plus livrées est perdue, sans dette sur ce qui a déjà été livré.",
+    },
+    // Révélée depuis garden-state-cmd-p.js, gardée sur "archives-restaurees" et sur une vraie
+    // transition true→false (jamais un appel qui ne change rien) à un moment où
+    // Memory.nightlyActivity contient déjà au moins une entrée (même garde que
+    // "nuit-attentive-reconnue", C5.6) — la veilleuse a réellement servi avant d'être coupée.
+    "levier-veilleuse-coupee": {
+      id: "levier-veilleuse-coupee",
+      trigger: "veilleuseTurnedOffAfterUse",
+      title: "Une veilleuse coupée",
+      text: "La veilleuse s’éteint. Le repos qu’elle empêchait redevient possible, là où elle a réellement servi.",
+    },
+    // Révélée depuis garden-state-cmd-q.js, même discipline que "levier-veilleuse-coupee" :
+    // transition true→false réelle, à un moment où Memory.waterWithdrawals[borneId] > 0 (la prise
+    // a réellement prélevé de l'eau avant d'être restituée).
+    "levier-prise-restituee": {
+      id: "levier-prise-restituee",
+      trigger: "priseFortDebitRestoredAfterUse",
+      title: "Une prise restituée",
+      text: "La prise à fort débit est restituée. Le bassin commun cesse de baisser, sans remonter aussitôt.",
+    },
   };
 
   function findByTrigger(signal) {
