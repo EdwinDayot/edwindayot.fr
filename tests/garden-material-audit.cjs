@@ -199,6 +199,36 @@ const TRANSPARENT_ALLOWLIST = [
         v.sync();
       }
 
+      // Epic C6.14 (docs/campagne-backlog.md): the chapter-17 passage point (campaign-passage.js,
+      // C6.12/C6.13), exercised through this exact live-page scene graph AND the real sync()/
+      // command wiring, same reason as every block above — this audit is the real gate for a
+      // rendering epic, never a screenshot a model merely looks at. A fresh save already carries
+      // a real, blocked s.campaignPassage (C6.12/C6.13) — render-houses.js's
+      // buildCampaignPassage() ran once already at world()-build time, before this script even
+      // runs, so the initial blocked Group is read here rather than built in isolation. The real
+      // `restorePassage` command (garden-state-cmd-w.js) then flips it, and v.sync()'s own
+      // reactive check (render-flow.js) is exercised to confirm the Group rebuilds to the open
+      // state through the real wiring, never hand-constructed for this check.
+      let passageWiring = { found: false };
+      if (window.GardenCampaignPassage && window.GardenRenderCampaignPassage && window.GardenApp.game) {
+        const blockedGroup = v.campaignPassageGroup;
+        const initiallyBlocked = blockedGroup ? blockedGroup.userData.blocked : null;
+        const initialPosition = blockedGroup ? blockedGroup.position.toArray() : null;
+        window.GardenApp.game.command({ type: "restorePassage" });
+        v.sync();
+        const openGroup = v.campaignPassageGroup;
+        passageWiring = {
+          found: !!(blockedGroup && openGroup),
+          initiallyBlocked,
+          initialPosition,
+          rebuiltOpen: openGroup ? openGroup.userData.blocked === false : false,
+          sameGroupInstance: blockedGroup === openGroup,
+          inScene: openGroup ? openGroup.parent === v.scene : false,
+          expectedX: window.GardenCampaignPassage.PASSAGE_POSITION.x,
+          expectedZ: window.GardenCampaignPassage.PASSAGE_POSITION.z,
+        };
+      }
+
       // Sample a few times of day: a defect that only shows under one lighting angle (the
       // terrain-normal bug was exactly this — it read fine at some sun angles) must not hide.
       const times = [50, 300, 600, 900, 1150];
@@ -315,6 +345,7 @@ const TRANSPARENT_ALLOWLIST = [
         wiring,
         stationWiring,
         teachingWiring,
+        passageWiring,
       };
     });
 
@@ -336,6 +367,14 @@ const TRANSPARENT_ALLOWLIST = [
     assert.ok(audit.teachingWiring.tileCount >= 3, "C2.5v-b: expected at least one tile per resolved station point");
     assert.equal(audit.teachingWiring.hex, "6d9365", "C2.5v-b: the overlay must reuse the documented 'survol de portée' hex, not an invented tint");
     assert.ok(audit.teachingWiring.opacity <= 0.15, "C2.5v-b: overlay opacity exceeds the documented allowlist ceiling for color 6d9365");
+
+    assert.equal(audit.passageWiring.found, true, "C6.14: sync() never built a Group for the campaign passage point");
+    assert.equal(audit.passageWiring.initiallyBlocked, true, "C6.14: a fresh save's passage should render blocked by default");
+    assert.equal(audit.passageWiring.initialPosition[0], audit.passageWiring.expectedX, "C6.14: passage Group x does not match PASSAGE_POSITION.x");
+    assert.equal(audit.passageWiring.initialPosition[2], audit.passageWiring.expectedZ, "C6.14: passage Group z does not match PASSAGE_POSITION.z");
+    assert.equal(audit.passageWiring.rebuiltOpen, true, "C6.14: sync() never rebuilt the passage Group to the open/franchissable state after restorePassage");
+    assert.equal(audit.passageWiring.sameGroupInstance, false, "C6.14: the passage Group should be rebuilt (not mutated in place) on a blocked-state change, same pattern as buildCampaignHouse");
+    assert.equal(audit.passageWiring.inScene, true, "C6.14: the rebuilt passage Group was never added to the real scene");
 
     assert.deepEqual(audit.nanMeshes, [], "Meshes with non-finite vertex positions: " + audit.nanMeshes.join(", "));
     assert.deepEqual(

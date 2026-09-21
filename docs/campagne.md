@@ -2872,3 +2872,77 @@ Aucun choix déjà confirmé du design remis en cause (Alma vivante, nom des Rai
 **Pour le prochain déclenchement** : aucun epic détaillé `todo` à dépendances satisfaites ne reste dans la phase 6 — le prochain déclenchement devra à nouveau endosser le rôle Cartographe pour détailler la suite du chapitre 17 (mare/berge/accès praticable/scène finale) et le chapitre 18, dernier lot de l'acte VI, avant de pouvoir reprendre l'implémentation.
 
 Commit : voir `git log` sur `maison-des-possibles` (message « Epic C6.13 : chapitre 17, position réelle du passage et blocage effectif du graphe de navigation »). `git push origin maison-des-possibles` à confirmer par `git ls-remote origin` avant conclusion de ce déclenchement.
+
+## Déclenchement automatisé du 21 septembre 2026 — Cartographe, dixième lot de la phase 6 : rendu du passage (C6.14)
+
+**Note de cohérence** : le lot Cartographe précédent (commit `1505e87`, détaillant C6.14 dans `docs/campagne-backlog.md`) affirmait dans sa propre entrée de backlog que son « détail complet » était « également consigné dans `docs/campagne.md` » — vérifié avant d'écrire la suite : ce n'est pas le cas, aucune section correspondante n'existe dans ce fichier avant la présente entrée. Aucune conséquence pratique (le backlog lui-même, source de vérité pour le choix d'epic, portait bien le détail complet C6.14, relu intégralement au début de ce déclenchement) — signalé ici par souci d'exactitude plutôt que silencieusement corrigé sans trace, cette entrée comblant l'écart a posteriori.
+
+Vérification anti-hallucination préalable (voir `docs/orchestration.md`/`execution-continue.md`) : dernier epic marqué fait au début de ce déclenchement = C6.13 (« chapitre 17, position réelle du passage et blocage effectif du graphe de navigation »), commit `fac95fa5091db4e21393c8094cf372ab996305f9` confirmé réel par `git show --stat fac95fa` (message identique à l'entrée existante du backlog et de ce fichier). `npm ci && npm test` relancé indépendamment avant tout nouveau travail →
+
+```
+# tests 746
+# suites 0
+# pass 746
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+```
+
+Exactement le nombre annoncé (746/746), zéro régression. Aucun bandeau de pause en tête de `docs/campagne-backlog.md` (vérifié, première ligne). Aucune anomalie : `docs/campagne-anomalies.md` toujours absent (vérifié, fichier inexistant). Les trois derniers epics consignés (C6.11, C6.12, C6.13) sont tous `fait` : aucune pause anti-emballement à déclencher.
+
+## Déclenchement automatisé du 21 septembre 2026 — chapitre 17, cinquième temps : rendu du passage (epic C6.14)
+
+**Choix de l'action.** Le lot Cartographe ci-dessus (commit `1505e87`) avait déjà détaillé **C6.14** comme seul epic `todo` à dépendance satisfaite (C6.13, `fait`) de la phase 6 ; les entrées historiques non actionnables (C2.2v/C2.5v/C2.8v/C2.8v-b) restent inchangées. Choisi sans ambiguïté.
+
+**Ce qui a été fait.** Design §10, chapitre 17, clause « la mare devient réellement visible et franchissable » : le point fixe `s.campaignPassage.x`/`z` (C6.12/C6.13) porte désormais une représentation Three.js réelle, à deux états pilotés par `s.campaignPassage.blocked` :
+
+- Nouveau `public/game/render-campaign-passage.js` (module autonome, ne dépend que de `THREE`, même patron que `render-campaign-house.js`/`render-campaign-stations.js` — chargeable tel quel en Node pur). `buildPassageGroup(blocked)` construit un socle terre commun (`0xb99875`) aux deux états, puis :
+  - **Bloqué** : un amas terre + un enchevêtrement de quatre branches croisées (angles fixes, déterministes), tons bois `0xb99670`/`0x785a3e` — une silhouette nommable (« amas »), jamais une texture qui prétendrait raconter la cause, conformément au critère de sortie.
+  - **Franchissable** : un disque d'eau bas plus un anneau d'accent, tons eau `0x80c3c3`/`0x9acfd3`, roughness 0,25 — **reprise verbatim** de la recette `this.mat.water` déjà utilisée par `render.js` (couleur + roughness), jamais une nouvelle valeur inventée.
+  - Toutes les teintes utilisées étaient déjà documentées dans le tableau de palette de `direction-artistique.md` avant cet epic (terre/bois/eau) : **aucune modification de ce fichier n'était nécessaire**, vérifié explicitement. Aucun matériau émissif introduit (le point est statique, aucun flux, aucune source de lumière ajoutée — direction-artistique.md réserve l'émissif au signal d'écoulement/aux lanternes). Les deux matériaux restent pleinement opaques (`transparent` jamais réglé), comme la citerne existante — **aucune nouvelle entrée `TRANSPARENT_ALLOWLIST` nécessaire** dans `tests/garden-material-audit.cjs`, vérifié plutôt que supposé.
+  - Empreinte du socle/de l'eau ≈1,5 unité, sous le seuil de 3×3 unités que la vérification « maillage au sol » de l'audit programmatique applique (même ordre de grandeur que le lit de zone de `campaign-stations.js`, jamais signalé non plus) ; `CylinderGeometry`/`SphereGeometry`/`TorusGeometry` de Three.js calculent déjà des normales sortantes correctes par construction — aucune correction manuelle de normales nécessaire, jamais la classe de bug du terrain.
+- `public/game/render-houses.js` : nouvelle méthode `buildCampaignPassage()`, sœur directe de `buildCampaignHouse()` juste au-dessus (choix tranché parmi les deux points d'appel légitimes laissés ouverts par le Cartographe) — élément quasi statique (un seul champ mutable, `blocked`) plutôt qu'un flux par tick comme les stations. Lit paresseusement `window.GardenCampaignPassage`/`window.GardenRenderCampaignPassage`, retire puis reconstruit intégralement le `Group` (jamais une mutation en place, même patron que `campaignHouseAccueilStatus`), le positionne à `Passage.PASSAGE_POSITION` via `Terrain.terrainHeight`, et mémorise l'état construit (`this.campaignPassageBlocked`).
+- `public/game/render.js` : `world()` appelle `this.buildCampaignPassage()` juste après `buildCampaignHouse()`.
+- `public/game/render-flow.js` : `sync()` revérifie `s.campaignPassage?.blocked` à chaque appel (même emplacement que la vérification `campaignHouseAccueilStatus` déjà existante juste au-dessus) et ne rebuild que si l'état a réellement changé — jamais à chaque frame.
+- `public/index.html` : nouvelle balise `<script>` pour `render-campaign-passage.js`, après `render-campaign-teaching.js` et avant `render-scene.js` (après `render-houses.js`, son seul appelant réel — lu paresseusement, aucune dépendance d'ordre au-delà de `three.min.js`, vérifié en relisant le fichier avant d'insérer plutôt que supposé, après le bug de séquencement réellement rencontré à C6.13).
+
+**Résultat réel et complet de `npm test`** (nouveau `tests/campaign-passage-render.cjs`, 7 tests Node purs sur le modèle de `campaign-house-render.cjs` : construction sans exception des deux états ; distinction visuelle — nombre de maillages et jeu de couleurs différents, l'état ouvert introduisant l'eau, l'état bloqué le bois ; aucune métallicité ni transparence, roughness conforme (0,72 solide / 0,25 eau) ; palette strictement limitée aux hex terre/bois/eau documentés ; aucun matériau émissif ; déterminisme entre deux constructions du même état) →
+
+```
+# tests 753
+# suites 0
+# pass 753
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+```
+
+746 existants + 7 nouveaux, zéro régression.
+
+**Epic de rendu : `tests/garden-material-audit.cjs` (le vrai gate, pas une formalité) réellement exécuté par ce déclenchement, jamais supposé vert.** Bloc dédié C6.14 ajouté : lit le `Group` déjà construit par `buildCampaignPassage()` au chargement réel de la page (état par défaut `blocked: true`, `s.campaignPassage` existant depuis C6.12 sur toute sauvegarde neuve), déclenche la **vraie commande** `window.GardenApp.game.command({type: "restorePassage"})` (`garden-state-cmd-w.js`, jamais une mutation directe de l'état), rappelle `v.sync()`, et vérifie que le `Group` a été **reconstruit** (instance différente, jamais mutée en place) vers l'état ouvert, ajouté à la scène réelle, à la position exacte de `PASSAGE_POSITION`. Exécuté directement (page servie localement via `python3 -m http.server` depuis `public/`, `executablePath` réel `/opt/pw-browsers/chromium`, déjà documenté dans ce fichier de test) →
+
+```
+PASS material/geometry audit: {"materialsInspected":120,"transparentAllowed":2,"timesSampled":5}
+```
+
+Zéro erreur console/page, zéro maillage à normales retournées, zéro sommet non fini, zéro matériau transparent non expliqué (toujours seulement les deux entrées `TRANSPARENT_ALLOWLIST` déjà existantes — verre de serre, survol de portée). Toutes les assertions C6.14 (`passageWiring.found`/`initiallyBlocked`/`initialPosition`/`rebuiltOpen`/`sameGroupInstance`/`inScene`) vérifiées vraies par le test.
+
+**Relecture multimodale réelle, en complément seulement (jamais en remplacement de l'audit programmatique ci-dessus).** Nouveau `tests/campaign-passage-visual.cjs` (banc de comparaison dédié, sur le modèle de `campaign-house-visual.cjs`) exécuté directement → `PASS campaign-passage-visual: {"overlap":false,"blockedMeshCount":6,"openMeshCount":3}` (absence de pénétration de maillage grossière entre les deux états à espacement connu, nombre de maillages distinct confirmant la différence visuelle). Capture archivée `/tmp/campaign-passage-visual.png`, relue avec l'outil Read : l'état bloqué montre un amas de branches brunes croisées sur un socle terre, lisible comme un obstacle à distance sans étiquette ; l'état franchissable montre un disque d'eau turquoise bas cerné d'un anneau plus clair, cohérent avec les autres surfaces d'eau du jeu (citerne, rivière) — silhouettes suffisamment distinctes l'une de l'autre pour qu'un joueur reconnaisse le changement d'état sans texte. Aucune dérive de palette relevée par rapport à `direction-artistique.md`.
+
+`package.json` : `tests/campaign-passage-render.cjs` ajouté à la liste explicite de `test`, `tests/campaign-passage-visual.cjs` ajouté à la liste explicite de `test:browser` (le script n'énumère pas par glob, leçon déjà tirée à C2.11).
+
+**Anomalie d'environnement rencontrée et isolée, honnêtement consignée plutôt que masquée.** La commande agrégée `npm run test:browser` telle qu'écrite dans `package.json` échoue dès son tout premier script, `tests/garden-play.cjs` (« Executable doesn't exist at .../chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell »). **Confirmé sans rapport avec cet epic** : rejoué à l'identique après un `git stash` complet des changements de ce déclenchement (échec strictement identique sur le commit `1505e87` non modifié, avant tout travail de cet epic). Cause identifiée : ce conteneur ne porte que la révision Playwright 1194 (`/opt/pw-browsers/chromium_headless_shell-1194`) alors que `playwright@1.63.0` (verrouillé par `package-lock.json`) attend la révision 1243 pour la coquille headless par défaut. `tests/garden-material-audit.cjs`/`tests/campaign-*-visual.cjs` (dont les deux nouveaux fichiers de ce déclenchement) contournent déjà ce problème documenté (voir leur propre commentaire d'en-tête sur l'environnement) via un `executablePath` explicite vers `/opt/pw-browsers/chromium` (le binaire complet préinstallé, jamais téléchargé) ; `tests/garden-play.cjs` et plusieurs autres scripts plus anciens n'ont jamais porté ce contournement. Un lien symbolique de diagnostic strictement temporaire (créé sous `/opt`, jamais dans le dépôt, jamais commité, supprimé avant la fin de ce déclenchement) a permis de vérifier que forcer artificiellement la coquille 1194 sous le nom 1243 laisse `garden-play.cjs` démarrer réellement mais expose ensuite une lenteur du rendu logiciel (`swiftshader`) qui lui fait dépasser son propre délai d'attente interne (`page.waitForFunction: Timeout 25000ms exceeded`) — un problème de performance de ce conteneur précis, sans rapport avec `render-campaign-passage.js`/`render-houses.js`/`render-flow.js`/`render.js`. Le gate réellement prescrit par le critère de sortie de cet epic et par `execution-continue.md` (`tests/garden-material-audit.cjs`, explicitement nommé « le vrai gate, pas une formalité ») a été exécuté directement avec succès, comme rapporté ci-dessus — cette anomalie d'environnement n'affecte donc pas la validité de la vérification de cet epic elle-même, mais elle est consignée ici pour qu'un futur déclenchement ne la redécouvre pas en silence ni ne suppose `npm run test:browser` entièrement vert sans relire cette note. Aucun fichier de configuration/outillage du dépôt modifié pour la contourner.
+
+`/code-review` (niveau medium) exécuté sur le diff complet par l'orchestrateur lui-même (aucune délégation) : aucun défaut relevé. Vérification particulière portée sur la lecture optionnelle (`this.game.s.campaignPassage?.blocked`, jamais un accès direct qui lèverait sur une sauvegarde antérieure à C6.12) et sur la comparaison stricte de `render-flow.js` (`!!s.campaignPassage?.blocked !== this.campaignPassageBlocked`) : `this.campaignPassageBlocked` n'existe pas avant le tout premier `buildCampaignPassage()` de `world()`, donc `undefined !== true/false` déclenche un premier rebuild bénin au tout premier `sync()` — jamais un second, la variable étant alors définie et correctement comparée par la suite.
+
+Aucun choix déjà confirmé du design remis en cause (Alma vivante ; nom des Rainelles ; culpabilisation de fin de campagne — non applicable, aucun texte narratif introduit par cet epic, conformément à ses propres « limites honnêtes » : la mise en scène du chapitre 17 reste un epic de Scénariste séparé). Aucune règle de `direction-artistique.md` modifiée (toutes les teintes utilisées y étaient déjà documentées).
+
+**Limites honnêtes du lot, reconduites** (voir l'entrée C6.14 du backlog) : aucune Rainelle ne se déplace encore jusqu'à ce point ni n'y reste (scène scriptée « elle traverse, puis reste au bord de l'eau », un futur epic une fois ce rendu posé). Aucune espèce filtrante ni aucune branche « protéger d'une extension lucrative » : la seconde suppose toujours une menace de conversion commerciale absente du moteur, inchangé depuis C6.12/C6.13. Aucun texte narratif ajouté (la mise en scène du chapitre 17 reste un epic de Scénariste séparé, une fois la scène de traversée elle-même construite).
+
+**Ne ferme ni la porte de sortie de la phase 6 ni l'acte VI dans son ensemble** : la scène finale de traversée, la branche de protection contre une extension lucrative et le chapitre 18 restent `todo`/non détaillés.
+
+**Pour le prochain déclenchement** : aucun epic détaillé `todo` à dépendances satisfaites ne reste dans la phase 6 — le prochain déclenchement devra à nouveau endosser le rôle Cartographe pour détailler la scène de traversée (une fois jugée utile), la branche de protection commerciale (une fois une menace de conversion existante ailleurs dans le moteur) et le chapitre 18, dernier lot de l'acte VI.
+
+Commit : voir `git log` sur `maison-des-possibles` (message « Epic C6.14 : chapitre 17, rendu du passage (mare/berge bloquée ou franchissable) »). `git push origin maison-des-possibles` à confirmer par `git ls-remote origin` avant conclusion de ce déclenchement.

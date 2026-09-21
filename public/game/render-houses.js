@@ -51,6 +51,29 @@
       // changes (repairHouseSpace, garden-state-cmd-l.js) instead of every ~0.25s tick.
       this.campaignHouseAccueilStatus = house?.spaces?.accueil?.status;
     },
+    // Epic C6.14: the chapter-17 passage point (campaign-passage.js, C6.12/C6.13) had a real
+    // world position and an effective navigation obstacle but no representation and no scene call
+    // site before this — same gap, same "world-build time, called from render.js's world()"
+    // pattern buildCampaignHouse() just above already fills for the refuge house.
+    // window.GardenCampaignPassage/window.GardenRenderCampaignPassage are read lazily here (not
+    // top-level consts) for the same script-order-independence reason buildCampaignHouse reads
+    // window.GardenRenderCampaignHouse lazily.
+    buildCampaignPassage() {
+      const Passage = window.GardenCampaignPassage,
+        RenderPassage = window.GardenRenderCampaignPassage;
+      if (!Passage || !RenderPassage) return;
+      if (this.campaignPassageGroup) this.scene.remove(this.campaignPassageGroup);
+      const blocked = !!this.game.s.campaignPassage?.blocked;
+      this.campaignPassageGroup = RenderPassage.buildPassageGroup(blocked);
+      const x = Passage.PASSAGE_POSITION.x,
+        z = Passage.PASSAGE_POSITION.z;
+      this.campaignPassageGroup.position.set(x, Terrain.terrainHeight(x, z), z);
+      this.scene.add(this.campaignPassageGroup);
+      // Cached so render-flow.js's sync() can rebuild only when this one field actually changes
+      // (restorePassage, garden-state-cmd-w.js) instead of every ~0.25s tick — same pattern as
+      // campaignHouseAccueilStatus just above.
+      this.campaignPassageBlocked = blocked;
+    },
     // A gable end: rectangle-plus-triangle profile (eave to eave, up to the
     // ridge) extruded to `thickness`, so the wall actually follows the roof
     // pitch instead of a full-height rectangular block the sloped roof

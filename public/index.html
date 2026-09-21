@@ -260,6 +260,12 @@
          lazily as `window.GardenRenderCampaignTeaching` inside render-flow.js's sync(), so its
          only load-time requirement is loading after /vendor/three.min.js. -->
     <script src="/game/render-campaign-teaching.js" defer></script>
+    <!-- Epic C6.14: the chapter-17 passage point, self-contained beyond THREE like
+         render-campaign-house.js/render-campaign-stations.js above — read lazily as
+         `window.GardenRenderCampaignPassage` inside render-houses.js's buildCampaignPassage(),
+         itself only called later at world()-build time (render.js), so its only load-time
+         requirement is loading after /vendor/three.min.js, same as those two sibling modules. -->
+    <script src="/game/render-campaign-passage.js" defer></script>
     <script src="/game/render-scene.js" defer></script>
     <script src="/game/render-items.js" defer></script>
     <script src="/game/render-flow.js" defer></script>

@@ -167,6 +167,7 @@
       this.buildActors();
       this.buildHouses();
       this.buildCampaignHouse();
+      this.buildCampaignPassage();
     }
     // y is an offset above the real ground height at (point.x, point.z), not
     // an absolute world Y — every caller already means "N units above where

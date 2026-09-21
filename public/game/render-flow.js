@@ -117,6 +117,11 @@
         this.campaignHouseAccueilStatus
       )
         this.buildCampaignHouse();
+      // Epic C6.14: rebuild the passage point only when `blocked` actually flips since the last
+      // sync (restorePassage, garden-state-cmd-w.js) — same "checked here, rebuilt only on real
+      // change" pattern the campaignHouse check just above already uses for its own one field.
+      if (!!s.campaignPassage?.blocked !== this.campaignPassageBlocked)
+        this.buildCampaignPassage();
       // Epic C5.11: a Rainelle joins the real scene the first time it has a real position
       // (garden-state.js's tickRainelleMovement/RainelleMovement.ensurePosition — never guessed
       // here). The Group itself (render-rainelles.js, C5.9) is built once per Rainelle id and
