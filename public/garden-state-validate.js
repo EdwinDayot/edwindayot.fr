@@ -371,6 +371,16 @@
         !count(s.campaignSeedBox.retrievals))
     )
       throw Error("Boîte de semences invalide.");
+    // Epic C6.12: a single boolean field, same shape discipline as campaignSeedBox.seeded above —
+    // no other field exists on this object yet (no position/navigation-graph link, see campaign-
+    // passage.js's own header comment).
+    if (
+      s.campaignPassage !== undefined &&
+      (typeof s.campaignPassage !== "object" ||
+        s.campaignPassage === null ||
+        typeof s.campaignPassage.blocked !== "boolean")
+    )
+      throw Error("Passage invalide.");
     if (
       s.specimens !== undefined &&
       (!Array.isArray(s.specimens) ||
@@ -923,6 +933,9 @@
     result.campaignMemory.contractsFed ??= {};
     result.campaignContracts ??= [];
     result.contractNextId ??= 1;
+    // Epic C6.12: a pre-epic save simply has no passage state yet — defaults blocked, same
+    // "simply absent before this epic" posture as campaignContracts/contractNextId just above.
+    result.campaignPassage ??= { blocked: true };
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };

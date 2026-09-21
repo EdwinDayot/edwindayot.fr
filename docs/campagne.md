@@ -2730,3 +2730,60 @@ Aucun choix déjà confirmé du design remis en cause. Aucune règle de `directi
 **Pour le prochain déclenchement** : C6.12 est désormais l'unique epic `todo` détaillé à dépendances satisfaites dans la phase 6 — le prochain déclenchement peut l'implémenter directement (Artisan moteur, sans rendu).
 
 Commit : voir `git log` sur `maison-des-possibles` (message « Cartographe : huitième lot de la phase 6, registre du passage vers la mare (C6.12) »). `git push origin maison-des-possibles` à confirmer par `git ls-remote origin` avant conclusion de ce déclenchement.
+
+## Déclenchement automatisé du 21 septembre 2026 — chapitre 17, troisième temps : registre du passage vers la mare (epic C6.12)
+
+Vérification anti-hallucination préalable (voir `docs/orchestration.md`/`execution-continue.md`) : dernier epic marqué fait au début de ce déclenchement = C6.11 (« chapitre 17, redimensionner un panier »), commit `752f362` confirmé réel par `git show --stat 752f362` (sept fichiers modifiés — `docs/campagne-backlog.md`, `docs/campagne.md`, `package.json`, `public/garden-state-cmd-v.js`, `public/garden-state.js`, `public/index.html`, `tests/campaign-chapter17-resize.cjs` — exactement cohérents avec l'entrée existante du backlog et de ce fichier). `npm ci && npm test` relancé indépendamment avant tout nouveau travail →
+
+```
+# tests 734
+# suites 0
+# pass 734
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+```
+
+Exactement le nombre annoncé par le backlog (734/734), zéro régression. Aucun bandeau de pause en tête de `docs/campagne-backlog.md`. Les trois derniers epics consignés (C6.9, C6.10, C6.11) sont tous `fait` : aucune pause anti-emballement à déclencher.
+
+**Choix de l'epic.** C6.12 était l'unique epic `todo` détaillé à dépendances satisfaites dans la phase 6, déjà posé par le lot Cartographe précédent (« aucune dépendance nouvelle au-delà de la structure de sauvegarde déjà en place depuis C1.1 »). Choisi directement, aucun nouveau passage de Cartographe nécessaire.
+
+**Ce qui a été fait.** Design §10, chapitre 17 (« Rendre le passage »), une seule clause littérale : « rétablir l'accès à une mare ». Exactement dans les fichiers probables du backlog (aucun écart), plus `package.json` (nouveau fichier de test ajouté à la liste explicite) :
+
+- Nouveau `public/game/campaign-passage.js` (UMD, `GardenCampaignPassage`) : une seule fonction pure, `restorePassage(passage)`, qui refuse (`{ok:false, error}`) si `blocked` est déjà `false`, sinon renvoie `{ok:true, blocked:false}`. Même patron que `campaign-contracts.js`.
+- Nouveau `public/garden-state-cmd-w.js` (branche `W`) : commande `restorePassage` (aucun paramètre), fine enveloppe sur la fonction pure ci-dessus, `st.taken = true` puis `s.campaignPassage.blocked = result.blocked` sur succès. Pas dans la liste `physical` de `garden-state.js` (pas d'`c.id`, un seul objet de campagne, même posture que `setVeilleuse`/`releaseGesture`).
+- `public/garden-state-lifecycle.js` : `campaignPassage: { blocked: true }` ajouté à `fresh()`.
+- `public/garden-state-validate.js` : validation stricte (objet non nul, `blocked` booléen) juste après le bloc `campaignSeedBox` ; migration `result.campaignPassage ??= { blocked: true }` juste après `contractNextId`, même « simplement absent avant cet epic » que `campaignContracts`.
+- `public/garden-state.js` : `"w"` ajouté à la liste des suffixes de `commandSegs`.
+- `public/index.html` : deux nouvelles balises `<script>` — `/game/campaign-passage.js` juste après `campaign-contracts.js`, `/garden-state-cmd-w.js` juste après `garden-state-cmd-v.js`.
+
+Aucun accueil narratif ajouté (aucune nouvelle entrée `data-narrative.js`) : un texte de réparation aurait besoin d'un signe factuel réel (le passage effectivement emprunté) qu'aucune mécanique de déplacement ne peut produire tant que le passage n'a pas de position — limite honnête déjà documentée dans l'entrée C6.12 du backlog, reconfirmée non traitée ici.
+
+**Résultat réel et complet de `npm test`** : **739/739** (734 existants + 5 nouveaux dans `tests/campaign-passage.cjs`, ajouté à `package.json`), zéro régression. Sortie complète :
+
+```
+# tests 739
+# suites 0
+# pass 739
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+```
+
+Les 5 tests couvrent : état initial bloqué sur une sauvegarde neuve ; `restorePassage` réussit une première fois et met `blocked` à `false` ; un second appel est refusé sans muter l'état ; une sauvegarde antérieure sans `campaignPassage` migre vers l'état bloqué par défaut ; aller-retour JSON réel via `validate()`, `blocked` strictement identique après rechargement.
+
+Épic Artisan moteur pur, aucun rendu Three.js touché (un champ de sauvegarde et une commande uniquement) : `test:browser`/`test:visual` complets non requis, même exemption que C6.1/C6.3/C6.5/C6.6/C6.7/C6.9/C6.10/C6.11. Vérification navigateur ciblée faite tout de même, comme à chaque nouvelle balise `<script>` (page servie localement via `python3 -m http.server` depuis `public/`, Playwright/Chromium préinstallé, `executablePath` réel `/opt/pw-browsers/chromium`) : **zéro erreur console/page**, `window.GardenApp`/`window.GardenCampaignPassage`/`window.GardenStateParts` tous bien définis.
+
+`/code-review` (skill, niveau medium) exécuté sur le diff complet : aucun défaut relevé (mutation/migration/validation conformes aux patrons `campaignContracts`/`setVeilleuse`/`releaseGesture`, helpers partagés `count`/`fail` réutilisés).
+
+Aucun choix déjà confirmé du design remis en cause (Alma vivante, nom des Rainelles, culpabilisation de fin de campagne — non concernés, aucun texte narratif introduit). Aucune règle de `direction-artistique.md` modifiée (aucun rendu/géométrie/teinte introduit par cet epic).
+
+**Limites honnêtes du lot, reconfirmées non traitées** (voir l'entrée C6.12 du backlog et la note de Cartographe du huitième lot) : aucune géométrie de mare, aucun branchement au graphe de navigation, aucune espèce filtrante, aucune protection contre une extension lucrative et aucune mise en scène de la Rainelle au bord de l'eau ne sont construites par cet epic — chacune exigerait d'inventer d'un bloc un système spatial entier, contraire à « épics petits et additifs ».
+
+**Ne ferme ni la porte de sortie de la phase 6 ni l'acte VI dans son ensemble** : le reste du chapitre 17 (mare, berge, accès praticable, scène finale) et le chapitre 18 restent `todo`, non détaillés.
+
+**Pour le prochain déclenchement** : aucun epic détaillé `todo` à dépendances satisfaites ne reste dans la phase 6 — le prochain déclenchement devra à nouveau endosser le rôle Cartographe pour détailler la suite du chapitre 17 (mare/berge/accès praticable/scène finale) et le chapitre 18, dernier lot de l'acte VI, avant de pouvoir reprendre l'implémentation.
+
+Commit : voir `git log` sur `maison-des-possibles` (message « Epic C6.12 : chapitre 17, registre du passage vers la mare »). `git push origin maison-des-possibles` à confirmer par `git ls-remote origin` avant conclusion de ce déclenchement.

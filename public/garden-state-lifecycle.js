@@ -182,6 +182,11 @@
       // fresh save — no contract is ever signed automatically.
       campaignContracts: [],
       contractNextId: 1,
+      // Epic C6.12 (design §10, chapitre 17): blocked by default — the chapter presents restoring
+      // it as a real repair, never a starting given. No position/navigation-graph link exists yet
+      // (see campaign-passage.js's own header comment); restorePassage (garden-state-cmd-w.js) is
+      // the single, one-way transition to false.
+      campaignPassage: { blocked: true },
     };
   }
   function migrate(old, now = Date.now()) {

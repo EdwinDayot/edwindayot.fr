@@ -264,7 +264,7 @@
   }
   GardenState.commandSegs = [];
   if (typeof module !== "undefined")
-    for (const k of ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v"]) {
+    for (const k of ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w"]) {
       const M = require("./garden-state-cmd-" + k + ".js");
       Object.assign(GardenState.prototype, M);
       GardenState.commandSegs.push(...Object.values(M));
