@@ -18,6 +18,10 @@
     typeof module !== "undefined"
       ? require("./game/campaign-memory.js")
       : root.GardenCampaignMemory;
+  const Passage =
+    typeof module !== "undefined"
+      ? require("./game/campaign-passage.js")
+      : root.GardenCampaignPassage;
   function fresh(now) {
     return {
       version: 3,
@@ -183,10 +187,12 @@
       campaignContracts: [],
       contractNextId: 1,
       // Epic C6.12 (design §10, chapitre 17): blocked by default — the chapter presents restoring
-      // it as a real repair, never a starting given. No position/navigation-graph link exists yet
-      // (see campaign-passage.js's own header comment); restorePassage (garden-state-cmd-w.js) is
-      // the single, one-way transition to false.
-      campaignPassage: { blocked: true },
+      // it as a real repair, never a starting given. restorePassage (garden-state-cmd-w.js) is the
+      // single, one-way transition to false. Epic C6.13 adds the fixed x/z position on the shared
+      // navigation grid — PASSAGE_POSITION, defined once in campaign-passage.js and reused here
+      // rather than duplicated, see that module's own header comment for how it was chosen and
+      // verified against GardenGeometry.zoneAt before being fixed.
+      campaignPassage: { blocked: true, ...Passage.PASSAGE_POSITION },
     };
   }
   function migrate(old, now = Date.now()) {

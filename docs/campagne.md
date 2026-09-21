@@ -2817,3 +2817,58 @@ Aucun choix déjà confirmé du design remis en cause. Aucune règle de `directi
 **Pour le prochain déclenchement** : C6.13 est désormais l'unique epic `todo` détaillé à dépendances satisfaites dans la phase 6 — le prochain déclenchement peut l'implémenter directement (Artisan moteur, sans rendu).
 
 Commit : voir `git log` sur `maison-des-possibles` (message « Cartographe : neuvième lot de la phase 6, blocage effectif du passage (C6.13) »). `git push origin maison-des-possibles` à confirmer par `git ls-remote origin` avant conclusion de ce déclenchement.
+
+## Déclenchement automatisé du 21 septembre 2026 — chapitre 17, quatrième temps : position réelle du passage et blocage effectif du graphe de navigation (epic C6.13)
+
+Vérification anti-hallucination préalable (voir `docs/orchestration.md`/`execution-continue.md`) : dernier epic marqué fait au début de ce déclenchement = C6.12 (« chapitre 17, registre du passage vers la mare »), commit `25a90be8d1dba4f39f61b3374eff6d7a57ef9c48` confirmé réel par `git show --stat 25a90be` (dix fichiers modifiés — `docs/campagne-backlog.md`, `docs/campagne.md`, `package.json`, `public/game/campaign-passage.js`, `public/garden-state-cmd-w.js`, `public/garden-state-lifecycle.js`, `public/garden-state-validate.js`, `public/garden-state.js`, `public/index.html`, `tests/campaign-passage.cjs` — exactement cohérents avec l'entrée existante du backlog). `npm ci && npm test` relancé indépendamment avant tout nouveau travail →
+
+```
+# tests 739
+# suites 0
+# pass 739
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+```
+
+Exactement le nombre annoncé par le backlog (739/739), zéro régression. Aucun bandeau de pause en tête de `docs/campagne-backlog.md` (vérifié, première ligne). Aucune anomalie : `docs/campagne-anomalies.md` toujours absent (vérifié, fichier inexistant). Les trois derniers epics consignés (C6.10, C6.11, C6.12) sont tous `fait` : aucune pause anti-emballement à déclencher.
+
+**Choix de l'action.** Recherche exhaustive des epics `todo` à dépendances satisfaites (`grep -n "^Statut : todo" docs/campagne-backlog.md`) : seules les entrées historiques supersédées (C2.5v, C2.6, C2.8v) et **C2.8v-b** (toujours non actionnable, ses deux prérequis — commande de suppression de station générique, livraison de transport étalée sur plusieurs ticks — toujours absents du code) plus **C6.13**, seul epic réellement candidat : dépendance C6.12 satisfaite (`fait`), déjà détaillé par le lot Cartographe du déclenchement précédent. Choisi sans ambiguïté.
+
+**Ce qui a été fait.** Design §10, chapitre 17, clause « le passage doit être réellement praticable dans la simulation » : `s.campaignPassage` gagne `x`/`z`, un point fixe du graphe de navigation partagé (grille 0,5 unité) ; tant que `blocked` est vrai, `construction.js`'s `obstacles(s)` inclut un obstacle circulaire conditionnel centré sur ce point. Exactement dans les fichiers probables du backlog, plus `public/index.html` (réordonnancement d'une balise `<script>` existante, voir plus bas) :
+
+- **Position choisie : `{-6, 30}`**, zone 4 (« le coin de village », toujours déverrouillée), pas zone 0 : un balayage réel (`GardenGeometry.zoneAt` + `construction.js`'s `walkable()` sur un état `fresh()` réel, pas supposé) a écarté zone 0 — la maison de campagne (`{-13, 6}`, C2.2v) et le pot y occupent déjà la seule poche documentée comme libre par `render-campaign-house.js`. `{-6, 30}` vérifié réellement : `zoneAt(-6, 30)` → zone 4 ; `walkable(fresh(), -6, 30)` → `true` ; ≈6,4 unités des deux maisons de villageois (`{-11, 26}`, `{-1, 26}`, empreinte 3,2×3,2 chacune) ; ≥6 unités de toute porte de zone (marge existante de `placement()` : 0,65–0,8) ; déjà sur la grille de 0,5 unité, aucun arrondi nécessaire.
+- Nouveau `public/game/campaign-passage.js` : `PASSAGE_POSITION = {x: -6, z: 30}` et `PASSAGE_OBSTACLE_RADIUS = 0.6` exportés, source unique partagée par `garden-state-lifecycle.js` (valeur par défaut de `fresh()`) et `construction.js` (obstacle conditionnel), jamais dupliqués en littéraux. Rayon 0,6 choisi et justifié dans le code (même discipline que `DEFAULT_PANIER_CAPACITY`/`MAX_WAIT_STEPS`) : avec la clairance de `walkable()` (`distance >= radius + 0.23`), 0,6 bloque non seulement les quatre voisins cardinaux (0,5 unité) mais aussi les quatre voisins diagonaux (≈0,71 unité) du point, forçant un vrai détour multi-cases plutôt qu'un simple pas de côté diagonal.
+- `public/garden-state-lifecycle.js` : `campaignPassage: { blocked: true, ...Passage.PASSAGE_POSITION }` dans `fresh()`.
+- `public/garden-state-validate.js` : validation stricte étendue (x/z finis et alignés sur la grille, **tolérante à leur absence pure** — même « champ ajouté à un objet existant » que `campaignHouse.furnitureMarks`, pour ne jamais rejeter une sauvegarde C6.12-era qui n'a pas encore ces deux champs) ; migration `result.campaignPassage.x ??= Passage.PASSAGE_POSITION.x` / `.z` juste après la migration C6.12 existante, défaut vers l'unique position réelle plutôt qu'un placeholder.
+- `public/game/construction.js` : nouvelle fonction privée `passageObstacle(s)`, lecture strictement conditionnelle (`s.campaignPassage?.blocked`), concaténée à `obstacles(s)` en plus des obstacles déjà listés — aucun nouveau paramètre sur `obstacles`/`walkable`/`path`/`flood`.
+- `public/index.html` : `campaign-passage.js` **déplacé** (pas ajouté) de sa position C6.12 (après `campaign-contracts.js`, ligne ~101 avant ce déclenchement) vers juste avant `construction.js` (nouveau lecteur de `root.GardenCampaignPassage` à l'exécution du script) — sans ce déplacement, `construction.js` se serait exécuté avant `campaign-passage.js` et aurait capturé `Passage === undefined` de façon permanente. Détecté et corrigé avant commit, pas après (vérification navigateur ciblée ci-dessous). Commentaire de tête de `campaign-automation.js` mis à jour (référence de ligne devenue obsolète par le déplacement : « line 38 » → « line 44 »).
+
+**Résultat réel et complet de `npm test`** : **746/746** (739 existants + 7 nouveaux dans `tests/campaign-passage.cjs`, ajouté à `package.json` implicitement — le fichier existait déjà, seul son contenu grandit), zéro régression. Sortie complète :
+
+```
+# tests 746
+# suites 0
+# pass 746
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+```
+
+Les 7 nouveaux tests couvrent : la position fixe résout bien vers la zone 0 ou 4 ; elle est sur la grille de 0,5 unité ; une sauvegarde C6.12-era sans x/z migre vers la position fixe ; `walkable()` refuse le point tant que bloqué, l'accepte une fois restauré ; un chemin entre deux points de part et d'autre du passage bloqué le contourne sans jamais le traverser, et redevient au moins aussi court une fois débloqué ; un chemin échoue proprement (`[]`) quand aucun détour n'existe (corridor artificiel muré des deux côtés dans le test, radius 0,2 explicite sur les murs pour ne bloquer que leur propre rangée et ne jamais déborder sur la rangée du passage) ; zéro régression sur `obstacles`/`walkable`/`path` pour une sauvegarde sans `campaignPassage` du tout (jardin libre ou sauvegarde antérieure à C6.12) — comparaison explicite avant/après suppression du champ, plus aller-retour JSON des champs `blocked`/`x`/`z` réellement rejoué (tests déjà existants, mis à jour pour la nouvelle forme de l'objet plutôt que cassés en silence).
+
+Épic Artisan moteur pur, aucun rendu Three.js/géométrie de mare touché (un champ de sauvegarde, une fonction de collision, aucune balise `<script>` nouvellement *ajoutée* — une seule déplacée) : `test:browser`/`test:visual` complets non requis, même exemption que C6.1/C6.3/C6.5/C6.6/C6.7/C6.9/C6.10/C6.11/C6.12. Vérification navigateur ciblée faite tout de même, à cause du déplacement de balise `<script>` (risque réel d'ordre de chargement déjà documenté à plusieurs reprises dans ce fichier, cette fois effectivement rencontré et corrigé) : page servie localement via `python3 -m http.server` depuis `public/`, Playwright/Chromium préinstallé (`executablePath` réel `/opt/pw-browsers/chromium`) → **zéro erreur console/page**, `window.GardenApp`/`window.GardenConstruction`/`window.GardenCampaignPassage` tous bien définis, `window.GardenCampaignPassage.PASSAGE_POSITION` renvoie bien `{x: -6, z: 30}` en conditions réelles de navigateur (pas seulement Node).
+
+`/code-review` (skill, niveau medium) exécuté sur le diff complet : aucun défaut relevé — revue explicite de la lecture optionnelle (`?.blocked`) pour l'absence de régression sur les sauvegardes sans `campaignPassage`, confirmée par le test dédié.
+
+Aucun choix déjà confirmé du design remis en cause (Alma vivante, nom des Rainelles, culpabilisation de fin de campagne — non concernés, aucun texte narratif introduit). Aucune règle de `direction-artistique.md` modifiée (aucun rendu/géométrie/teinte introduit par cet epic — le point reste abstrait, sans représentation visuelle, exactement comme documenté par la note de Cartographe du neuvième lot).
+
+**Limites honnêtes du lot, reconfirmées non traitées** (voir l'entrée C6.13 du backlog et la note de Cartographe du neuvième lot) : aucune géométrie de mare/berge, aucune protection contre une extension lucrative, aucune scène finale de Rainelle au bord de l'eau — chacune hors de portée pour la même raison déjà documentée (système spatial ou narratif entier à inventer d'un bloc). `placement()` (construction d'objets par le joueur) n'a délibérément pas été étendu pour éviter la position du passage : le critère de sortie de l'epic ne le demandait que pour `obstacles`/`walkable`/`path`/`flood`, et zone 4 n'est aujourd'hui pas une zone de construction pratique pour un joueur (aucun contenu constructible n'y est encore proposé) — à revisiter si un futur epic y ajoute une mécanique de placement.
+
+**Ne ferme ni la porte de sortie de la phase 6 ni l'acte VI dans son ensemble** : le reste du chapitre 17 (mare, berge, accès praticable, scène finale) et le chapitre 18 restent `todo`, non détaillés.
+
+**Pour le prochain déclenchement** : aucun epic détaillé `todo` à dépendances satisfaites ne reste dans la phase 6 — le prochain déclenchement devra à nouveau endosser le rôle Cartographe pour détailler la suite du chapitre 17 (mare/berge/accès praticable/scène finale) et le chapitre 18, dernier lot de l'acte VI, avant de pouvoir reprendre l'implémentation.
+
+Commit : voir `git log` sur `maison-des-possibles` (message « Epic C6.13 : chapitre 17, position réelle du passage et blocage effectif du graphe de navigation »). `git push origin maison-des-possibles` à confirmer par `git ls-remote origin` avant conclusion de ce déclenchement.

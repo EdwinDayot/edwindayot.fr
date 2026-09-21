@@ -38,6 +38,10 @@
     typeof module !== "undefined"
       ? require("./game/campaign-house.js")
       : root.GardenCampaignHouse;
+  const Passage =
+    typeof module !== "undefined"
+      ? require("./game/campaign-passage.js")
+      : root.GardenCampaignPassage;
   const Memory =
     typeof module !== "undefined"
       ? require("./game/campaign-memory.js")
@@ -371,14 +375,23 @@
         !count(s.campaignSeedBox.retrievals))
     )
       throw Error("Boîte de semences invalide.");
-    // Epic C6.12: a single boolean field, same shape discipline as campaignSeedBox.seeded above —
-    // no other field exists on this object yet (no position/navigation-graph link, see campaign-
-    // passage.js's own header comment).
+    // Epic C6.12: blocked, same shape discipline as campaignSeedBox.seeded above. Epic C6.13 adds
+    // x/z, the passage's fixed point on the shared 0.5-unit navigation grid (campaign-passage.js's
+    // PASSAGE_POSITION) — same finite+grid-alignment check already applied to entities just above,
+    // never a semantic re-check of zone membership here: the point is fixed once and for all by
+    // fresh()/PASSAGE_POSITION, verified resolvable at that single source rather than on every load.
+    // x/z tolerate outright absence (a save made between C6.12 and C6.13 has campaignPassage but
+    // no position yet) the same way campaignHouse.furnitureMarks does above: only a *present but
+    // malformed* value throws, absence is migrated below instead.
     if (
       s.campaignPassage !== undefined &&
       (typeof s.campaignPassage !== "object" ||
         s.campaignPassage === null ||
-        typeof s.campaignPassage.blocked !== "boolean")
+        typeof s.campaignPassage.blocked !== "boolean" ||
+        (s.campaignPassage.x !== undefined &&
+          (!Number.isFinite(s.campaignPassage.x) || (s.campaignPassage.x * 2) % 1)) ||
+        (s.campaignPassage.z !== undefined &&
+          (!Number.isFinite(s.campaignPassage.z) || (s.campaignPassage.z * 2) % 1)))
     )
       throw Error("Passage invalide.");
     if (
@@ -936,6 +949,12 @@
     // Epic C6.12: a pre-epic save simply has no passage state yet — defaults blocked, same
     // "simply absent before this epic" posture as campaignContracts/contractNextId just above.
     result.campaignPassage ??= { blocked: true };
+    // Epic C6.13: a save created between C6.12 and C6.13 has campaignPassage but no x/z yet —
+    // same two-level "field added to an existing object" migration as campaignHouse.furnitureMarks
+    // above, defaulted to the one real position (PASSAGE_POSITION) rather than a placeholder,
+    // since there has only ever been one passage position, never a per-save random draw.
+    result.campaignPassage.x ??= Passage.PASSAGE_POSITION.x;
+    result.campaignPassage.z ??= Passage.PASSAGE_POSITION.z;
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };

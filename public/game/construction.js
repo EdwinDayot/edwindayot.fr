@@ -7,6 +7,10 @@
       : root.GardenGeometry;
   const River =
     typeof module !== "undefined" ? require("./river.js") : root.GardenRiver;
+  const Passage =
+    typeof module !== "undefined"
+      ? require("./campaign-passage.js")
+      : root.GardenCampaignPassage;
   const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
   const zoneAt = (x, z) => G.zoneAt(D.zones, x, z);
   const radius = (e) => e.radius ?? D.recipes[e.type]?.radius ?? 0.5;
@@ -41,6 +45,22 @@
     s.resources
       .filter((r) => r.type !== "clay" && resourceClear(s, r))
       .map((r) => ({ ...r, radius: D.mining[r.type].radius }));
+  // Epic C6.13: strictly conditional on s.campaignPassage?.blocked — never a new parameter on
+  // obstacles/walkable/path/flood's own signature, so every existing caller (free-garden saves,
+  // and any campaign save before C6.12 never carrying this field at all) sees exactly the same
+  // obstacle list as before. Reads campaignPassage.x/z directly rather than campaign-passage.js's
+  // own PASSAGE_POSITION constant: a save's actual position is the one persisted in s (fresh()
+  // wrote PASSAGE_POSITION there once; the two only ever coincide because nothing else changes it).
+  const passageObstacle = (s) =>
+    s.campaignPassage?.blocked
+      ? [
+          {
+            x: s.campaignPassage.x,
+            z: s.campaignPassage.z,
+            radius: Passage.PASSAGE_OBSTACLE_RADIUS,
+          },
+        ]
+      : [];
   const obstacles = (s) =>
     s.entities
       .filter((e) => !e.stored && !D.recipes[e.type].flat)
@@ -49,6 +69,7 @@
         trees(s),
         resourceObstacles(s),
         buildingObstacles,
+        passageObstacle(s),
       );
   function walkable(s, x, z, obs = obstacles(s)) {
     const zone = zoneAt(x, z);

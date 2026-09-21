@@ -35,6 +35,12 @@
     <script src="/game/data.js" defer></script>
     <script src="/game/gauge.js" defer></script>
     <script src="/game/river.js" defer></script>
+    <!-- Epic C6.13: construction.js (next script) now reads root.GardenCampaignPassage at its own
+         execution time (the conditional obstacle in obstacles()), so campaign-passage.js must load
+         before it — moved here from further below (right after campaign-contracts.js, where C6.12
+         first placed it) for exactly this, same "load before every reader" discipline already
+         applied to every other campaign module in this file. Still no dependency of its own. -->
+    <script src="/game/campaign-passage.js" defer></script>
     <script src="/game/construction.js" defer></script>
     <script src="/game/irrigation.js" defer></script>
     <script src="/game/irrigation-sim.js" defer></script>
@@ -98,12 +104,7 @@
          script's own execution time — loaded here anyway, right after campaign-memory.js, to
          avoid the exact class of missing-script ordering bug documented throughout this file. -->
     <script src="/game/campaign-contracts.js" defer></script>
-    <!-- Epic C6.12: campaign-passage.js has no dependency of its own (pure, over a single plain
-         {blocked} object) but is read by garden-state-cmd-w.js further below at that script's own
-         execution time — loaded here anyway, right after campaign-contracts.js, same "load before
-         every reader" discipline already applied to every other campaign module in this file. -->
-    <script src="/game/campaign-passage.js" defer></script>
-    <!-- Epic C2.6c: campaign-automation.js reads root.GardenConstruction (line 38 above),
+    <!-- Epic C2.6c: campaign-automation.js reads root.GardenConstruction (line 44 above),
          root.GardenCampaignStations and root.GardenCultivars (both above) at its own
          script-execution time, and is itself read the same way by garden-state-validate.js
          (CYCLE_SECONDS) and garden-state.js (tickRainelle/updateSpecimenReadiness) below — so it
