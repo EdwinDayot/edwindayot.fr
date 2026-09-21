@@ -2658,3 +2658,45 @@ Vérification anti-hallucination préalable (voir `docs/orchestration.md`/`execu
 **Pour le prochain déclenchement** : **C6.11** est le candidat naturel — epic moteur pur (une commande sur des champs déjà existants, aucune délégation Artisan rendu nécessaire), sa dépendance (C2.8) est `fait` de longue date. Le reste du chapitre 17 (mare/berge/passage/scène finale) et le chapitre 18 restent à détailler par un futur passage du Cartographe, une fois C6.11 pris — la recherche factuelle menée ici (aucun concept de mare/atelier/passage dans le code) lui sert de point de départ direct.
 
 Commit : voir `git log` sur `maison-des-possibles` (message « Cartographe : huitième lot de la phase 6, redimensionner un panier (C6.11) »). `git push origin maison-des-possibles` à confirmer par `git ls-remote origin` avant conclusion de ce déclenchement.
+
+## Déclenchement automatisé du 21 septembre 2026 — chapitre 17, deuxième temps : redimensionner un panier (epic C6.11)
+
+Vérification anti-hallucination préalable (voir `docs/orchestration.md`/`execution-continue.md`) : dernier epic marqué fait au début de ce déclenchement = C6.10 (« chapitre 17, réaménager un habitat et libérer une Rainelle de son geste »), commit `859a199` confirmé réel par `git show --stat 859a199` (sept fichiers modifiés — `docs/campagne-backlog.md`, `docs/campagne.md`, `package.json`, `public/garden-state-cmd-u.js`, `public/garden-state.js`, `public/index.html`, `tests/campaign-chapter17.cjs` — exactement cohérents avec l'entrée existante du backlog et de ce fichier). `npm ci && npm test` relancé indépendamment avant tout nouveau travail → **727/727**, exactement le nombre annoncé par le backlog, zéro régression. Aucun bandeau de pause en tête de `docs/campagne-backlog.md`. Les trois derniers epics consignés (C6.8, C6.9, C6.10) sont tous `fait` : aucune pause anti-emballement à déclencher.
+
+**Choix de l'epic.** C6.11 était l'unique epic `todo` à dépendance satisfaite (C2.8, `fait` de longue date) — déjà identifié comme le candidat naturel par la note de Cartographe du huitième lot. Choisi directement, aucun nouveau passage de Cartographe nécessaire.
+
+**Ce qui a été fait.** Design §10, chapitre 17 (« Rendre le passage », volet « redimensionner les bacs »). Une nouvelle commande, exactement dans les fichiers probables du backlog (aucun écart) : nouveau `public/garden-state-cmd-v.js` (branche `V`), enregistré dans `public/garden-state.js` (suffixe `"v"` ajouté à la liste de `commandSegs`) et chargé par `public/index.html` (nouveau `<script>`).
+
+`resizePanier({panierId, capacity, min})` — valide les bornes via le helper `count` déjà partagé (`garden-state-util.js`, même helper que `reduceContract`, C6.8) : `capacity`/`min` entiers finis, `capacity ≥ 1`, `min ≥ 0`, `min ≤ capacity`. Résout l'identifiant via `Stations.resolveStation` (`campaign-stations.js`) et refuse explicitement un identifiant inconnu ou qui ne désigne pas un panier — même discipline que `setVeilleuse` (C5.2) sur sa propre vérification de type de station. Refuse un rétrécissement qui ferait passer `capacity` sous `Stations.panierTotal(panier)`, la seule règle spécifique à cette commande : jamais de perte silencieuse d'une ressource déjà stockée, exactement le risque nommé par le critère de sortie littéral de l'epic. Sur succès, remplace `capacity`/`min` du panier ciblé, sans toucher `buffer` ni aucun autre panier du registre.
+
+Aucun accueil narratif ajouté (aucune nouvelle entrée `data-narrative.js`) : la taille d'un panier ne figure pas parmi les trois leviers d'intensification du tableau §11, même limite honnête déjà posée par C6.10 pour l'habitat retiré et le geste libéré — inventer une révélation ici n'aurait pas été lire le design.
+
+**Défaut trouvé et corrigé en écrivant les tests, avant tout commit (pas par `/code-review`, qui n'a rien relevé de son côté)** : la première version des tests peuplait `panier.buffer` avec des clés en chaîne libre (`"flower:aster-des-vents"`), plausibles par analogie avec l'inventaire du jardin libre mais fausses ici — `garden-state-validate.js` les a réellement rejetées (« Registre de stations invalide ») au moment de l'aller-retour JSON. Relecture du code de validation (`garden-state-validate.js`, ligne ~605) et de `campaign-automation.js`'s `tickRecolter` : la clé de `buffer` d'un panier est un `cultivarId` réellement présent dans `s.cultivars`, jamais un identifiant d'objet arbitraire (règle posée dès C2.6c, vérifiée dans le code plutôt que supposée en écrivant le test). Corrigé en obtenant un vrai cultivar via la rencontre scriptée (`triggerFrogEncounter`, C2.3, la seule source légitime d'un cultivar par commande — même fixture `bornRainelle` que `tests/campaign-chapter17.cjs`/`campaign-automation.cjs`) avant de peupler `buffer` dans les trois tests qui en avaient besoin.
+
+**Résultat réel et complet de `npm test`** : **734/734** (727 existants + 7 nouveaux dans `tests/campaign-chapter17-resize.cjs`, nouveau fichier séparé plutôt qu'une extension de `tests/campaign-chapter17.cjs` — choix de l'Artisan moteur, laissé ouvert par le backlog — ajouté à `package.json`), zéro régression. Sortie complète :
+
+```
+# tests 734
+# suites 0
+# pass 734
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+```
+
+Les 7 tests couvrent : refus sur un identifiant de panier inconnu, sans mutation du registre ; refus sur un identifiant qui résout vers autre chose qu'un panier (une zone) ; refus sur une capacité sous le contenu déjà détenu (8 unités réelles déposées dans le buffer, capacité visée 7) ; refus sur `min > capacity` ; refus sur une série de valeurs non entières/non finies/négatives pour `capacity` et pour `min`, testées séparément (`0`, `-1`, `1.5`, `NaN`, `Infinity`, une chaîne) ; réussite qui met à jour `capacity`/`min` exactement aux valeurs demandées sans toucher `buffer` ni un second panier du registre ; aller-retour JSON réel via `validate()`, capacité/min/buffer strictement identiques après rechargement.
+
+Épic Artisan moteur pur, aucun rendu Three.js touché (une commande et son registre de données uniquement) : `test:browser`/`test:visual` complets non requis, même exemption que C6.1/C6.3/C6.5/C6.6/C6.7/C6.9/C6.10. Vérification navigateur ciblée faite tout de même, comme à chaque nouvelle balise `<script>` (page servie localement via `python3 -m http.server` depuis `public/`, Playwright/Chromium préinstallé, `executablePath` réel `/opt/pw-browsers/chromium`) : **zéro erreur console/page**, `window.GardenApp`/`window.GardenCampaignStations`/`window.GardenStateParts` tous bien définis.
+
+`/code-review` (skill, niveau medium) exécuté sur le diff complet : aucun défaut relevé — patterns `st.taken`/refus explicite/`resolveStation` vérifiés conformes aux commandes sœurs (`setVeilleuse`, `setPriseFortDebit`, `removeHabitat`), helpers `finite`/`count` partagés plutôt que redéfinis.
+
+Aucun choix déjà confirmé du design remis en cause (Alma vivante, nom des Rainelles, culpabilisation de fin de campagne — non concernés, aucun texte narratif introduit). Aucune règle de `direction-artistique.md` modifiée (aucun rendu/géométrie/teinte introduit par cet epic).
+
+**Limites honnêtes du lot, reconfirmées non traitées** (voir la note de Cartographe du huitième lot et l'entrée de C6.11 dans `docs/campagne-backlog.md`) : la mare, la berge, l'accès praticable représenté dans la simulation, la protection contre une extension lucrative et la scène finale du chapitre (Rainelle qui traverse et reste au bord de l'eau) restent hors de ce lot — chacun exigerait d'inventer d'un bloc un système spatial entier, contraire à « épics petits et additifs ». « Sélectionner des plantes plus adaptées » reste déjà possible avec les commandes existantes, non traité non plus (rien à construire).
+
+**Ne ferme ni la porte de sortie de la phase 6 ni l'acte VI dans son ensemble** : le reste du chapitre 17 (mare, berge, accès praticable, scène finale) et le chapitre 18 restent `todo`, non détaillés — un futur passage du Cartographe devra les détailler pour clore la porte de sortie de la phase 6 (« tous les parcours narratifs actes IV-VI concluent sans imposer l'exploitation ni inventer une faute »).
+
+**Pour le prochain déclenchement** : aucun epic détaillé `todo` à dépendances satisfaites ne reste dans la phase 6 — le prochain déclenchement devra endosser le rôle Cartographe pour détailler la suite du chapitre 17 (mare/berge/accès praticable/scène finale) et le chapitre 18, dernier lot de l'acte VI, avant de pouvoir reprendre l'implémentation.
+
+Commit : voir `git log` sur `maison-des-possibles` (message « Epic C6.11 : chapitre 17, redimensionner un panier »). `git push origin maison-des-possibles` à confirmer par `git ls-remote origin` avant conclusion de ce déclenchement.
