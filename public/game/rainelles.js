@@ -73,6 +73,9 @@
   // `job`/`bourgeon` above — no real placement mechanism exists yet (C5.11's own job, see
   // rainelle-movement.js's header comment), so nothing here would have a meaningful coordinate to
   // assign; a guessed one would only have to be corrected later.
+  // Epic C6.15 (design §10, chapitre 17, sixième temps): `settledAt` starts `false` — never
+  // settled at the passage yet, same "posed, not yet true" posture as `founder` before the very
+  // first individual is created.
   function createRainelle(s, { cultivarId, name = "" }) {
     const rainelle = {
       id: `r${s.rainelleNextId++}`,
@@ -84,6 +87,7 @@
       founder: s.rainelles.length === 0,
       x: null,
       z: null,
+      settledAt: false,
     };
     s.rainelles.push(rainelle);
     return rainelle;

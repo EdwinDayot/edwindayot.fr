@@ -502,7 +502,10 @@
             // must be a boolean when present — see rainelles.js's createRainelle comment.
             (r.founder !== undefined && typeof r.founder !== "boolean") ||
             // Epic C5.10: x/z are optional (see badRainellePosition's own comment).
-            badRainellePosition(r.x, r.z),
+            badRainellePosition(r.x, r.z) ||
+            // Epic C6.15: settledAt is optional (a pre-epic save has none yet, migrated below)
+            // but must be a boolean when present — see rainelles.js's createRainelle comment.
+            (r.settledAt !== undefined && typeof r.settledAt !== "boolean"),
         ))
     )
       throw Error("Rainelle invalide.");
@@ -513,6 +516,15 @@
     if (
       s.rainelles?.length &&
       s.rainelles.filter((r) => r.founder === true).length > 1
+    )
+      throw Error("Rainelle invalide.");
+    // Epic C6.15 (design §10, chapitre 17, sixième temps) : at most one Rainelle can ever be
+    // settled at the passage, same invariant discipline as founder just above — never a save with
+    // two, whether hand-edited or from a future bug, since selectRainelleToSettle itself refuses
+    // to return a candidate once any Rainelle already carries the mark.
+    if (
+      s.rainelles?.length &&
+      s.rainelles.filter((r) => r.settledAt === true).length > 1
     )
       throw Error("Rainelle invalide.");
     if (s.rainelleNextId !== undefined && !count(s.rainelleNextId))
@@ -868,12 +880,15 @@
     // Epic C5.10: x/z migrate per rainelle to `null` (no position yet), same reasoning as job/
     // bourgeon just above — a pre-epic rainelle only lacks these two fields, never guessed from
     // a habitat/spawn coordinate here (that real assignment is C5.11's own job).
+    // Epic C6.15: settledAt migrates per rainelle to `false` (never settled), same reasoning as
+    // x/z just above — a pre-epic rainelle only lacks this one field, never guessed true.
     result.rainelles = (result.rainelles ?? []).map((r, i) => ({
       job: null,
       bourgeon: null,
       founder: i === 0,
       x: null,
       z: null,
+      settledAt: false,
       ...r,
     }));
     result.rainelleNextId ??= 1;

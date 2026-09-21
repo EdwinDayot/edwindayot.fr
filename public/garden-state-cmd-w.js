@@ -10,12 +10,23 @@
    the passage was actually used (someone crossing it, once it has a position) — nothing in the
    engine can produce that yet, since this epic gives the passage no position or navigation-graph
    link at all. Left for a future epic, once that socle exists, same "moteur avant narration"
-   sequencing already applied to C6.4/C6.5 and C6.8/C6.9. */
+   sequencing already applied to C6.4/C6.5 and C6.8/C6.9.
+
+   Epic C6.15 adds one further step once restorePassage itself has actually succeeded: the passage
+   opening is one of the two events that can complete the settling condition (the other is
+   releaseGesture, garden-state-cmd-u.js) — RainelleMovement.selectRainelleToSettle(s) (pure,
+   never mutates) is consulted immediately after, and its candidate (if any) is the one place this
+   command applies `settledAt = true`, same "decide there, mutate here" split already documented
+   in rainelle-movement.js's own header comment for this function. */
 (function (root) {
   const Passage =
     typeof module !== "undefined"
       ? require("./game/campaign-passage.js")
       : root.GardenCampaignPassage;
+  const RainelleMovement =
+    typeof module !== "undefined"
+      ? require("./game/rainelle-movement.js")
+      : root.GardenRainelleMovement;
   const M = {
     commandSegW(c, ctx, st) {
       const { s, fail } = st;
@@ -25,6 +36,8 @@
         if (!result.ok) return fail(result.error);
         s.campaignPassage.blocked = result.blocked;
         st.message = "Passage rétabli.";
+        const settleId = RainelleMovement.selectRainelleToSettle(s);
+        if (settleId) s.rainelles.find((r) => r.id === settleId).settledAt = true;
       }
       return null;
     },

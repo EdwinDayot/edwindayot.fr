@@ -54,6 +54,10 @@
     typeof module !== "undefined"
       ? require("./game/campaign-contracts.js")
       : root.GardenCampaignContracts;
+  const RainelleMovement =
+    typeof module !== "undefined"
+      ? require("./game/rainelle-movement.js")
+      : root.GardenRainelleMovement;
   const M = {
     commandSegF(c, ctx, st) {
       const { s, fail } = st;
@@ -163,6 +167,17 @@
           Memory.recordBirth(s.campaignMemory, born.id);
         }
         s.campaignNursery = [];
+        // Epic C6.15 (found by /code-review before this epic's own commit: neither restorePassage
+        // nor releaseGesture is ever called by "sleep" itself, so a Rainelle born right here —
+        // frog encounter above, or a bourgeon resolved in the loop just above, both created with
+        // geste null — could already satisfy the settling condition (passage already open, no one
+        // settled yet) without either of this epic's own two entry points ever running again to
+        // notice her: restorePassage is one-way and refuses once already open, releaseGesture
+        // refuses on a Rainelle whose geste is already null. Checked once here, after both birth
+        // loops above, same "decide there (pure), mutate here" split already applied to
+        // garden-state-cmd-w.js/-u.js.
+        const settleId = RainelleMovement.selectRainelleToSettle(s);
+        if (settleId) s.rainelles.find((r) => r.id === settleId).settledAt = true;
         // Epic C5.1/C5.2: every Rainelle that already existed before tonight's resolution either
         // did real night work under an active veilleuse (workedIds, recorded above by
         // runNightWork's own effect and here by recordNightlyActivity) or rested — the two are

@@ -26,12 +26,25 @@
    No narrative reveal here, deliberately: neither habitat removal nor gesture release is one of
    the three intensification levers named by design §11's table (unlike C6.9's reduceContract/
    setVeilleuse/setPriseFortDebit) — inventing one would not be reading the design, see this
-   epic's own "limite honnête" in campagne-backlog.md. */
+   epic's own "limite honnête" in campagne-backlog.md.
+
+   Epic C6.15 adds one further step once releaseGesture itself has actually succeeded: freeing a
+   gesture is one of the two events that can complete the settling condition (the other is
+   restorePassage, garden-state-cmd-w.js) — RainelleMovement.selectRainelleToSettle(s) (pure,
+   never mutates) is consulted immediately after, and its candidate (if any, here necessarily the
+   very Rainelle just released, geste already null) is the one place this command applies
+   `settledAt = true`, same "decide there, mutate here" split already documented in
+   rainelle-movement.js's own header comment for this function. removeHabitat never reaches this
+   check: it never sets a Rainelle's geste to null, so it cannot complete the condition. */
 (function (root) {
   const Stations =
     typeof module !== "undefined"
       ? require("./game/campaign-stations.js")
       : root.GardenCampaignStations;
+  const RainelleMovement =
+    typeof module !== "undefined"
+      ? require("./game/rainelle-movement.js")
+      : root.GardenRainelleMovement;
   const M = {
     commandSegU(c, ctx, st) {
       const { s, fail } = st;
@@ -54,6 +67,8 @@
         rainelle.geste = null;
         rainelle.job = null;
         st.message = "Geste libéré.";
+        const settleId = RainelleMovement.selectRainelleToSettle(s);
+        if (settleId) s.rainelles.find((r) => r.id === settleId).settledAt = true;
       }
       return null;
     },

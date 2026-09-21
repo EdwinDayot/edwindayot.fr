@@ -184,7 +184,9 @@
          validate.js, see the C2.4/C2.6c comments above) since validate.js needs both too; they
          remain before garden-state-cmd-f.js/-i.js/-j.js below, which also read root.GardenRainelles/
          root.GardenCultivars at their own execution time, same ordering requirement as
-         botany-genetics.js/-pot.js above. -->
+         botany-genetics.js/-pot.js above. Epic C6.15 adds a further dependency to
+         garden-state-cmd-f.js alone, root.GardenRainelleMovement, already loaded much earlier
+         above too (see the C5.10 comment there). -->
     <script src="/garden-state-cmd-f.js" defer></script>
     <script src="/garden-state-cmd-g.js" defer></script>
     <script src="/garden-state-cmd-h.js" defer></script>
@@ -218,13 +220,17 @@
          time, already loaded much earlier above (see the C6.4 comment there). -->
     <script src="/garden-state-cmd-t.js" defer></script>
     <!-- Epic C6.10: garden-state-cmd-u.js reads root.GardenCampaignStations at its own execution
-         time, already loaded much earlier above (see the C2.6a comment there). -->
+         time, already loaded much earlier above (see the C2.6a comment there). Epic C6.15 adds a
+         second dependency, root.GardenRainelleMovement, already loaded much earlier above too
+         (see the C5.10 comment there). -->
     <script src="/garden-state-cmd-u.js" defer></script>
     <!-- Epic C6.11: garden-state-cmd-v.js reads root.GardenCampaignStations at its own execution
          time, already loaded much earlier above (see the C2.6a comment there). -->
     <script src="/garden-state-cmd-v.js" defer></script>
     <!-- Epic C6.12: garden-state-cmd-w.js reads root.GardenCampaignPassage at its own execution
-         time, loaded just above (see the C6.12 comment there). -->
+         time, loaded just above (see the C6.12 comment there). Epic C6.15 adds a second
+         dependency, root.GardenRainelleMovement, already loaded much earlier above too (see the
+         C5.10 comment there). -->
     <script src="/garden-state-cmd-w.js" defer></script>
     <script src="/game/save.js" defer></script>
     <script src="/garden-models.js" defer></script>
