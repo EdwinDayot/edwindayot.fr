@@ -2700,3 +2700,33 @@ Aucun choix déjà confirmé du design remis en cause (Alma vivante, nom des Rai
 **Pour le prochain déclenchement** : aucun epic détaillé `todo` à dépendances satisfaites ne reste dans la phase 6 — le prochain déclenchement devra endosser le rôle Cartographe pour détailler la suite du chapitre 17 (mare/berge/accès praticable/scène finale) et le chapitre 18, dernier lot de l'acte VI, avant de pouvoir reprendre l'implémentation.
 
 Commit : voir `git log` sur `maison-des-possibles` (message « Epic C6.11 : chapitre 17, redimensionner un panier »). `git push origin maison-des-possibles` à confirmer par `git ls-remote origin` avant conclusion de ce déclenchement.
+
+## Déclenchement automatisé du 21 septembre 2026 — Cartographe, huitième lot de la phase 6 : premier temps du passage vers la mare (C6.12)
+
+Vérification anti-hallucination préalable (voir `docs/orchestration.md`/`execution-continue.md`) : dernier epic marqué fait au début de ce déclenchement = C6.11 (« chapitre 17, redimensionner un panier »), commit `752f362` confirmé réel par `git show --stat 752f362` (message de commit, description des fichiers modifiés cohérente avec l'entrée du backlog). `npm ci && npm test` relancé indépendamment avant tout nouveau travail →
+
+```
+# tests 734
+# suites 0
+# pass 734
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+```
+
+Exactement le nombre annoncé par le backlog (734/734), zéro régression. Aucun bandeau de pause en tête de `docs/campagne-backlog.md`. Les trois derniers epics consignés (C6.9, C6.10, C6.11) sont tous `fait` : aucune pause anti-emballement à déclencher.
+
+**Choix de l'action.** Aucun epic `todo` détaillé à dépendances satisfaites ne restait dans la phase 6 (seuls des epics `todo` obsolètes/reformulés d'autres phases, marqués « ne plus choisir directement » ou explicitement non actionnables — C2.5v, C2.6, C2.8v, C2.8v-b — subsistent ailleurs dans le fichier, aucun n'appartient à la phase courante). La porte de sortie de la phase 6 (« tous les parcours narratifs actes IV-VI concluent ») n'est pas atteinte : chapitres 17 (au-delà de son moteur habitat/panier déjà livré) et 18 restent non détaillés. Rôle Cartographe endossé, conformément à l'étape 3 d'`execution-continue.md`.
+
+**Recherche factuelle faite avant d'écrire une ligne**, pas recopiée depuis la limite honnête laissée par le lot précédent : `grep -rln "mare\|berge" public/game/*.js public/render*.js public/*.js` ne remonte toujours que les commentaires déjà cités par C4.5/C6.10/C6.11 qui notent l'absence du concept ; lecture de `public/game/construction.js` confirmant que le graphe de navigation existant est purement dérivé de la topologie déjà posée (zones, bâtiments, troncs), sans aucune notion de « passage bloqué/débloqué » réglable par une commande de campagne ; `grep -n "extension\|conversion" public/game/campaign-*.js` : aucune correspondance (aucune menace de conversion lucrative n'est modélisée nulle part).
+
+**Conclusion et lot détaillé.** Construire la géométrie réelle d'une mare, son branchement au graphe de navigation partagé et une espèce botanique filtrante associée dans un seul epic romprait « épics petits et additifs » — même conclusion déjà posée par C6.10/C6.11, revérifiée plutôt que recopiée. Une seule des cinq clauses littérales du chapitre 17 reste néanmoins buildable au niveau moteur sans cette géométrie : « rétablir l'accès à une mare », qui ne demande qu'un état ouvert/fermé réel et une commande qui le fait basculer — même patron déjà appliqué à un concept spatial avant sa position/son rendu réels par C5.5 (« Lieu dérivé d'une Rainelle : poste, repos ou habitat, moteur pur, sans position ni rendu »). Un seul nouvel epic ajouté au backlog, **C6.12 — Chapitre 17, troisième temps : registre du passage vers la mare (moteur pur, sans position ni rendu)** : nouveau champ `s.campaignPassage = { blocked: true }` (bloqué par défaut), nouvelle commande `restorePassage` (aucun paramètre) qui met `blocked` à `false`, refusée explicitement si déjà `false`. Fichiers probables : nouveau `public/game/campaign-passage.js`, nouveau `public/garden-state-cmd-w.js` (suffixe libre après `-v.js`), `public/garden-state-lifecycle.js`, `public/garden-state-validate.js`, `public/garden-state.js`, `public/index.html`, nouveau test Node.
+
+**Limites honnêtes documentées dans le backlog, pas devinées** : aucune géométrie de mare, aucun branchement au graphe de navigation, aucune espèce filtrante, aucune protection contre une extension lucrative (menace non modélisée) et aucune mise en scène de la Rainelle au bord de l'eau ne sont construites par ce lot ni par le futur C6.12 lui-même — un futur epic de rendu/moteur séparé devra encore donner une position réelle au passage, le relier au graphe de navigation, et construire la branche alternative « déjà préservé, à protéger ». Aucun accueil narratif n'est prévu par C6.12 (aucun signe factuel réel disponible tant que le passage n'a pas de position). Le chapitre 18 reste non détaillé, son critère dépendant toujours d'un chapitre 17 complet.
+
+Aucun choix déjà confirmé du design remis en cause. Aucune règle de `direction-artistique.md` concernée (aucun rendu/géométrie/teinte introduit par ce travail de planification). Épic de planification pure (Cartographe) : aucun code modifié, `npm test` non requis au-delà de la vérification anti-hallucination déjà relancée ci-dessus.
+
+**Pour le prochain déclenchement** : C6.12 est désormais l'unique epic `todo` détaillé à dépendances satisfaites dans la phase 6 — le prochain déclenchement peut l'implémenter directement (Artisan moteur, sans rendu).
+
+Commit : voir `git log` sur `maison-des-possibles` (message « Cartographe : huitième lot de la phase 6, registre du passage vers la mare (C6.12) »). `git push origin maison-des-possibles` à confirmer par `git ls-remote origin` avant conclusion de ce déclenchement.
