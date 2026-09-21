@@ -35,7 +35,13 @@
    very Rainelle just released, geste already null) is the one place this command applies
    `settledAt = true`, same "decide there, mutate here" split already documented in
    rainelle-movement.js's own header comment for this function. removeHabitat never reaches this
-   check: it never sets a Rainelle's geste to null, so it cannot complete the condition. */
+   check: it never sets a Rainelle's geste to null, so it cannot complete the condition.
+
+   Epic C6.16 adds the narrative reveal for that same event: once settleId is really non-null
+   here, Narrative.pendingReveal fires "passageRainelleSettled" (data-narrative.js), same one-shot
+   pattern already used by every other campaignFlags reveal in this codebase — same signal as
+   garden-state-cmd-w.js's restorePassage, since either can complete the condition and the text is
+   about the settling itself, not about which command happened to complete it. */
 (function (root) {
   const Stations =
     typeof module !== "undefined"
@@ -45,6 +51,10 @@
     typeof module !== "undefined"
       ? require("./game/rainelle-movement.js")
       : root.GardenRainelleMovement;
+  const Narrative =
+    typeof module !== "undefined"
+      ? require("./game/data-narrative.js")
+      : root.GardenNarrative;
   const M = {
     commandSegU(c, ctx, st) {
       const { s, fail } = st;
@@ -68,7 +78,14 @@
         rainelle.job = null;
         st.message = "Geste libéré.";
         const settleId = RainelleMovement.selectRainelleToSettle(s);
-        if (settleId) s.rainelles.find((r) => r.id === settleId).settledAt = true;
+        if (settleId) {
+          s.rainelles.find((r) => r.id === settleId).settledAt = true;
+          const revealed = Narrative.pendingReveal(
+            s.campaignFlags,
+            "passageRainelleSettled",
+          );
+          if (revealed) s.campaignFlags.push(revealed.id);
+        }
       }
       return null;
     },

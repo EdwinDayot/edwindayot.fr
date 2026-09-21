@@ -340,6 +340,22 @@
       title: "Une prise restituée",
       text: "La prise à fort débit est restituée. Le bassin commun cesse de baisser, sans remonter aussitôt.",
     },
+    // Epic C6.16 (design §10, chapitre 17 "Rendre le passage" ; §11, scène de référence "Rendre
+    // le passage" : "Une Rainelle passe, s'assied et ne revient pas au poste. Le résultat de la
+    // réparation n'appartient pas entièrement au joueur."). Révélée depuis les trois sites réels
+    // qui appliquent rainelle.settledAt = true (garden-state-cmd-w.js's restorePassage,
+    // garden-state-cmd-u.js's releaseGesture, garden-state-cmd-f.js's bloc sleep), immédiatement
+    // après cette ligne — jamais avant que settleId soit véritablement non nul. Le texte constate
+    // le fait déjà réel (elle ne rejoint plus le poste préparé pour elle) sans lui prêter une
+    // motivation qu'elle ne possède pas et sans en faire une leçon adressée au joueur, même
+    // discipline que "premier-non-*"/"bilan-matin-*" : aucune formulation d'obligation ou
+    // d'accusation.
+    "passage-rainelle-installee": {
+      id: "passage-rainelle-installee",
+      trigger: "passageRainelleSettled",
+      title: "Rendre le passage",
+      text: "Une Rainelle a traversé, puis s’est arrêtée près de l’eau — elle ne rejoint plus le poste qu’on avait préparé pour elle. Rien ici n’explique pourquoi ; le résultat de cette réparation n’appartient pas entièrement à qui l’a menée.",
+    },
   };
 
   function findByTrigger(signal) {

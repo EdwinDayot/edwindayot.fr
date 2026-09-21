@@ -176,8 +176,19 @@
         // refuses on a Rainelle whose geste is already null. Checked once here, after both birth
         // loops above, same "decide there (pure), mutate here" split already applied to
         // garden-state-cmd-w.js/-u.js.
+        //
+        // Epic C6.16: same reveal as garden-state-cmd-w.js's restorePassage/garden-state-cmd-u.js's
+        // releaseGesture — "passageRainelleSettled" (data-narrative.js), fired only once settleId
+        // is really non-null, never before.
         const settleId = RainelleMovement.selectRainelleToSettle(s);
-        if (settleId) s.rainelles.find((r) => r.id === settleId).settledAt = true;
+        if (settleId) {
+          s.rainelles.find((r) => r.id === settleId).settledAt = true;
+          const settledRevealed = Narrative.pendingReveal(
+            s.campaignFlags,
+            "passageRainelleSettled",
+          );
+          if (settledRevealed) s.campaignFlags.push(settledRevealed.id);
+        }
         // Epic C5.1/C5.2: every Rainelle that already existed before tonight's resolution either
         // did real night work under an active veilleuse (workedIds, recorded above by
         // runNightWork's own effect and here by recordNightlyActivity) or rested — the two are
