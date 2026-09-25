@@ -896,6 +896,11 @@
         // must be a valid campaignDay count. Entries from before this epic simply don't exist (the
         // field has been an empty array since C5.1), so no optional/undefined branch is needed
         // here, unlike overexertion/persistentGestureIds above.
+        // Epic C6.27: returnedDay is optional per entry (undefined = still active, the only shape
+        // C6.26 alone could ever produce) — when present, only a valid campaignDay count is
+        // checked, same "type only, never re-derived" posture as day itself; which entry is
+        // "the" active one for a zone is campaign-memory.js's own
+        // findActiveHabitatTransformation's concern, not this validator's.
         !Array.isArray(M.habitatTransformations) ||
         M.habitatTransformations.some(
           (h) =>
@@ -905,7 +910,8 @@
             typeof h.habitatId !== "string" ||
             !h.habitatId ||
             !finite(h.capacity, Stations.MIN_HABITAT_CAPACITY, Infinity) ||
-            !count(h.day),
+            !count(h.day) ||
+            (h.returnedDay !== undefined && !count(h.returnedDay)),
         ) ||
         typeof M.unsoldStock !== "object" ||
         M.unsoldStock === null ||

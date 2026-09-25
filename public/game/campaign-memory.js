@@ -95,6 +95,17 @@
    fact, never erase it" posture as `births`. A future epic's reparation (C6.27) marks an entry
    returned rather than deleting it, matching this field's own append-only shape.
 
+   Epic C6.27 (design §11, reparation of the same lever, "coût réel... jamais une annulation
+   gratuite") adds the reparation side: `convertZoneToLivingSpace` (garden-state-cmd-y.js) pays a
+   real cost, restores the zone's `extensionCommerciale` flag to false, registers a brand-new
+   habitat of the *same* capacity as the one this lever once took, and calls
+   markHabitatTransformationReturned below to annotate — never delete — the entry that recorded
+   the original taking. See findActiveHabitatTransformation/markHabitatTransformationReturned
+   below: at most one entry can ever be "active" (no `returnedDay` yet) for a given zone at a
+   time, since extendZoneOverHabitat itself refuses to re-extend an already-extended zone
+   (C6.26) — so "the last matching entry without a returnedDay" is an unambiguous fact about the
+   data, never a convenient guess among several candidates.
+
    `bassinCommunLevel` derives the shared level from that cumulative total rather than storing a
    second, independently-mutated number: level = BASSIN_COMMUN_CAPACITY − Σ(waterWithdrawals),
    floored at zero. This is deliberate, not a simplification of a "real" stored level — since
@@ -273,6 +284,28 @@
     memory.habitatTransformations.push(entry);
   }
 
+  // Epic C6.27: pure lookup, never a mutation — the one still-open (no `returnedDay` yet)
+  // transformation entry for a given zone, if any. Searches from the end since a zone can only
+  // ever hold one active entry at a time (see header comment above for why), so the last match
+  // is also the only match in practice; returns the real array entry (not a copy), so a caller
+  // can pass it straight to markHabitatTransformationReturned below without a second lookup.
+  function findActiveHabitatTransformation(memory, zoneId) {
+    const entries = memory.habitatTransformations;
+    for (let i = entries.length - 1; i >= 0; i--) {
+      if (entries[i].zoneId === zoneId && entries[i].returnedDay === undefined)
+        return entries[i];
+    }
+    return null;
+  }
+
+  // Epic C6.27: annotates (never deletes) the fact that a once-taken habitat has been given
+  // back — same "append, never rewrite history" posture as recordHabitatTransformation itself.
+  // `entry` must already be the real array entry returned by findActiveHabitatTransformation
+  // above, the only intended caller — this function does not search, only mark.
+  function markHabitatTransformationReturned(entry, day) {
+    entry.returnedDay = day;
+  }
+
   const api = {
     freshMemory,
     OVEREXERTION_THRESHOLD,
@@ -289,6 +322,8 @@
     recordPersistentGesture,
     recordContractDelivery,
     recordHabitatTransformation,
+    findActiveHabitatTransformation,
+    markHabitatTransformationReturned,
   };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenCampaignMemory = api;
