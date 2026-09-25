@@ -42,6 +42,7 @@ test("a fresh save starts with no epilogue state at all, canOpen false", () => {
     unlocksOnDay: null,
     orientation: null,
     openedOnDay: null,
+    gift: null,
   });
   assert.equal(Epilogue.canOpen(g.s), false);
 });
@@ -230,6 +231,7 @@ test("migration : une sauvegarde antérieure sans campaignEpilogue migre à l'é
     unlocksOnDay: null,
     orientation: null,
     openedOnDay: null,
+    gift: null,
   });
 });
 
@@ -273,5 +275,6 @@ test("non-régression : une sauvegarde fresh() réelle a canOpen faux et campaig
     unlocksOnDay: null,
     orientation: null,
     openedOnDay: null,
+    gift: null,
   });
 });

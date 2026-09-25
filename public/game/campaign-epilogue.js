@@ -60,7 +60,30 @@
    -u.js/-w.js's own comments for the three sites), the current day has reached it, and the
    epilogue has not already been opened (`openedOnDay` still null) — `openEpilogue`
    (garden-state-cmd-x.js) is the only place this can ever move from false to true, freezing
-   `orientation(s)`'s result at that exact moment rather than leaving it live. */
+   `orientation(s)`'s result at that exact moment rather than leaving it live.
+
+   Epic C6.20 adds `gift()`, reused by `openEpilogue` on its one success path to freeze
+   `s.campaignEpilogue.gift` (design §10, chapitre 18, last paragraph: "une jeune plante offerte
+   par un habitant peut rejoindre la maison : elle n'a pas été créée par le héros"). The design
+   fixes neither the species nor the giver, so both are this epic's own explicit, documented
+   choice — never a guess deferred to a future epic, never a value invented outside the two real
+   catalogues that already exist:
+     - speciesId "aster-des-vents": the one founding species (botany-genetics.js) whose palette
+       family (violet) direction-artistique.md already reserves and names for exactly this species
+       ("aster/violet non encore utilisé en jeu... à réserver pour l'Aster des vents") without ever
+       putting it on screen — this gift is that reservation's first real use, and its violet also
+       keeps the gifted plant visually distinct from anything the player has bred (the founder
+       palettes players actually reach through the pot lean green/warm, see C1.8's own six).
+     - giverId "iris": the only NPC in data-buildings.js whose role is "botanist" — offering a
+       plant is literally what that role already means in data-roles.js, so no other real
+       visitorId reads as coherently. Jeanne, named in the design at chapters 15/18, is not (yet)
+       a real visitorId in data-buildings.js — never invented here to stand in for a data row that
+       does not exist; a future epic that adds her as a real building can revisit this choice.
+     Both are fixed for every game (no derivation from orientation/seed/id): the design gives no
+     reason a gift species or giver should vary by playthrough, and inventing one now would be a
+     guess this epic has no basis for — left to a future epic if a real reason to vary ever shows
+     up. `gift()` takes no argument and returns a fresh object each call (never a shared mutable
+     reference two saves could alias). */
 (function (root) {
   const ORIENTATIONS = { INTENSIVE: "intensive", PARTIEL: "partiel", DURABLE: "durable" };
 
@@ -100,7 +123,22 @@
     );
   }
 
-  const api = { ORIENTATIONS, orientation, canOpen };
+  // Fixed for every game — see header comment for why "aster-des-vents"/"iris" are this epic's
+  // own explicit, documented choice rather than a derivation. Returns a fresh object every call.
+  const GIFT_SPECIES_ID = "aster-des-vents";
+  const GIFT_GIVER_ID = "iris";
+  function gift() {
+    return { speciesId: GIFT_SPECIES_ID, giverId: GIFT_GIVER_ID };
+  }
+
+  const api = {
+    ORIENTATIONS,
+    orientation,
+    canOpen,
+    gift,
+    GIFT_SPECIES_ID,
+    GIFT_GIVER_ID,
+  };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenCampaignEpilogue = api;
 })(globalThis);

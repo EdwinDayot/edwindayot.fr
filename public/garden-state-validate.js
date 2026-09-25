@@ -425,7 +425,24 @@
         (s.campaignEpilogue.orientation === null) !==
           (s.campaignEpilogue.openedOnDay === null) ||
         (s.campaignEpilogue.openedOnDay !== null &&
-          s.campaignEpilogue.unlocksOnDay === null))
+          s.campaignEpilogue.unlocksOnDay === null) ||
+        // Epic C6.20: gift is null or an object naming a real founding species (botany-genetics.js's
+        // founders, never a fictional id) and a real visitor (data.js's buildings, never an invented
+        // name) — same "read against the real catalogue rather than duplicate a literal list"
+        // posture already applied to orientation against Epilogue.ORIENTATIONS above. gift can never
+        // be real before openedOnDay is (frozen on the same success path, garden-state-cmd-x.js).
+        (s.campaignEpilogue.gift !== undefined &&
+          s.campaignEpilogue.gift !== null &&
+          (typeof s.campaignEpilogue.gift !== "object" ||
+            !Genetics.founders.some(
+              (f) => f.id === s.campaignEpilogue.gift.speciesId,
+            ) ||
+            !D.buildings.some(
+              (b) => b.visitorId === s.campaignEpilogue.gift.giverId,
+            ))) ||
+        (s.campaignEpilogue.gift !== undefined &&
+          s.campaignEpilogue.gift !== null &&
+          s.campaignEpilogue.openedOnDay === null))
     )
       throw Error("Épilogue de campagne invalide.");
     if (
@@ -1012,6 +1029,11 @@
       orientation: null,
       openedOnDay: null,
     };
+    // Epic C6.20: a save from between C6.18 and C6.20 already has campaignEpilogue but no gift
+    // yet — same two-level "field added to an existing object" migration as campaignPassage.x/z
+    // above, defaulted to null (nothing offered before this epic existed, exactly like a fresh
+    // save's own default), never guessed as already-open.
+    result.campaignEpilogue.gift ??= null;
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };

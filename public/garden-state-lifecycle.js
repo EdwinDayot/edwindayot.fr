@@ -198,7 +198,14 @@
       // additively, by the same three sites that already set `rainelle.settledAt = true`
       // (garden-state-cmd-f.js/-u.js/-w.js, C6.15); `orientation`/`openedOnDay` are set together,
       // exactly once, by openEpilogue (garden-state-cmd-x.js) once Epilogue.canOpen(s) is true.
-      campaignEpilogue: { unlocksOnDay: null, orientation: null, openedOnDay: null },
+      // Epic C6.20 adds `gift`, frozen on that same success path (Epilogue.gift()) — unset here
+      // for the same reason: nothing has been offered before the epilogue actually opens.
+      campaignEpilogue: {
+        unlocksOnDay: null,
+        orientation: null,
+        openedOnDay: null,
+        gift: null,
+      },
     };
   }
   function migrate(old, now = Date.now()) {

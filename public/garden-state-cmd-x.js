@@ -22,7 +22,15 @@
    just-frozen orientation to its own trigger (exactly one of epilogueOuvertIntensive/-Partiel/
    -Durable, data-narrative.js), then the common closing clause ("epilogueOuvert",
    "epilogue-suite") is revealed right after — always both, on every successful call, never either
-   alone (openEpilogue is one-way, C6.18, so this can only ever run once per game). */
+   alone (openEpilogue is one-way, C6.18, so this can only ever run once per game).
+
+   Epic C6.20 (design §10, chapitre 18, quatrième temps : "jeune plante offerte par un habitant")
+   freezes s.campaignEpilogue.gift on the same success path, right after orientation/openedOnDay
+   — Epilogue.gift() (see campaign-epilogue.js for why "aster-des-vents"/"iris" are this epic's own
+   fixed, documented choice) is read exactly once, same "photograph, never a live value" posture
+   already applied to orientation itself. No narrative reveal is added here: the gift is not named
+   in any of the three orientation texts or the common closing clause C6.19 already wired, and the
+   backlog's own critère de sortie for this epic requires none. */
 (function (root) {
   const Epilogue =
     typeof module !== "undefined"
@@ -43,6 +51,7 @@
           return fail("L'épilogue n'est pas encore accessible.");
         s.campaignEpilogue.orientation = Epilogue.orientation(s);
         s.campaignEpilogue.openedOnDay = s.campaignDay;
+        s.campaignEpilogue.gift = Epilogue.gift();
         const orientationRevealed = Narrative.pendingReveal(
           s.campaignFlags,
           Narrative.epilogueOrientationSignal(s.campaignEpilogue.orientation),
