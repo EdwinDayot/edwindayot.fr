@@ -41,7 +41,12 @@
    here, Narrative.pendingReveal fires "passageRainelleSettled" (data-narrative.js), same one-shot
    pattern already used by every other campaignFlags reveal in this codebase — same signal as
    garden-state-cmd-w.js's restorePassage, since either can complete the condition and the text is
-   about the settling itself, not about which command happened to complete it. */
+   about the settling itself, not about which command happened to complete it.
+
+   Epic C6.18 adds one further step, only once settleId is really non-null here and only if
+   s.campaignEpilogue.unlocksOnDay is still null (the first of the three settling sites reached
+   wins, same reasoning as garden-state-cmd-w.js's own C6.18 comment): s.campaignEpilogue.unlocksOnDay
+   = s.campaignDay + 3. */
 (function (root) {
   const Stations =
     typeof module !== "undefined"
@@ -85,6 +90,8 @@
             "passageRainelleSettled",
           );
           if (revealed) s.campaignFlags.push(revealed.id);
+          if (s.campaignEpilogue.unlocksOnDay === null)
+            s.campaignEpilogue.unlocksOnDay = s.campaignDay + 3;
         }
       }
       return null;

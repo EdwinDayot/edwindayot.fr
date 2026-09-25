@@ -46,6 +46,13 @@
     typeof module !== "undefined"
       ? require("./game/campaign-memory.js")
       : root.GardenCampaignMemory;
+  // Epic C6.18: read here only for ORIENTATIONS, to validate s.campaignEpilogue.orientation
+  // against the same three literal strings orientation(s)/openEpilogue actually produce, rather
+  // than duplicating them as a second literal list here.
+  const Epilogue =
+    typeof module !== "undefined"
+      ? require("./game/campaign-epilogue.js")
+      : root.GardenCampaignEpilogue;
   // Epic C1.5: read here to validate a pinned trait (AXES/founders), both on s.campaignPin
   // itself and on an optional pin attached to a pending campaignPot entry below.
   const Genetics =
@@ -394,6 +401,33 @@
           (!Number.isFinite(s.campaignPassage.z) || (s.campaignPassage.z * 2) % 1)))
     )
       throw Error("Passage invalide.");
+    // Epic C6.18 (design §10, chapitre 18, second beat): unlocksOnDay/openedOnDay are day numbers
+    // (same >=1 discipline campaignDay itself is checked with, further below), orientation is null or exactly
+    // one of Epilogue.ORIENTATIONS's three values — never a fourth string a hand-edited or future
+    // save could otherwise smuggle in. orientation and openedOnDay are set together, exactly once,
+    // by openEpilogue (garden-state-cmd-x.js): never one real without the other. openedOnDay can
+    // never be set before unlocksOnDay is (Epilogue.canOpen's own gate; the command can never
+    // reach that state, but a hand-edited save could).
+    if (
+      s.campaignEpilogue !== undefined &&
+      (typeof s.campaignEpilogue !== "object" ||
+        s.campaignEpilogue === null ||
+        (s.campaignEpilogue.unlocksOnDay !== null &&
+          (!count(s.campaignEpilogue.unlocksOnDay) ||
+            s.campaignEpilogue.unlocksOnDay < 1)) ||
+        (s.campaignEpilogue.orientation !== null &&
+          !Object.values(Epilogue.ORIENTATIONS).includes(
+            s.campaignEpilogue.orientation,
+          )) ||
+        (s.campaignEpilogue.openedOnDay !== null &&
+          (!count(s.campaignEpilogue.openedOnDay) ||
+            s.campaignEpilogue.openedOnDay < 1)) ||
+        (s.campaignEpilogue.orientation === null) !==
+          (s.campaignEpilogue.openedOnDay === null) ||
+        (s.campaignEpilogue.openedOnDay !== null &&
+          s.campaignEpilogue.unlocksOnDay === null))
+    )
+      throw Error("Épilogue de campagne invalide.");
     if (
       s.specimens !== undefined &&
       (!Array.isArray(s.specimens) ||
@@ -970,6 +1004,14 @@
     // since there has only ever been one passage position, never a per-save random draw.
     result.campaignPassage.x ??= Passage.PASSAGE_POSITION.x;
     result.campaignPassage.z ??= Passage.PASSAGE_POSITION.z;
+    // Epic C6.18: a pre-epic save simply has no epilogue state yet — nothing has settled, nothing
+    // can be open, same "simply absent before this epic" posture as campaignPassage/campaignContracts
+    // above.
+    result.campaignEpilogue ??= {
+      unlocksOnDay: null,
+      orientation: null,
+      openedOnDay: null,
+    };
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };

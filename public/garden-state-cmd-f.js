@@ -180,6 +180,13 @@
         // Epic C6.16: same reveal as garden-state-cmd-w.js's restorePassage/garden-state-cmd-u.js's
         // releaseGesture — "passageRainelleSettled" (data-narrative.js), fired only once settleId
         // is really non-null, never before.
+        //
+        // Epic C6.18: same third settling site as garden-state-cmd-w.js/-u.js's own C6.18 comment
+        // — s.campaignEpilogue.unlocksOnDay = s.campaignDay + 3, only if still null, only once
+        // settleId is really non-null. Read here before this same command's own `s.campaignDay +=
+        // 1` further below: a Rainelle settling from tonight's birth counts tonight (the day about
+        // to end), not the day about to start, same "posed at the moment observed" posture as
+        // every other campaignMemory entry recorded earlier in this same command.
         const settleId = RainelleMovement.selectRainelleToSettle(s);
         if (settleId) {
           s.rainelles.find((r) => r.id === settleId).settledAt = true;
@@ -188,6 +195,8 @@
             "passageRainelleSettled",
           );
           if (settledRevealed) s.campaignFlags.push(settledRevealed.id);
+          if (s.campaignEpilogue.unlocksOnDay === null)
+            s.campaignEpilogue.unlocksOnDay = s.campaignDay + 3;
         }
         // Epic C5.1/C5.2: every Rainelle that already existed before tonight's resolution either
         // did real night work under an active veilleuse (workedIds, recorded above by

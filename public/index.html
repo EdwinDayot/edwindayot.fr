@@ -106,9 +106,9 @@
     <script src="/game/campaign-contracts.js" defer></script>
     <!-- Epic C6.17: campaign-epilogue.js has no dependency of its own (pure, over plain
          campaignMemory/campaignContracts/campaignStations/campaignFlags data already loaded by the
-         scripts above) and nothing yet reads it in the browser (no epilogue screen/command wires it
-         — see that file's own header comment for the future rendering/narration epic this awaits).
-         Loaded here anyway, right after campaign-contracts.js, for the same reason every other pure
+         scripts above). Epic C6.18 gives it its first real browser readers — garden-state-
+         validate.js/-lifecycle.js and garden-state-cmd-x.js's openEpilogue, all further below —
+         loaded here anyway, right after campaign-contracts.js, for the same reason every other pure
          campaign module in this file is loaded ahead of any real reader: avoiding the exact class of
          missing-script ordering bug documented throughout this file, before one exists. -->
     <script src="/game/campaign-epilogue.js" defer></script>
@@ -240,6 +240,9 @@
          dependency, root.GardenRainelleMovement, already loaded much earlier above too (see the
          C5.10 comment there). -->
     <script src="/garden-state-cmd-w.js" defer></script>
+    <!-- Epic C6.18: garden-state-cmd-x.js reads root.GardenCampaignEpilogue at its own execution
+         time, already loaded much earlier above (see the C6.17 comment there). -->
+    <script src="/garden-state-cmd-x.js" defer></script>
     <script src="/game/save.js" defer></script>
     <script src="/garden-models.js" defer></script>
     <script src="/garden-models-leaf.js" defer></script>

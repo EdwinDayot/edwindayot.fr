@@ -193,6 +193,12 @@
       // rather than duplicated, see that module's own header comment for how it was chosen and
       // verified against GardenGeometry.zoneAt before being fixed.
       campaignPassage: { blocked: true, ...Passage.PASSAGE_POSITION },
+      // Epic C6.18 (design §10, chapitre 18, second beat): unset on a fresh save — nothing has
+      // settled yet, so there is nothing to observe or freeze. `unlocksOnDay` is set exactly once,
+      // additively, by the same three sites that already set `rainelle.settledAt = true`
+      // (garden-state-cmd-f.js/-u.js/-w.js, C6.15); `orientation`/`openedOnDay` are set together,
+      // exactly once, by openEpilogue (garden-state-cmd-x.js) once Epilogue.canOpen(s) is true.
+      campaignEpilogue: { unlocksOnDay: null, orientation: null, openedOnDay: null },
     };
   }
   function migrate(old, now = Date.now()) {

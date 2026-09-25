@@ -21,7 +21,13 @@
 
    Epic C6.16 adds the narrative reveal for that same event: once settleId is really non-null
    here, Narrative.pendingReveal fires "passageRainelleSettled" (data-narrative.js), same one-shot
-   pattern already used by every other campaignFlags reveal in this codebase. */
+   pattern already used by every other campaignFlags reveal in this codebase.
+
+   Epic C6.18 adds one further step, only once settleId is really non-null here and only if
+   s.campaignEpilogue.unlocksOnDay is still null (the first of the three settling sites reached
+   wins, the other two never run this again for the same game — a Rainelle only ever settles
+   once, C6.15): s.campaignEpilogue.unlocksOnDay = s.campaignDay + 3, the same three-site pattern
+   as settledAt/the narrative reveal just above. */
 (function (root) {
   const Passage =
     typeof module !== "undefined"
@@ -52,6 +58,8 @@
             "passageRainelleSettled",
           );
           if (revealed) s.campaignFlags.push(revealed.id);
+          if (s.campaignEpilogue.unlocksOnDay === null)
+            s.campaignEpilogue.unlocksOnDay = s.campaignDay + 3;
         }
       }
       return null;

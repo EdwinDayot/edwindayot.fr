@@ -52,7 +52,15 @@
    enough, rather than guessing their weight now. Chapter 17's "protection contre une extension
    lucrative" branch is not covered here either — closed for good by the Cartographe's own note
    above this epic (structurally unreachable, s.campaignPassage.blocked can never become true again
-   once restored). */
+   once restored).
+
+   Epic C6.18 adds `canOpen(s)`, also pure/never mutating: true only once `s.campaignEpilogue`
+   (garden-state-lifecycle.js/garden-state-validate.js, new this epic) has a real `unlocksOnDay`
+   (set the moment a Rainelle actually settles at the passage, C6.15 — see garden-state-cmd-f.js/
+   -u.js/-w.js's own comments for the three sites), the current day has reached it, and the
+   epilogue has not already been opened (`openedOnDay` still null) — `openEpilogue`
+   (garden-state-cmd-x.js) is the only place this can ever move from false to true, freezing
+   `orientation(s)`'s result at that exact moment rather than leaving it live. */
 (function (root) {
   const ORIENTATIONS = { INTENSIVE: "intensive", PARTIEL: "partiel", DURABLE: "durable" };
 
@@ -82,7 +90,17 @@
     return ORIENTATIONS.PARTIEL;
   }
 
-  const api = { ORIENTATIONS, orientation };
+  // Pure: never mutates s. See header comment (Epic C6.18) for what each field of
+  // s.campaignEpilogue means and who writes it.
+  function canOpen(s) {
+    return (
+      s.campaignEpilogue.unlocksOnDay !== null &&
+      s.campaignDay >= s.campaignEpilogue.unlocksOnDay &&
+      s.campaignEpilogue.openedOnDay === null
+    );
+  }
+
+  const api = { ORIENTATIONS, orientation, canOpen };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenCampaignEpilogue = api;
 })(globalThis);
