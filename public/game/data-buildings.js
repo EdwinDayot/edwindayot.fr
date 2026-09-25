@@ -201,7 +201,32 @@
       accent: 0x5f8f6a,
       personColor: 0xe8d4a0,
       role: "resident",
-      roleData: { line: "trie de vieux carnets, près de la serre commune" },
+      // Epic C6.25: the "resident" role's optional narrativeAction (data-roles.js)
+      // is what reaches restoreArchiveLabels (C6.7, garden-state-cmd-s.js) from a
+      // real player action — that command existed since C6.7 but no interaction
+      // ever called it (grep confirmed empty before this epic). Gated on
+      // "alma-retour" (already narrated by then) and self-closing once spent.
+      // Divergence from the backlog's own critère de sortie, verified against the
+      // real code rather than assumed: the text names "archiveLabelsRestored" as
+      // the flag to watch for, but that string is only garden-state-cmd-s.js's
+      // internal Narrative.pendingReveal *trigger* signal — the id actually
+      // pushed to s.campaignFlags is the narrative entry's own id,
+      // "archives-restaurees" (data-narrative.js, entry "archives-restaurees",
+      // trigger: "archiveLabelsRestored"). doneFlag below uses the real
+      // persisted id; using the trigger name instead would never match and the
+      // action would never self-close.
+      roleData: {
+        line: "trie de vieux carnets, près de la serre commune",
+        narrativeAction: {
+          flag: "alma-retour",
+          doneFlag: "archives-restaurees",
+          command: "restoreArchiveLabels",
+          label: "E · Restaurer les étiquettes",
+          activeStatus:
+            "peut aider à restaurer les deux noms sur les étiquettes",
+          doneStatus: "les étiquettes portent de nouveau les deux noms",
+        },
+      },
       roofColor: 0x4a5a42,
       // Epic C6.24 : seul bâtiment de visiteur à porter ce knob — lu par
       // render-houses.js's buildHouse() pour remplacer this.mat.stone par le

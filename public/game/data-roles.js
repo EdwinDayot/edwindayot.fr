@@ -60,14 +60,30 @@
     // village isn't only NPCs the player extracts something from — E just
     // shows a flavour line (roleData.line) and does nothing (command: null,
     // same no-op pattern the trader/mining fallbacks already use).
+    //
+    // Epic C6.25: an optional roleData.narrativeAction lets a resident also
+    // expose a one-shot story command once a flag is set, without a new role
+    // or an id literal here — the branching stays entirely data-driven, same
+    // generalisation already applied to wares/quests above. Gated on two
+    // flags: `flag` (must be present to offer anything beyond the plain
+    // line) and `doneFlag` (once present, the action is already spent — a
+    // constat line replaces it, command reverts to null so the player is
+    // never shown a live action that would no longer do anything).
     resident: {
-      context(e) {
-        const line =
-          D.buildings.find((b) => b.visitorId === e.id)?.roleData?.line ||
-          "habite ici";
+      context(e, s) {
+        const b = D.buildings.find((b) => b.visitorId === e.id);
+        const na = b?.roleData?.narrativeAction;
+        if (na && s?.campaignFlags?.includes(na.flag)) {
+          const done = s.campaignFlags.includes(na.doneFlag);
+          return {
+            label: done ? "E · Saluer" : na.label,
+            status: `${firstName(e.id)} · ${done ? na.doneStatus : na.activeStatus}`,
+            command: done ? null : na.command,
+          };
+        }
         return {
           label: "E · Saluer",
-          status: `${firstName(e.id)} · ${line}`,
+          status: `${firstName(e.id)} · ${b?.roleData?.line || "habite ici"}`,
           command: null,
         };
       },
