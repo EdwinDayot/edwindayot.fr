@@ -221,6 +221,18 @@
           if (entry)
             rows.push({ title: entry.title, detail: entry.text, action: null });
         }
+        // Epic C6.21 (design §10, chapitre 18): the real trigger point openEpilogue (C6.18) lacked
+        // until now — visible only once Epilogue.canOpen(m.s) is true, same "no row at all before
+        // the predicate holds" posture as the pending-cultivar rows above, rather than an always-
+        // present disabled row (unlike the always-relevant per-Rainelle "Regarde-moi" rows in the
+        // "observation" panel below, this action simply does not exist yet before its gate opens).
+        const Epilogue = window.GardenCampaignEpilogue;
+        if (Epilogue?.canOpen(m.s))
+          rows.push({
+            title: "Ouvrir l'épilogue",
+            detail: "Le domaine, dans l'état où tu l'as laissé.",
+            action: "open-epilogue",
+          });
       } else if (m.panel === "nightfall") {
         // Epic C2.2v (design §3: "le jeu propose de préparer ou de confirmer le pot dans un
         // écran suspendu... il reste possible de ne rien croiser"). Shows whatever sowPot
@@ -266,6 +278,22 @@
               : "persistance-geste-vide"
           ];
         if (entry) rows.push({ title: entry.title, detail: entry.text });
+      } else if (m.panel === "epilogue-scene") {
+        // Epic C6.21 (design §10, chapitre 18). Read-only, same shape as "gesture-scene" above:
+        // holds the exact two narrative texts already revealed on the same successful openEpilogue
+        // call (C6.19 — the orientation's own text, keyed "epilogue-" + orientation, plus the
+        // common "epilogue-suite" closing clause always revealed alongside it, garden-state-cmd-
+        // x.js) while render-items.js's beginEpilogueScene() keeps the camera on its wide shot —
+        // never a second, independent text. No bespoke "skip" button: Échap already closes any
+        // panel and ends the scene the same way (garden-cmd.js's closePanel calling
+        // endEpilogueScene).
+        const Narrative = window.GardenNarrative,
+          orientationEntry =
+            Narrative?.TEXTS["epilogue-" + m.s.campaignEpilogue.orientation],
+          suiteEntry = Narrative?.TEXTS["epilogue-suite"];
+        if (orientationEntry)
+          rows.push({ title: orientationEntry.title, detail: orientationEntry.text });
+        if (suiteEntry) rows.push({ title: suiteEntry.title, detail: suiteEntry.text });
       } else if (m.panel === "teaching") {
         // Epic C2.5v-b (design §5's own "quatre moments" screen, deferred from C2.5 — see
         // garden-state-cmd-k.js's header comment): the three literal rendering clauses C2.5v's

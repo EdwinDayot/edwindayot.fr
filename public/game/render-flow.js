@@ -237,6 +237,51 @@
           }
         }
       }
+      // Epic C6.21 (design §10, chapitre 18, dernier paragraphe : "une jeune plante offerte par un
+      // habitant peut rejoindre la maison"). Built once, the moment C6.20's own
+      // s.campaignEpilogue.gift first freezes — never rebuilt afterward, since gift itself is
+      // frozen exactly once (openEpilogue is one-way, C6.18) — same "build once, cache" posture as
+      // rainelleModels/stationModels above, simplified to a single guard ("not yet built") instead
+      // of a per-id Map, since a game only ever has exactly one gift.
+      //
+      // Reuses botany-hybrids.js's buildSpecimenGroup DIRECTLY on the founder's own {id, traits}
+      // shape (never GardenCultivars/the pot draw: design §10 literal, "elle n'a pas été créée par
+      // le héros") — the exact same call already exercised, for every founder including
+      // "aster-des-vents", by tests/garden-material-audit.cjs's own founders.forEach block, so no
+      // new material/mesh is introduced by this epic.
+      //
+      // Position {-13, 9.5}: verified, not guessed, against the real modules this epic's own
+      // mandate names (geometry.js/terrain.js/construction.js), the same discipline
+      // render-campaign-house.js's own header comment used for CAMPAIGN_HOUSE_X/Z. The refuge
+      // house's real world footprint (measured via Box3 on buildRefugeHouseGroup, rotation
+      // included) is x:[-15.0,-11.0] z:[3.7,8.3]; its door faces world +X (design's own
+      // "player-facing door" convention, confirmed from the local door offset at local z=-d2
+      // rotated by CAMPAIGN_HOUSE_ROTATION_Y). {-13, 9.5} sits 1.2 units north of the house's own
+      // wall, away from the east-facing door and the spawn-side approach, still centered on the
+      // house's own x. Confirmed flat (terrainHeight and its four cardinal neighbours all exactly
+      // 0), inside zone 0 with a 3-unit polygon-edge margin, walkable() true, and clear of every
+      // visitor/cache/fresh-save entity (nearest visitor ≈3.85 units away) — checked with a fresh
+      // GardenState, not assumed.
+      const EPILOGUE_GIFT_X = -13,
+        EPILOGUE_GIFT_Z = 9.5;
+      const Genetics = window.GardenGenetics,
+        Hybrids = window.GardenBotanyHybrids;
+      if (!this.epilogueGiftModel && s.campaignEpilogue?.gift && Genetics && Hybrids) {
+        const founder = Genetics.founders.find(
+          (f) => f.id === s.campaignEpilogue.gift.speciesId,
+        );
+        if (founder) {
+          const group = Hybrids.buildSpecimenGroup({ id: founder.id, traits: founder.traits });
+          group.position.set(
+            EPILOGUE_GIFT_X,
+            Terrain.terrainHeight(EPILOGUE_GIFT_X, EPILOGUE_GIFT_Z),
+            EPILOGUE_GIFT_Z,
+          );
+          this.scene.add(group);
+          this.epilogueGiftModel = group;
+          this.batchDirty = true;
+        }
+      }
       const signature = JSON.stringify([
         s.links,
         s.entities.map((e) => [e.id, e.x, e.z, e.stored]),

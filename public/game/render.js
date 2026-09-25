@@ -55,6 +55,11 @@
       // buildCampaignHouse's own campaignHouseAccueilStatus field.
       this.teachingTrajectoryModel = null;
       this.teachingTrajectoryKey = null;
+      // Epic C6.21: the epilogue's gifted young plant (s.campaignEpilogue.gift, C6.20) — a single,
+      // non-collection persistent model, same shape as this.teachingTrajectoryModel above rather
+      // than a per-id Map like rainelleModels/stationModels, since a game only ever has exactly
+      // one gift, frozen exactly once (openEpilogue is one-way, C6.18).
+      this.epilogueGiftModel = null;
       this.zoneModels = [];
       this.nodes = new Map();
       this.routes = [];

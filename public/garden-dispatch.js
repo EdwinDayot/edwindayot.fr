@@ -130,6 +130,18 @@
         }
         break;
       }
+      // Epic C6.21: the real trigger point openEpilogue (C6.18/C6.19/C6.20) lacked until now
+      // (verified: no occurrence anywhere in this file before this epic) — same "execute the real
+      // command first, only stage the camera/panel on success" shape as "confirm-night"/
+      // "begin-teaching" above.
+      case "open-epilogue": {
+        const result = A.execute({ type: "openEpilogue" });
+        if (result.ok) {
+          A.closePanel();
+          if (A.view.beginEpilogueScene()) A.openPanel("epilogue-scene");
+        }
+        break;
+      }
       case "inspect": {
         const e = data.id
           ? A.target(data.id)

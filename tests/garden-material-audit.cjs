@@ -229,6 +229,26 @@ const TRANSPARENT_ALLOWLIST = [
         };
       }
 
+      // Epic C6.21 (docs/campagne-backlog.md): the epilogue's gifted young plant
+      // (s.campaignEpilogue.gift, C6.20), exercised through this exact live-page scene graph AND
+      // the real sync() wiring, same reason as every block above — this audit is the real gate for
+      // a rendering epic, never a screenshot a model merely looks at. No command reaches
+      // s.campaignEpilogue.gift in a fresh save's own default state (it starts null), so it is
+      // pushed directly into the live save, same posture as the C5.11/C5.13 blocks above for state
+      // no command places yet at this point in the page's life — the real openEpilogue command
+      // path itself is exercised end to end by tests/campaign-chapter18-epilogue-scene-browser.cjs.
+      let giftWiring = { found: false };
+      if (window.GardenGenetics && window.GardenApp.game) {
+        const s = window.GardenApp.game.s;
+        s.campaignEpilogue.gift = { speciesId: "aster-des-vents", giverId: "iris" };
+        v.sync();
+        giftWiring = {
+          found: !!v.epilogueGiftModel,
+          inScene: v.epilogueGiftModel ? v.epilogueGiftModel.parent === v.scene : false,
+          position: v.epilogueGiftModel ? v.epilogueGiftModel.position.toArray() : null,
+        };
+      }
+
       // Sample a few times of day: a defect that only shows under one lighting angle (the
       // terrain-normal bug was exactly this — it read fine at some sun angles) must not hide.
       const times = [50, 300, 600, 900, 1150];
@@ -346,6 +366,7 @@ const TRANSPARENT_ALLOWLIST = [
         stationWiring,
         teachingWiring,
         passageWiring,
+        giftWiring,
       };
     });
 
@@ -375,6 +396,11 @@ const TRANSPARENT_ALLOWLIST = [
     assert.equal(audit.passageWiring.rebuiltOpen, true, "C6.14: sync() never rebuilt the passage Group to the open/franchissable state after restorePassage");
     assert.equal(audit.passageWiring.sameGroupInstance, false, "C6.14: the passage Group should be rebuilt (not mutated in place) on a blocked-state change, same pattern as buildCampaignHouse");
     assert.equal(audit.passageWiring.inScene, true, "C6.14: the rebuilt passage Group was never added to the real scene");
+
+    assert.equal(audit.giftWiring.found, true, "C6.21: sync() never built the epilogue gift plant Group once s.campaignEpilogue.gift froze");
+    assert.equal(audit.giftWiring.inScene, true, "C6.21: the gift plant Group was never added to the real scene");
+    assert.equal(audit.giftWiring.position[0], -13, "C6.21: gift plant Group x does not match the documented fixed position");
+    assert.equal(audit.giftWiring.position[2], 9.5, "C6.21: gift plant Group z does not match the documented fixed position");
 
     assert.deepEqual(audit.nanMeshes, [], "Meshes with non-finite vertex positions: " + audit.nanMeshes.join(", "));
     assert.deepEqual(
