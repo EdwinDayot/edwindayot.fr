@@ -203,6 +203,13 @@
       role: "resident",
       roleData: { line: "trie de vieux carnets, près de la serre commune" },
       roofColor: 0x4a5a42,
+      // Epic C6.24 : seul bâtiment de visiteur à porter ce knob — lu par
+      // render-houses.js's buildHouse() pour remplacer this.mat.stone par le
+      // verre déjà en usage pour l'objet « Serre » du jardin libre sur les
+      // quatre panneaux de mur plats (arrière, deux murs latéraux, façade) ;
+      // pignons triangulaires (gableGeometry) et toit restent stone/roofColor
+      // inchangés (voir la limite honnête de C6.24 dans campagne-backlog.md).
+      greenhouse: true,
     },
   ].map(
     ({
@@ -217,6 +224,7 @@
       roofColor,
       roofHeight,
       chimney,
+      greenhouse,
     }) => ({
       visitorId,
       x: cx,
@@ -226,6 +234,7 @@
       roofHeight: roofHeight || ROOF_H,
       roofColor,
       chimney: !!chimney,
+      greenhouse: !!greenhouse,
       accent,
       personColor,
       role,

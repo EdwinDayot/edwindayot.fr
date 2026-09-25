@@ -114,6 +114,23 @@
         stoneDark = (this.stoneDark ??= M.mat(0x8f8a76)),
         trim = M.mat(b.accent),
         roofMat = M.mat(b.roofColor || 0x5c4632),
+        // Epic C6.24 (docs/campagne-backlog.md) : le seul bâtiment portant
+        // b.greenhouse (Jeanne, C6.22) échange le mur plat stone contre le
+        // verre déjà en usage pour l'objet « Serre » du jardin libre
+        // (render-scene.js, même teinte/opacité/rugosité à l'identique,
+        // déjà couvert par TRANSPARENT_ALLOWLIST/cbe8e2 dans
+        // tests/garden-material-audit.cjs — élargi à ce second site).
+        // wallMat ne remplace stone que sur les quatre panneaux plats
+        // (arrière, deux murs latéraux, façade) ; les pignons triangulaires
+        // (gableGeometry, ci-dessous) et le toit gardent stone/roofMat
+        // inchangés, comme documenté dans la limite honnête de l'epic.
+        wallMat = b.greenhouse
+          ? (this.greenhouseWallGlass ??= M.mat(0xcbe8e2, {
+              transparent: true,
+              opacity: 0.4,
+              roughness: 0.15,
+            }))
+          : stone,
         frontW = w2 - doorHalf;
       const floor = this.shape(
         group,
@@ -136,15 +153,18 @@
       // plus a triangular cap that actually follows the roof pitch (see
       // gableGeometry above) instead of a rectangle reaching the ridge
       // height along the whole depth.
-      this.shape(group, "box", stone, [0, WALL_H / 2, d2], [b.w, WALL_H, 0.16]);
+      this.shape(group, "box", wallMat, [0, WALL_H / 2, d2], [b.w, WALL_H, 0.16]);
       this.shape(
         group,
         "box",
-        stone,
+        wallMat,
         [-w2, WALL_H / 2, 0],
         [0.16, WALL_H, b.d],
       );
-      this.shape(group, "box", stone, [w2, WALL_H / 2, 0], [0.16, WALL_H, b.d]);
+      this.shape(group, "box", wallMat, [w2, WALL_H / 2, 0], [0.16, WALL_H, b.d]);
+      // The triangular gable cap always stays opaque stone, greenhouse or
+      // not (see the wallMat comment above): only the eave-height wall
+      // panels below it turn to glass.
       const gable = this.gableGeometry(0.16, d2, WALL_H, b.roofHeight);
       this.shape(group, gable, stone, [-w2, 0, 0]);
       this.shape(group, gable, stone, [w2, 0, 0]);
@@ -153,7 +173,7 @@
         this.shape(
           group,
           "box",
-          stone,
+          wallMat,
           [side * (doorHalf + frontW / 2), WALL_H / 2, -d2],
           [frontW, WALL_H, 0.16],
         );

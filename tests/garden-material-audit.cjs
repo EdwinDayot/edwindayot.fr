@@ -10,7 +10,13 @@ const { chromium } = require("playwright"),
 // on this list that is found transparent, or off this list expected to be opaque but isn't,
 // fails the audit — additions require a one-line reason, not a silent pass.
 const TRANSPARENT_ALLOWLIST = [
-  { color: "cbe8e2", reason: "greenhouse glass panel (render-scene.js)" },
+  {
+    color: "cbe8e2",
+    reason:
+      "greenhouse glass panel (render-scene.js free-garden object; also " +
+      "reused at the same hex/opacity/roughness by render-houses.js's " +
+      "buildHouse() for a b.greenhouse building's wall panels, epic C6.24)",
+  },
   { color: "6d9365", opacityMax: 0.15, reason: "vision-radius ground overlay (render-world.js)" },
 ];
 
