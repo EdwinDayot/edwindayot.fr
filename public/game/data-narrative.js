@@ -309,6 +309,22 @@
       title: "Les deux noms",
       text: "Les deux noms reprennent leur place sur les étiquettes. Alma reconnaît : « Au début, je ne savais pas. Ensuite, je savais surtout comment ne plus y penser. »",
     },
+    // Epic C6.23 (design §10, chapitre 15, dernière clause littérale : "...puis voit que Jeanne
+    // attend encore un usage réel de la serre."). Révélée par garden-state-cmd-f.js's sleep, au
+    // premier réveil une fois "archives-restaurees" déjà présent (C6.7) — Jeanne elle-même existe
+    // déjà comme visiteuse réelle du monde depuis C6.22, condition non re-vérifiée ici au sens
+    // strict du code (elle est désormais toujours vraie), seulement au sens narratif documenté
+    // par la dépendance de l'epic. Un constat, jamais une promesse d'un mécanisme que ce lot ne
+    // construit pas : ni l'habillage visuel distinctif de "serre" (verre/transparence), ni la
+    // mise en scène de l'étiquette retournée (chapitre 9/15), ni un usage jouable réel (chapitre
+    // 16) — ces trois chantiers restent de futurs epics séparés (voir la note Cartographe de
+    // C6.22 dans campagne-backlog.md).
+    "jeanne-serre-sans-usage": {
+      id: "jeanne-serre-sans-usage",
+      trigger: "jeanneGreenhouseAwaitsUse",
+      title: "La serre de Jeanne",
+      text: "Jeanne a maintenant sa place dans le village. Sa serre, elle, n’a encore reçu aucun usage réel.",
+    },
     // Epic C6.9 (design §10, chapitre 16 "Ce qu'on accepte de perdre" ; §11, tableau des trois
     // leviers, colonne "réparation avec coût réel"). Révélée depuis garden-state-cmd-t.js, gardée
     // sur "archives-restaurees" (C6.7, ancrage de séquencement de l'acte VI) et sur

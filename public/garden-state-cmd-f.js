@@ -397,6 +397,21 @@
           if (jeanneReconstRevealed)
             s.campaignFlags.push(jeanneReconstRevealed.id);
         }
+        // Epic C6.23 (design §10, chapitre 15, dernière clause littérale). At the first sleep
+        // once "archives-restaurees" (C6.7, restoreArchiveLabels) is already present, reveal the
+        // closing chapter-15 constat: Jeanne, already a real visitor since C6.22, still has no
+        // real use for her greenhouse. Gated purely on the flag, never re-checking Jeanne's
+        // existence in code — she is unconditionally a real D.buildings entry since C6.22, so
+        // that condition is always true now (see the epic's own dependency note in
+        // campagne-backlog.md: "jamais une dépendance de code au sens strict").
+        if (s.campaignFlags.includes("archives-restaurees")) {
+          const jeanneGreenhouseRevealed = Narrative.pendingReveal(
+            s.campaignFlags,
+            "jeanneGreenhouseAwaitsUse",
+          );
+          if (jeanneGreenhouseRevealed)
+            s.campaignFlags.push(jeanneGreenhouseRevealed.id);
+        }
         // Epic C2.2: the atomic night bilan. "sleep" is the single command a scripted 23h
         // transition and a voluntary early bedtime ("dormir plus tôt", design §3) both end up
         // calling — neither reads s.campaignClock.gameSeconds beforehand, so an early sleep

@@ -169,8 +169,59 @@ test("restoreArchiveLabels reveals the closing text exactly once; a second call 
   );
 });
 
-test("all three chapter-15 texts contain no obligation formulation, and the closing text quotes Alma's exact line", () => {
-  for (const id of [...CHAPTER15_FLAGS, "archives-restaurees"]) {
+// Epic C6.23 (design §10, chapitre 15, dernière clause littérale : "...puis voit que Jeanne
+// attend encore un usage réel de la serre."). Gated purely on "archives-restaurees" (C6.7).
+test("the Jeanne-greenhouse text never appears before archives-restaurees", () => {
+  const g = new GardenState(null, 1000);
+  const r = firstRainelle(g);
+  reachChapter12Flag(g);
+  reachSecondJeanneNote(g);
+  reachPremierNonFlag(g, r);
+  g.command({ type: "sleep" });
+  assert.ok(g.s.campaignFlags.includes("alma-retour"));
+  assert.equal(g.s.campaignFlags.includes("archives-restaurees"), false);
+  assert.equal(g.s.campaignFlags.includes("jeanne-serre-sans-usage"), false);
+  g.command({ type: "sleep" });
+  assert.equal(
+    g.s.campaignFlags.includes("jeanne-serre-sans-usage"),
+    false,
+    "still gated: archives-restaurees was never reached",
+  );
+});
+
+test("the Jeanne-greenhouse text is revealed exactly once, at the first sleep once archives-restaurees already holds", () => {
+  const g = new GardenState(null, 1000);
+  const r = firstRainelle(g);
+  reachChapter12Flag(g);
+  reachSecondJeanneNote(g);
+  reachPremierNonFlag(g, r);
+  g.command({ type: "sleep" });
+  g.command({ type: "restoreArchiveLabels" });
+  assert.ok(g.s.campaignFlags.includes("archives-restaurees"));
+  assert.equal(
+    g.s.campaignFlags.includes("jeanne-serre-sans-usage"),
+    false,
+    "not revealed yet: no sleep has happened since archives-restaurees",
+  );
+  g.command({ type: "sleep" });
+  assert.equal(
+    g.s.campaignFlags.filter((f) => f === "jeanne-serre-sans-usage").length,
+    1,
+  );
+  g.command({ type: "sleep" });
+  assert.equal(
+    g.s.campaignFlags.filter((f) => f === "jeanne-serre-sans-usage").length,
+    1,
+    "a later sleep with the gate still true never reveals it a second time",
+  );
+});
+
+test("all four chapter-15 texts contain no obligation formulation, and the closing text quotes Alma's exact line", () => {
+  for (const id of [
+    ...CHAPTER15_FLAGS,
+    "archives-restaurees",
+    "jeanne-serre-sans-usage",
+  ]) {
     const entry = Narrative.TEXTS[id];
     assert.ok(entry, `TEXTS must carry an entry for "${id}"`);
     const lower = entry.text.toLowerCase();
@@ -228,8 +279,10 @@ test("a JSON round-trip after both reveals keeps the exact flags", () => {
   reachPremierNonFlag(g, r);
   g.command({ type: "sleep" });
   g.command({ type: "restoreArchiveLabels" });
+  g.command({ type: "sleep" });
   const before = chapter15Flags(g).sort();
   const reloaded = new GardenState(JSON.parse(JSON.stringify(g.serialize())));
   assert.deepEqual(chapter15Flags(reloaded).sort(), before);
   assert.ok(reloaded.s.campaignFlags.includes("archives-restaurees"));
+  assert.ok(reloaded.s.campaignFlags.includes("jeanne-serre-sans-usage"));
 });
