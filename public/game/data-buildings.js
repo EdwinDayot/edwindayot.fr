@@ -179,6 +179,31 @@
       roofColor: 0x5c4632,
       roofHeight: 2.7,
     },
+    // Épic C6.22 (campagne, phase 6) : fondation seule — Jeanne comme
+    // visitorId réel et son bâtiment, tous deux prérequis nommés par
+    // C6.5/C6.7/C6.20-C6.21 mais jamais posés jusqu'ici (voir le lot
+    // Cartographe qui a précédé cet epic). Rôle "resident" générique,
+    // comme hugo/zoe/villageois-*: aucune habillage "serre" distinctif
+    // tenté ici (verre/transparence, chapitre 9/15), délibérément laissé
+    // à un futur epic une fois cette fondation posée et vérifiée.
+    // Position {3,32} vérifiée contre le moteur réel (geometry.js/
+    // terrain.js/construction.js), pas devinée : zone 4 (coin de
+    // village), marge ≥1.8 unité de tout wallCircle de bâtiment existant
+    // (le plus proche : villageois-2), ≥5 unités de toute ressource, hors
+    // du rayon d'obstacle du passage du chapitre 17 ({-6,30}, ~9 unités),
+    // route piétonne réelle confirmée depuis le portail (C.approach).
+    // Teintes toutes reprises telles quelles de bâtiments déjà en usage
+    // (iris/ines), aucune couleur inventée : direction-artistique.md.
+    {
+      visitorId: "jeanne",
+      cx: 3,
+      cz: 32,
+      accent: 0x5f8f6a,
+      personColor: 0xe8d4a0,
+      role: "resident",
+      roleData: { line: "trie de vieux carnets, près de la serre commune" },
+      roofColor: 0x4a5a42,
+    },
   ].map(
     ({
       visitorId,
@@ -222,6 +247,7 @@
     zoe: "Zoé · sieste",
     "villageois-1": "Villageois 1 · coin de village",
     "villageois-2": "Villageois 2 · coin de village",
+    jeanne: "Jeanne · carnets",
   };
   const visitors = buildings.map((b) => ({
     id: b.visitorId,

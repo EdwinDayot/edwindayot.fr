@@ -76,9 +76,11 @@
        palettes players actually reach through the pot lean green/warm, see C1.8's own six).
      - giverId "iris": the only NPC in data-buildings.js whose role is "botanist" — offering a
        plant is literally what that role already means in data-roles.js, so no other real
-       visitorId reads as coherently. Jeanne, named in the design at chapters 15/18, is not (yet)
-       a real visitorId in data-buildings.js — never invented here to stand in for a data row that
-       does not exist; a future epic that adds her as a real building can revisit this choice.
+       visitorId reads as coherently. Jeanne, named in the design at chapters 15/18, was not yet
+       a real visitorId when this epic fixed the choice; Épic C6.22 has since added her as one
+       (fondation seule — no distinct visual/narrative role beyond a generic resident), but that
+       does not by itself give a reason to move the gift here: this choice stays "iris", unrevised,
+       until a future epic gives an explicit design reason to reconsider it.
      Both are fixed for every game (no derivation from orientation/seed/id): the design gives no
      reason a gift species or giver should vary by playthrough, and inventing one now would be a
      guess this epic has no basis for — left to a future epic if a real reason to vary ever shows

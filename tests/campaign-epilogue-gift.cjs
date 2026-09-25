@@ -158,7 +158,12 @@ test("validate : refuse un gift dont le donateur n'est pas un visiteur réel", (
     unlocksOnDay: 5,
     orientation: "durable",
     openedOnDay: 5,
-    gift: { speciesId: "aster-des-vents", giverId: "jeanne" },
+    // "jeanne" used to be this fixture's example (she wasn't yet a real
+    // visitorId) until Épic C6.22 added her as one — a fixture value this
+    // test's own premise depends on staying false must never be a value a
+    // later epic could accidentally make true, so this uses an id that can
+    // never resolve to a real building by construction.
+    gift: { speciesId: "aster-des-vents", giverId: "ceci-n-est-pas-un-visiteur" },
   };
   assert.throws(() => validate(raw));
 });
