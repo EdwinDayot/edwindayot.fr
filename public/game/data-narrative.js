@@ -356,7 +356,65 @@
       title: "Rendre le passage",
       text: "Une Rainelle a traversé, puis s’est arrêtée près de l’eau — elle ne rejoint plus le poste qu’on avait préparé pour elle. Rien ici n’explique pourquoi ; le résultat de cette réparation n’appartient pas entièrement à qui l’a menée.",
     },
+    // Epic C6.19 (design §10, chapitre 18 "Le lendemain" ; design §10 littéral : "Elles ne sont
+    // pas présentées comme moralement équivalentes. Le commerce peut prospérer dans la première,
+    // tandis que des liens, des habitats ou des possibilités de vie restent dégradés."). Révélée
+    // par openEpilogue (garden-state-cmd-x.js) exactement quand s.campaignEpilogue.orientation
+    // vient d'être figée à "intensive" — jamais recalculée après coup (C6.18 gèle la valeur).
+    // Relecture adverse (design §11 : "ne pas ajouter un monologue accusateur pour compenser" une
+    // réparation absente) : constat factuel de ce qui reste dégradé, aucun mot de faute/culpabilité
+    // adressé au joueur, aucun jugement au-delà de ce que le design affirme déjà lui-même.
+    "epilogue-intensive": {
+      id: "epilogue-intensive",
+      trigger: "epilogueOuvertIntensive",
+      title: "Le lendemain",
+      text: "Le commerce prospère ; aucun levier engagé n’a jamais été coupé ou restitué. Des liens, des habitats ou des possibilités de vie restent, dans cet état, dégradés.",
+    },
+    // Branche "durable" (design §10 littéral : "on voit le rendement abandonné et la vie revenue.
+    // Certaines Rainelles récupèrent leurs jeux sans jamais reprendre leur ancien métier."). Relue
+    // contre design §11 : "pas de bouton pardonner" — le texte ne prétend jamais effacer un coût
+    // déjà payé (levier coupé/restitué/contrat réduit, C6.9) ni présenter ce chemin comme
+    // strictement supérieur en confort matériel ; il constate un fait, pas un dénouement heureux.
+    "epilogue-durable": {
+      id: "epilogue-durable",
+      trigger: "epilogueOuvertDurable",
+      title: "Le lendemain",
+      text: "Le rendement a été abandonné ; la vie est revenue. Certaines Rainelles ont retrouvé leurs jeux, sans jamais reprendre leur ancien métier. Ce qui a déjà été perdu en chemin ne s’efface pas pour autant.",
+    },
+    // Branche "partiel" (design §11 : "joueur qui effectue quelques gestes sans modifier son
+    // fonctionnement"). Ni éloge ni reproche — un mélange assumé, lu au sens large comme le reste
+    // de cette famille de branches à trois issues (bilan-matin-*, variete-suivante-*).
+    "epilogue-partiel": {
+      id: "epilogue-partiel",
+      trigger: "epilogueOuvertPartiel",
+      title: "Le lendemain",
+      text: "Ni l’un ni l’autre pleinement : quelques gestes ont changé sans que le fonctionnement d’ensemble en soit bouleversé. Ce mélange reste assumé, pas subi.",
+    },
+    // Quatrième clause commune aux trois orientations (design §10, dernier paragraphe littéral :
+    // "Après le générique, les travaux, commandes et découvertes continuent... sans effacer
+    // l'épilogue précédent ni l'historique."), révélée par openEpilogue à la suite de l'une des
+    // trois branches ci-dessus, jamais seule (voir garden-state-cmd-x.js) : jamais présentée comme
+    // une fin qui verrouille la partie.
+    "epilogue-suite": {
+      id: "epilogue-suite",
+      trigger: "epilogueOuvert",
+      title: "Après le générique",
+      text: "Les travaux, les commandes et les découvertes continuent. Un bilan ultérieur pourra refléter une évolution des pratiques, sans jamais effacer ce qui vient d’être constaté ni l’historique qui le précède.",
+    },
   };
+
+  // Epic C6.19: which of the three mutually-exclusive orientation triggers corresponds to a given
+  // Epilogue.orientation(s) value (GardenCampaignEpilogue.ORIENTATIONS) — the only place this
+  // mapping is written, so garden-state-cmd-x.js never hard-codes the trigger string itself.
+  const EPILOGUE_ORIENTATION_SIGNALS = {
+    intensive: "epilogueOuvertIntensive",
+    partiel: "epilogueOuvertPartiel",
+    durable: "epilogueOuvertDurable",
+  };
+
+  function epilogueOrientationSignal(orientation) {
+    return EPILOGUE_ORIENTATION_SIGNALS[orientation] || null;
+  }
 
   function findByTrigger(signal) {
     return Object.values(TEXTS).find((t) => t.trigger === signal) || null;
@@ -393,7 +451,13 @@
       : "chapter13FirstNonQuestion";
   }
 
-  const api = { TEXTS, findByTrigger, pendingReveal, chapter13Signal };
+  const api = {
+    TEXTS,
+    findByTrigger,
+    pendingReveal,
+    chapter13Signal,
+    epilogueOrientationSignal,
+  };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenNarrative = api;
 })(globalThis);

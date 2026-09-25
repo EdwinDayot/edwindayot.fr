@@ -17,14 +17,21 @@
    afterward (a lever toggled back on after this command runs must never move the frozen
    orientation, see tests/campaign-epilogue-gate.cjs).
 
-   No narrative reveal here, deliberately: this epic is moteur pur (its own backlog entry's title),
-   the text shown per orientation is C6.19's job once this signal is real — same "moteur avant
-   narration" sequencing already applied to C6.4/C6.5, C6.8/C6.9, C6.17/C6.19 itself. */
+   Epic C6.19 (design §10, chapitre 18, troisième temps : "texte de l'épilogue par orientation")
+   adds the narrative reveal here, on success only: Narrative.epilogueOrientationSignal maps the
+   just-frozen orientation to its own trigger (exactly one of epilogueOuvertIntensive/-Partiel/
+   -Durable, data-narrative.js), then the common closing clause ("epilogueOuvert",
+   "epilogue-suite") is revealed right after — always both, on every successful call, never either
+   alone (openEpilogue is one-way, C6.18, so this can only ever run once per game). */
 (function (root) {
   const Epilogue =
     typeof module !== "undefined"
       ? require("./game/campaign-epilogue.js")
       : root.GardenCampaignEpilogue;
+  const Narrative =
+    typeof module !== "undefined"
+      ? require("./game/data-narrative.js")
+      : root.GardenNarrative;
   const M = {
     commandSegX(c, ctx, st) {
       const { s, fail } = st;
@@ -36,6 +43,16 @@
           return fail("L'épilogue n'est pas encore accessible.");
         s.campaignEpilogue.orientation = Epilogue.orientation(s);
         s.campaignEpilogue.openedOnDay = s.campaignDay;
+        const orientationRevealed = Narrative.pendingReveal(
+          s.campaignFlags,
+          Narrative.epilogueOrientationSignal(s.campaignEpilogue.orientation),
+        );
+        if (orientationRevealed) s.campaignFlags.push(orientationRevealed.id);
+        const suiteRevealed = Narrative.pendingReveal(
+          s.campaignFlags,
+          "epilogueOuvert",
+        );
+        if (suiteRevealed) s.campaignFlags.push(suiteRevealed.id);
         st.message = "Épilogue ouvert.";
       }
       return null;
