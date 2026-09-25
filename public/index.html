@@ -104,6 +104,14 @@
          script's own execution time — loaded here anyway, right after campaign-memory.js, to
          avoid the exact class of missing-script ordering bug documented throughout this file. -->
     <script src="/game/campaign-contracts.js" defer></script>
+    <!-- Epic C6.17: campaign-epilogue.js has no dependency of its own (pure, over plain
+         campaignMemory/campaignContracts/campaignStations/campaignFlags data already loaded by the
+         scripts above) and nothing yet reads it in the browser (no epilogue screen/command wires it
+         — see that file's own header comment for the future rendering/narration epic this awaits).
+         Loaded here anyway, right after campaign-contracts.js, for the same reason every other pure
+         campaign module in this file is loaded ahead of any real reader: avoiding the exact class of
+         missing-script ordering bug documented throughout this file, before one exists. -->
+    <script src="/game/campaign-epilogue.js" defer></script>
     <!-- Epic C2.6c: campaign-automation.js reads root.GardenConstruction (line 44 above),
          root.GardenCampaignStations and root.GardenCultivars (both above) at its own
          script-execution time, and is itself read the same way by garden-state-validate.js
