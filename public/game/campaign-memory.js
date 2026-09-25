@@ -84,6 +84,17 @@
    real, derived answer lives there (`unsoldStock(specimens, cultivarId)`), not here, so this file
    is not left with two different things both named `unsoldStock`.
 
+   Epic C6.26 (design §11, third intensification lever, "extension standardisée sur un espace
+   vivant") fills in `habitatTransformations` for real: an append-only list of
+   `{zoneId, habitatId, capacity, day}` entries, one per successful extendZoneOverHabitat
+   (garden-state-cmd-y.js's own command, campaign-stations.js's Stations.removeHabitat the
+   mechanism it preempts) — see recordHabitatTransformation below, its only writer. `capacity`
+   is the removed habitat's own capacity at the moment it was taken (never recomputed later, the
+   habitat itself no longer exists in the registry to ask); `habitatId` is kept as a historical
+   reference even though it no longer resolves to any registered station, the same "record the
+   fact, never erase it" posture as `births`. A future epic's reparation (C6.27) marks an entry
+   returned rather than deleting it, matching this field's own append-only shape.
+
    `bassinCommunLevel` derives the shared level from that cumulative total rather than storing a
    second, independently-mutated number: level = BASSIN_COMMUN_CAPACITY − Σ(waterWithdrawals),
    floored at zero. This is deliberate, not a simplification of a "real" stored level — since
@@ -130,7 +141,9 @@
       // Epic C5.7: flat, never-duplicated list of every Rainelle id ever detected in persistance
       // de geste (C5.6) — see header comment and recordPersistentGesture below.
       persistentGestureIds: [],
-      // Reserved — no epic yet transforms/removes a habitat once registered (C3.3).
+      // Epic C6.26: append-only list of {zoneId, habitatId, capacity, day} entries, one per
+      // successful extendZoneOverHabitat — see header comment and recordHabitatTransformation
+      // below.
       habitatTransformations: [],
       // Reserved — no unsold-stock concept exists yet (no présentoir/demande system in campaign).
       unsoldStock: {},
@@ -250,6 +263,16 @@
       (memory.contractsFed[contractId] || 0) + amount;
   }
 
+  // Epic C6.26 (design §11, third intensification lever, "extension standardisée sur un espace
+  // vivant"): called once per successful extendZoneOverHabitat (garden-state-cmd-y.js), the only
+  // writer — first real fill of this field, reserved and empty since C5.1. Append-only, same
+  // "never rewrite history" discipline as births/waterWithdrawals: a repair (C6.27, a future epic)
+  // marks an entry returned rather than removing it, so the fact that a zone once preempted a
+  // habitat is never erased, only annotated.
+  function recordHabitatTransformation(memory, entry) {
+    memory.habitatTransformations.push(entry);
+  }
+
   const api = {
     freshMemory,
     OVEREXERTION_THRESHOLD,
@@ -265,6 +288,7 @@
     bassinCommunLevel,
     recordPersistentGesture,
     recordContractDelivery,
+    recordHabitatTransformation,
   };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenCampaignMemory = api;

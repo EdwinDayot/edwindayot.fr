@@ -733,6 +733,18 @@
           list.some((st) => st.veilleuse !== undefined && typeof st.veilleuse !== "boolean")
         )
           throw Error("Registre de stations invalide.");
+        // Epic C6.26: extensionCommerciale is optional so a pre-epic zone still loads (defaulted
+        // to false below, same posture as veilleuse just above); when present, it must be a real
+        // boolean, never a truthy stand-in.
+        if (
+          kind === "zone" &&
+          list.some(
+            (st) =>
+              st.extensionCommerciale !== undefined &&
+              typeof st.extensionCommerciale !== "boolean",
+          )
+        )
+          throw Error("Registre de stations invalide.");
         // Epic C5.4: priseFortDebit is optional so a pre-epic borne still loads (defaulted to
         // false below, same posture as a zone's veilleuse at C5.2); when present, it must be a
         // real boolean, never a truthy stand-in.
@@ -802,10 +814,12 @@
     // Epic C5.1/C5.2/C5.3: campaignMemory is a bounded journal (campaign-memory.js), never an
     // arbitrary object — rest/firstGesture/nightlyActivity/overexertion only ever key an id that
     // actually resolves to a real s.rainelles entry (never a stale/hand-edited reference), births
-    // is a flat unique list of such ids, manualInterventions a bare count, and the four still-
-    // reserved fields (no epic writes real values into them yet, see campaign-memory.js's own
-    // header comment) are only type-checked against their fresh() shape so a future epic's first
-    // real write still loads.
+    // is a flat unique list of such ids, manualInterventions a bare count. waterWithdrawals/
+    // contractsFed/habitatTransformations were reserved the same way but are now real, written
+    // fields (C5.4/C6.4/C6.26 respectively, each validated against its own real shape below);
+    // unsoldStock alone is still only type-checked against its fresh() shape (no epic writes real
+    // values into it, see campaign-memory.js's own header comment for why) so a future epic's
+    // first real write still loads.
     if (s.campaignMemory !== undefined) {
       const M = s.campaignMemory;
       const rainelleIds = new Set((s.rainelles || []).map((r) => r?.id));
@@ -814,6 +828,16 @@
       // against campaignStations.bornes instead of s.rainelles.
       const borneIds = new Set(
         (s.campaignStations?.bornes || []).map((b) => b?.id),
+      );
+      // Epic C6.26: habitatTransformations' zoneId must resolve to a real registered zone (the
+      // zone itself is never removed by extendZoneOverHabitat, only flagged) — same "must resolve
+      // to a real registered entry" discipline as waterWithdrawals' borneIds above. habitatId, in
+      // contrast, is deliberately never checked against a live registry: the whole point of this
+      // entry is that the habitat it names has already been removed (Stations.removeHabitat) by
+      // the time it is recorded, so it can never resolve to anything current — only its type
+      // (a non-empty string) is checked below.
+      const zoneIds = new Set(
+        (s.campaignStations?.zones || []).map((z) => z?.id),
       );
       // Epic C6.4: contractsFed is keyed by contract id, not Rainelle/borne id — same "must
       // resolve to a real registered entry" discipline as waterWithdrawals above, plus its value
@@ -863,7 +887,26 @@
         Object.entries(M.waterWithdrawals).some(
           ([id, n]) => !borneIds.has(id) || !count(n),
         ) ||
+        // Epic C6.26: habitatTransformations now holds real entries — each one the record of a
+        // successful extendZoneOverHabitat (garden-state-cmd-y.js). zoneId must resolve to a real,
+        // still-registered zone (see zoneIds above); habitatId is only type-checked (a non-empty
+        // string, deliberately never resolved — see the comment on zoneIds above for why);
+        // capacity must be finite and at least MIN_HABITAT_CAPACITY (it is a real habitat's own
+        // former capacity, which could never have been registered below that floor, C3.3); day
+        // must be a valid campaignDay count. Entries from before this epic simply don't exist (the
+        // field has been an empty array since C5.1), so no optional/undefined branch is needed
+        // here, unlike overexertion/persistentGestureIds above.
         !Array.isArray(M.habitatTransformations) ||
+        M.habitatTransformations.some(
+          (h) =>
+            typeof h !== "object" ||
+            h === null ||
+            !zoneIds.has(h.zoneId) ||
+            typeof h.habitatId !== "string" ||
+            !h.habitatId ||
+            !finite(h.capacity, Stations.MIN_HABITAT_CAPACITY, Infinity) ||
+            !count(h.day),
+        ) ||
         typeof M.unsoldStock !== "object" ||
         M.unsoldStock === null ||
         // Epic C6.4: contractsFed is now a real, written field, but stays optional here exactly
@@ -977,8 +1020,10 @@
     );
     // Epic C5.2: veilleuse migrates per zone, same reasoning as a panier's buffer/capacity/min
     // just above — a pre-epic zone only lacks this one field, defaulted off (no free night work).
+    // Epic C6.26: extensionCommerciale migrates per zone, same reasoning as veilleuse just above —
+    // a pre-epic zone only lacks this one field, defaulted off (no free habitat preemption).
     result.campaignStations.zones = (result.campaignStations.zones ?? []).map(
-      (z) => ({ veilleuse: false, ...z }),
+      (z) => ({ veilleuse: false, extensionCommerciale: false, ...z }),
     );
     // Epic C5.4: priseFortDebit migrates per borne, same reasoning as a zone's veilleuse just
     // above — a pre-epic borne only lacks this one field, defaulted off (no free flow boost).

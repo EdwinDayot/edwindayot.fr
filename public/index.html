@@ -243,6 +243,10 @@
     <!-- Epic C6.18: garden-state-cmd-x.js reads root.GardenCampaignEpilogue at its own execution
          time, already loaded much earlier above (see the C6.17 comment there). -->
     <script src="/garden-state-cmd-x.js" defer></script>
+    <!-- Epic C6.26: garden-state-cmd-y.js reads root.GardenCampaignStations and
+         root.GardenCampaignMemory at its own execution time, both already loaded much earlier
+         above (see the C2.6a and C5.1 comments there). -->
+    <script src="/garden-state-cmd-y.js" defer></script>
     <script src="/game/save.js" defer></script>
     <script src="/garden-models.js" defer></script>
     <script src="/garden-models-leaf.js" defer></script>

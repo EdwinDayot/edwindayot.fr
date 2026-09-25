@@ -76,6 +76,13 @@
     // posture as a panier's capacity/min above — a zone never works overnight until a command
     // (setVeilleuse, garden-state-cmd-p.js) explicitly turns it on.
     if (kind === "zone") station.veilleuse = false;
+    // Epic C6.26 (design §11, third intensification lever, "extension standardisée sur un espace
+    // vivant") : only a zone can carry this flag — a borne/panier is never itself the thing
+    // extended over a habitat. Off by default, same "no free capability" posture as veilleuse just
+    // above — a zone never preempts a habitat until a command (extendZoneOverHabitat,
+    // garden-state-cmd-y.js) explicitly turns it on, and only ever at the real cost of removing a
+    // registered habitat (Stations.removeHabitat).
+    if (kind === "zone") station.extensionCommerciale = false;
     // Epic C5.4 (design §11, "prise d'eau à fort débit"): only a borne can carry one — a zone/
     // panier is never itself the water intake, only the borne a Rainelle's "arroser" geste
     // resolves as its source (see campaign-automation.js's doArroser/tickArroser). Off by
