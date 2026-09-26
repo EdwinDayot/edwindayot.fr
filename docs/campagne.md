@@ -4036,3 +4036,53 @@ Aucun code ni test modifié ce déclenchement — travail de planification seul,
 **Pour le prochain déclenchement** : **C7.8** est l'unique epic détaillé `todo` à dépendances satisfaites de tout le backlog (recherche exhaustive refaite en fin de déclenchement, identique à celle du début). Le prendre en Artisan rendu, mais sans dépendance WebGL réelle pour ses propres tests (Node pur, sur le modèle de `tests/campaign-hybrids-render.cjs`) ; `test:browser`/`test:visual` complets non requis puisqu'aucun chemin de rendu réel du jeu n'est modifié (aucun branchement), seule une vérification structurelle Node suffit — à confirmer explicitement par l'Artisan qui prend l'epic plutôt que supposé ici.
 
 Commit : voir `git log` sur `maison-des-possibles` (message « Cartographe : huitième lot de la phase 7, fondation d'un pool d'instances Three.js (C7.8) »). `git push origin maison-des-possibles` à confirmer par `git ls-remote origin` avant conclusion de ce déclenchement.
+
+## Déclenchement automatisé du 26 septembre 2026 — Artisan moteur, épic C7.8 (fondation d'un pool d'instances Three.js dynamique)
+
+**Vérification anti-hallucination faite avant tout le reste.** Dernier epic « fait » du backlog : **C7.7**, commit `9431338811dc45c779def940b89a22c5407d2716` — `git show --stat 9431338` confirme un commit réel (11 fichiers, message et diff cohérents avec `docs/campagne-backlog.md` et l'entrée précédente de ce fichier). `npm ci && npm test` relancés indépendamment avant tout nouveau travail → **925/925**, zéro échec, identique au rapport déjà consigné. Aucun bandeau de pause en tête de `docs/campagne-backlog.md` (vérifié, première ligne). `docs/campagne-anomalies.md` relu : son unique entrée (fusion de phase 6 jamais poussée vers `origin/main`) reste résolue, reconfirmée à l'instant (`git fetch origin main` puis `git merge-base --is-ancestor ffdbe2c origin/main` → vrai). Aucun epic `bloqué` dans tout le backlog : aucune pause anti-emballement à déclencher.
+
+**Choix de l'epic.** Recherche exhaustive de tout `Statut : todo` dans `docs/campagne-backlog.md` : uniquement les quatre entrées historiques non actionnables déjà connues (C2.5v, C2.6, C2.8v, C2.8v-b, ce dernier revérifié — mêmes deux prérequis toujours absents de `campaign-stations.js`/`campaign-automation.js`), plus **C7.8**, détaillé par le lot Cartographe précédent (voir son entrée ci-dessus), dépendance « rien de nouveau » donc satisfaite par construction. Seul candidat réel : choisi sans ambiguïté.
+
+**Implémenté directement par l'orchestrateur** (pas de délégation — module isolé, sans dépendance sur aucun autre système de campagne, taille jugée suffisante pour une session unique). Nouveau `public/game/render-instances.js` (UMD, sans dépendance DOM, sur le modèle exact de `botany-hybrids.js`) :
+
+- `createInstancePool(scene, geometry, material, initialCapacity)` alloue un `THREE.InstancedMesh` (capacité bornée à au moins 1, pour ne jamais boucler indéfiniment sur un doublement de zéro) et l'ajoute immédiatement à la scène réelle passée en paramètre.
+- `set(pool, id, matrix)` ajoute un nouvel id (en réallouant d'abord si la capacité courante est atteinte) ou met à jour la matrice d'un id déjà connu — jamais un second index pour le même id.
+- `remove(pool, id)` retire par swap-and-pop : le dernier id actif prend l'index libéré (sa matrice migrée), `mesh.count` décrémenté d'exactement un — jamais de trou dans la plage d'instances actives.
+- `size(pool)` renvoie le nombre d'instances actives.
+
+Réallocation par doublement de capacité : nouveau `InstancedMesh` alloué, toutes les matrices actives migrées via `getMatrixAt`/`setMatrixAt`, substitué dans la scène réelle (le nouveau ajouté avant que l'ancien soit retiré, exactement l'ordre prescrit par le critère de sortie), puis `dispose()` appelé uniquement sur l'ancien `InstancedMesh` lui-même — vérifié directement contre `public/vendor/three.min.js` avant d'écrire cette ligne : `InstancedMesh#dispose()` ne fait que déclencher un événement `dispose` (libère le buffer GPU de `instanceMatrix`), sans jamais toucher `geometry`/`material`. La géométrie et le matériau partagés, propriété de l'appelant, ne sont ni dupliqués ni `dispose()`-és par ce module, à aucun moment — vérifié par un test dédié (écouteurs d'événement `dispose` posés sur les deux, jamais déclenchés après plusieurs réallocations).
+
+**Hors périmètre, respecté à la lettre** : aucun branchement sur `render-specimens.js`/`botany-hybrids.js`/`syncSpecimenModels`. Le module n'est chargé nulle part dans `public/index.html` — contrairement à `campaign-stations.js`/C2.6a qui avait, lui, un consommateur immédiat (`garden-state-validate.js`), rien ne dépend encore de `render-instances.js` : ajouter une balise `<script>` maintenant aurait été prématuré et aurait reproduit sans raison la classe de régression d'ordre de chargement déjà documentée à plusieurs reprises dans ce journal, sur un module qui ne sert encore à rien au runtime réel. Le comportement observable du jeu (rendu des spécimens, `render.calls`/`.triangles` mesurés par `tests/campaign-specimen-load.cjs` en C7.5) reste donc strictement inchangé, comme l'exige le critère de sortie lui-même.
+
+**Tests** (nouveau `tests/campaign-render-instances.cjs`, Node pur, `global.THREE = require("../public/vendor/three.min.js")`, même patron que `tests/campaign-hybrids-render.cjs`, ajouté à la liste explicite du script `test` de `package.json` — celui-ci n'énumère pas par glob, leçon déjà tirée à C2.11) :
+
+1. Création : mesh `InstancedMesh` visible ajouté à la scène réelle, `size(pool) === 0`.
+2. Ajout d'un nouvel id : index cohérent, matrice exacte, `size` incrémenté.
+3. Mise à jour d'un id déjà connu : matrice changée en place, `size` et index inchangés (pas de second index).
+4. Retrait au milieu : l'ancien dernier id vérifié à l'index libéré (matrice exacte), `size` décrémenté d'exactement un.
+5. Retrait du dernier id : pas de swap nécessaire, `size` décrémenté correctement.
+6. Retrait d'un id inconnu : no-op, `size` inchangé.
+7. Dépassement de la capacité initiale : nouveau mesh dans la scène, ancien retiré (`scene.children` vérifié dans les deux sens), toutes les matrices actives retrouvées exactement après migration, capacité doublée.
+8. Séquence mixte réaliste (6 ajouts, 2 retraits, 4 ajouts au-delà de l'ancienne capacité) : aucune instance fantôme, aucun index dupliqué ou manquant (vérifié exhaustivement sur toute la table d'ids attendue), aucune valeur non finie dans `instanceMatrix.array`.
+9. Non-`dispose()` de la géométrie/du matériau partagés sur plusieurs réallocations forcées.
+
+**Résultat réellement exécuté** : `node --test tests/campaign-render-instances.cjs` seul → **9/9**. Puis `npm ci && npm test` intégral → **934/934** (925 existants + 9 nouveaux, zéro régression). Sortie complète :
+
+```
+1..934
+# tests 934
+# suites 0
+# pass 934
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+```
+
+`/code-review` (niveau medium, skill `code-review`) exécuté sur le diff complet (`render-instances.js`, `campaign-render-instances.cjs`, `package.json`) : **aucun défaut relevé**. Constats explicites du rapport : aucun appelant existant (angle « appelants » sans objet, le module n'est référencé nulle part encore) ; aucun comportement retiré (fichiers purement additifs plus un append de chaîne dans `package.json`) ; logique de croissance/retrait cohérente avec les tests, qui passent tous ; `InstancedMesh#dispose()` du vendor vérifié directement (événement seul, jamais la géométrie/le matériau) ; aucun helper existant dupliqué (`grep` sur `InstancedMesh` dans `public/game/*.js` : seuls `render-light.js`/`render-world.js`, aucun pooling par id) ; aucune règle d'`AGENTS.md` concernée (ce fichier ne régit que le déploiement du portfolio statique Nginx/Docker, sans rapport avec ce module de jeu).
+
+**Épic Artisan moteur confirmé explicitement avant de conclure, pas supposé** : module Three.js sans dépendance DOM, testable en Node pur exactement comme `botany-hybrids.js`, aucun chemin de rendu réel du jeu modifié (aucun branchement, comportement observable strictement inchangé) — `npm run test:browser`/`npm run test:visual` non requis, même exemption que C2.6a/b/c/C7.1/C7.2/C7.3/C7.6/C7.7. Aucune relecture narrative adverse requise (pas un epic de Scénariste). Aucune règle de `direction-artistique.md` concernée (aucune couleur/matériau introduit, aucune géométrie de jeu construite ou modifiée). Aucun choix déjà confirmé par l'utilisateur dans `game-design.md` remis en cause. Ne ferme aucune porte de phase : la phase 7 reste ouverte (catalogue décoratif, extensions de maison, tactile, histoires secondaires et le branchement réel de ce pool d'instances restent sans epic détaillé).
+
+**Pour le prochain déclenchement** : plus aucun epic détaillé `todo` à dépendances satisfaites dans tout le backlog (recherche exhaustive refaite en fin de déclenchement, identique à celle du début — seuls C2.5v/C2.6/C2.8v/C2.8v-b, tous non actionnables, restent `todo`). Un futur déclenchement devra endosser le rôle Cartographe pour détailler un neuvième lot de la phase 7 — le branchement réel de `render-instances.js` sur `render-specimens.js` (une fois cette fondation prouvée par ses propres tests, exactement comme le prévoyait le critère de sortie de C7.8) en serait un candidat naturel, mais reste à trancher par un futur passage plutôt que deviné ici.
+
+Commit : voir `git log` sur `maison-des-possibles` (message « Epic C7.8 : fondation d'un pool d'instances Three.js dynamique »). `git push origin maison-des-possibles` à confirmer par `git ls-remote origin` avant conclusion de ce déclenchement.
