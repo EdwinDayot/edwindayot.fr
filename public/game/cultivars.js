@@ -25,8 +25,22 @@
    explicit non-zero `stage`, the convention this file's own tests and several others use to get
    an instantly mature specimen for setup, still gets one via a backdated `plantedAt` — see
    `createSpecimen`) but is no longer the source of truth `isMature`/consumers read: a future
-   rendu epic that gives specimens a persistent world model is what would actually read it. */
+   rendu epic that gives specimens a persistent world model is what would actually read it.
+
+   Epic C7.3 (design §12: "le printemps favorise les jeunes plants... sans tuer automatiquement
+   les plantes hors saison") adds `plantedSeason`, derived once at creation from
+   `GardenCampaignSeasons.seasonForDay(s.campaignDay)` and frozen forever — never re-read from the
+   season the specimen currently sits in, so a specimen already growing never speeds up or slows
+   down retroactively just because the calendar moved on. Only the stage 0 -> 1 transition (a
+   "jeune plant") is shortened when `plantedSeason === "printemps"`; stage 1 -> MATURE_STAGE always
+   takes the same STAGE_DURATION_ELAPSED_SECONDS regardless of season, and every other season keeps
+   the ordinary duration for both transitions (a bonus, never a penalty — the design explicitly
+   rules out killing or slowing plants outside their favored season). */
 (function (root) {
+  const Seasons =
+    typeof module !== "undefined"
+      ? require("./campaign-seasons.js")
+      : root.GardenCampaignSeasons;
   // Traits are frozen at creation: two calls with the same input never re-derive different
   // values, and nothing here recomputes them later from parentIds.
   function createCultivar(s, { name, parentIds = [], traits = {} }) {
@@ -56,6 +70,11 @@
   // MOISTURE_DECAY_PER_ELAPSED_SECOND just above. Two transitions (0 -> 1 -> MATURE_STAGE) at
   // this duration mean six hours of simulated elapsed time from planting to maturity.
   const STAGE_DURATION_ELAPSED_SECONDS = 3 * 3600;
+  // Epic C7.3: the spring bonus for the stage 0 -> 1 transition only, expressed as an explicit
+  // fraction of STAGE_DURATION_ELAPSED_SECONDS (never a separate magic number) — half the ordinary
+  // duration, a first, easily revisable guess like STAGE_DURATION_ELAPSED_SECONDS itself, no real
+  // play to calibrate it against yet.
+  const SPRING_YOUNG_STAGE_DURATION_ELAPSED_SECONDS = STAGE_DURATION_ELAPSED_SECONDS / 2;
   // stage 0 is a freshly planted cutting/seedling; later epics (C1.7/C1.8) attach a rendered
   // form per stage. No trait ever lands on the specimen itself — see specimenTraits below.
   // moistureAt is the elapsed instant the specimen was last "fully moist" (creation counts as a
@@ -66,7 +85,15 @@
   // do). `stage` itself is still stored on the object, and an explicit non-zero `stage` backdates
   // plantedAt so specimenStage(s, specimen) derives that exact same stage right away, with zero
   // drift between the two — this is what keeps every existing "createSpecimen(..., { stage:
-  // Cultivars.MATURE_STAGE })" test-setup convenience working unchanged after this epic.
+  // Cultivars.MATURE_STAGE })" test-setup convenience working unchanged after this epic. This
+  // backdating deliberately keeps using STAGE_DURATION_ELAPSED_SECONDS alone, never the spring
+  // bonus below, whatever plantedSeason ends up being (Epic C7.3): it still always lands on
+  // exactly the requested stage (the spring duration is strictly shorter, so the gap it leaves
+  // never crosses into the next stage boundary), and the comfort parameter's whole point is an
+  // immediate, season-independent stage — the bonus is for real elapsed-time progression only.
+  // plantedSeason (Epic C7.3) is derived once, here, from the campaign day this specimen is
+  // actually planted on — never recomputed later, so a specimen already growing never reacts to
+  // the season the calendar has since moved on to.
   function createSpecimen(s, { cultivarId, x, z, stage = 0 }) {
     const specimen = {
       id: `sp${s.specimenNextId++}`,
@@ -75,6 +102,7 @@
       z,
       stage,
       plantedAt: s.elapsed - stage * STAGE_DURATION_ELAPSED_SECONDS,
+      plantedSeason: Seasons.seasonForDay(s.campaignDay),
       moistureAt: s.elapsed,
       readyToProduce: false,
     };
@@ -105,11 +133,23 @@
   // without advancing s.elapsed in between agree. Floors at 0 (never a negative stage, even if
   // plantedAt were ever ahead of s.elapsed) and caps at MATURE_STAGE (never advances past the
   // last stage no matter how long a specimen is left alone).
+  //
+  // Epic C7.3: only the first transition (0 -> 1, the "jeune plant") uses a shorter duration when
+  // plantedSeason is "printemps" — every later transition (1 -> MATURE_STAGE) always uses the
+  // ordinary STAGE_DURATION_ELAPSED_SECONDS, whatever the planting season, exactly as the design's
+  // "sans tuer automatiquement les plantes hors saison" requires (a bonus in favored conditions,
+  // never a penalty elsewhere, and never extended past the one stage the design names).
   function specimenStage(s, specimen) {
     const since = Math.max(0, s.elapsed - specimen.plantedAt);
+    const firstStageDuration =
+      specimen.plantedSeason === "printemps"
+        ? SPRING_YOUNG_STAGE_DURATION_ELAPSED_SECONDS
+        : STAGE_DURATION_ELAPSED_SECONDS;
+    if (since < firstStageDuration) return 0;
+    const sinceFirstStage = since - firstStageDuration;
     return Math.min(
       MATURE_STAGE,
-      Math.floor(since / STAGE_DURATION_ELAPSED_SECONDS),
+      1 + Math.floor(sinceFirstStage / STAGE_DURATION_ELAPSED_SECONDS),
     );
   }
   function isMature(s, specimen) {
@@ -136,6 +176,7 @@
     setReadyToProduce,
     MATURE_STAGE,
     STAGE_DURATION_ELAPSED_SECONDS,
+    SPRING_YOUNG_STAGE_DURATION_ELAPSED_SECONDS,
   };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenCultivars = api;

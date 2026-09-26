@@ -59,6 +59,13 @@
     typeof module !== "undefined"
       ? require("./game/botany-genetics.js")
       : root.GardenGenetics;
+  // Epic C7.3: read here only to validate a specimen's plantedSeason against the real SEASONS
+  // list, the same "read against the real catalogue rather than duplicate a literal list" posture
+  // already applied to Epilogue.ORIENTATIONS/Genetics.founders above.
+  const Seasons =
+    typeof module !== "undefined"
+      ? require("./game/campaign-seasons.js")
+      : root.GardenCampaignSeasons;
   // Epic C2.6c: only read here for its CYCLE_SECONDS bound on a persisted rainelle.job.remaining
   // (see campaign-automation.js's own header comment on that constant) — never for validate()'s
   // own control flow, so this stays a pure sibling of the Cultivars/Rainelles/Stations reads
@@ -469,6 +476,10 @@
                 -Number.MAX_SAFE_INTEGER,
                 Number.MAX_SAFE_INTEGER,
               )) ||
+            // Epic C7.3: plantedSeason, once present, must be one of the real seasons — never a
+            // separate literal list here (see the Seasons read above).
+            (sp.plantedSeason !== undefined &&
+              !Seasons.SEASONS.includes(sp.plantedSeason)) ||
             (sp.readyToProduce !== undefined &&
               typeof sp.readyToProduce !== "boolean") ||
             (sp.readyToProduce === true && !Cultivars.isMature(s, sp)),
@@ -970,9 +981,15 @@
     // before this epic only lacks this one field. It defaults to s.elapsed (never 0), so an
     // existing specimen doesn't retroactively look like it was just planted and instantly become
     // mature at load — specimenStage(s, sp) on a freshly migrated specimen is exactly 0.
+    // Epic C7.3: plantedSeason migrates to "ete" — deliberately never "printemps", the backlog's
+    // own migration rule ("ne raccourcit jamais sa croissance en cours"): only "printemps" ever
+    // shortens the stage 0 -> 1 transition (cultivars.js), so any of the other three seasons keeps
+    // a specimen already growing on an old save exactly as slow as before this epic. "ete" is an
+    // arbitrary pick among those three equally-safe options, named rather than left implicit.
     result.specimens = (result.specimens ?? []).map((sp) => ({
       moistureAt: s.elapsed ?? 0,
       plantedAt: s.elapsed ?? 0,
+      plantedSeason: "ete",
       readyToProduce: false,
       ...sp,
     }));

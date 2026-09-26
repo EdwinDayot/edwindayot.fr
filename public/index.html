@@ -77,6 +77,13 @@
          class of missing-script ordering bug documented above for campaign-clock.js/rainelles.js/
          cultivars.js. -->
     <script src="/game/data-narrative.js" defer></script>
+    <!-- Epic C7.3: cultivars.js now reads root.GardenCampaignSeasons (seasonForDay, to derive a
+         freshly created specimen's plantedSeason) at its own script-execution time, so this pure,
+         dependency-free catalog must load before it here — the same ordering requirement already
+         applied to every other pure campaign module above (rainelles.js/campaign-stations.js/
+         campaign-house.js/data-narrative.js). campaign-seasons.js existed since C7.1 but had no
+         browser consumer until now, so this is its first <script> tag. -->
+    <script src="/game/campaign-seasons.js" defer></script>
     <!-- Moved here from much further below (epic C2.6c): cultivars.js has no dependency of its
          own (pure schema, like rainelles.js/campaign-stations.js above), but garden-state-
          validate.js has read root.GardenCultivars since C2.6b without this script ever loading

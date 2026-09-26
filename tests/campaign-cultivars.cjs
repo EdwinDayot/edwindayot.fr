@@ -47,6 +47,9 @@ test("createSpecimen assigns a stable id and appends the specimen to s.specimens
     z: -1,
     stage: 0,
     plantedAt: 0,
+    // Epic C7.3: default campaignDay (1) is a spring day (campaign-seasons.js's own
+    // seasonForDay(1)), so a freshly created specimen here is planted in "printemps".
+    plantedSeason: "printemps",
     moistureAt: 0,
     readyToProduce: false,
   });

@@ -13,6 +13,11 @@ function makeCultivar(g) {
 }
 
 const DURATION = Cultivars.STAGE_DURATION_ELAPSED_SECONDS;
+// Epic C7.3: a fresh GardenState defaults campaignDay to 1, a spring day (campaign-seasons.js's
+// own seasonForDay(1) === "printemps"), so every specimen created below without an explicit
+// campaignDay is planted in spring and its stage 0 -> 1 transition uses this shorter duration —
+// these tests are updated to reflect that new default behavior rather than dodge it.
+const SPRING_DURATION = Cultivars.SPRING_YOUNG_STAGE_DURATION_ELAPSED_SECONDS;
 
 test("a freshly created specimen (default stage) is immature: specimenStage is 0", () => {
   const g = new GardenState(null, 1000);
@@ -28,7 +33,8 @@ test("a specimen becomes mature after exactly the total expected duration, recom
   const g = new GardenState(null, 1000);
   const cv = makeCultivar(g);
   const sp = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 0, z: 0 });
-  const totalToMature = Cultivars.MATURE_STAGE * DURATION;
+  assert.equal(sp.plantedSeason, "printemps");
+  const totalToMature = SPRING_DURATION + DURATION;
   // Just before: still not mature.
   g.s.elapsed = sp.plantedAt + totalToMature - 1;
   assert.equal(Cultivars.isMature(g.s, sp), false);
@@ -45,12 +51,19 @@ test("specimenStage walks through every intermediate stage boundary, each recomp
   const g = new GardenState(null, 1000);
   const cv = makeCultivar(g);
   const sp = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 0, z: 0 });
+  // Boundary 0 -> 1 uses the shorter spring duration (default campaignDay is a spring day);
+  // every later boundary keeps the ordinary DURATION, recomputed here independently rather than
+  // copied from cultivars.js's own internals.
+  const boundaries = [0, SPRING_DURATION];
+  for (let stage = 2; stage <= Cultivars.MATURE_STAGE; stage++) {
+    boundaries.push(boundaries[stage - 1] + DURATION);
+  }
   for (let stage = 0; stage <= Cultivars.MATURE_STAGE; stage++) {
-    g.s.elapsed = sp.plantedAt + stage * DURATION;
+    g.s.elapsed = sp.plantedAt + boundaries[stage];
     assert.equal(Cultivars.specimenStage(g.s, sp), stage);
     // One second before this stage's own boundary (when stage > 0): still the previous stage.
     if (stage > 0) {
-      g.s.elapsed = sp.plantedAt + stage * DURATION - 1;
+      g.s.elapsed = sp.plantedAt + boundaries[stage] - 1;
       assert.equal(Cultivars.specimenStage(g.s, sp), stage - 1);
     }
   }
