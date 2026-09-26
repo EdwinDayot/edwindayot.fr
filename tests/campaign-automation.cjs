@@ -610,8 +610,145 @@ test("transporter: a source already at or below its min moves nothing, blocking 
   assert.equal(to.buffer[cultivarId], undefined);
 });
 
-test("the three remaining out-of-scope verbs (replanter/preparer/trier) never crash and never start a job", () => {
-  for (const verbe of ["replanter", "preparer", "trier"]) {
+test("trier: extracts a single filtered category from the source panier's buffer, leaving other categories in place", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const from = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  const to = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  from.buffer[cultivarId] = 3;
+  from.buffer.autre = 5;
+  teach(rainelle, {
+    verbe: "trier",
+    poste: "peu-importe",
+    source: from.id,
+    destination: to.id,
+    condition: cultivarId,
+  });
+  g.step(CYCLE);
+  assert.equal(from.buffer[cultivarId], undefined);
+  assert.equal(from.buffer.autre, 5);
+  assert.equal(to.buffer[cultivarId], 3);
+  assert.equal(to.buffer.autre, undefined);
+});
+
+test("trier: an empty condition (no category taught) never starts a job", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const from = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  const to = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  from.buffer[cultivarId] = 3;
+  teach(rainelle, {
+    verbe: "trier",
+    poste: "peu-importe",
+    source: from.id,
+    destination: to.id,
+    condition: "",
+  });
+  assert.doesNotThrow(() => g.step(CYCLE * 2));
+  assert.equal(rainelle.job, null);
+  assert.equal(from.buffer[cultivarId], 3);
+  assert.equal(to.buffer[cultivarId], undefined);
+});
+
+test("trier: a panier taught as both source and destination is a degenerate no-op, never a job", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  panier.buffer[cultivarId] = 3;
+  teach(rainelle, {
+    verbe: "trier",
+    poste: "peu-importe",
+    source: panier.id,
+    destination: panier.id,
+    condition: cultivarId,
+  });
+  assert.doesNotThrow(() => g.step(CYCLE * 2));
+  assert.equal(rainelle.job, null);
+  assert.equal(panier.buffer[cultivarId], 3);
+});
+
+test("trier: an unknown source/destination id, or one of the wrong kind, leaves the Rainelle inactive without throwing", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const from = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+  });
+  teach(rainelle, {
+    verbe: "trier",
+    poste: "peu-importe",
+    source: from.id,
+    destination: "inconnu",
+    condition: cultivarId,
+  });
+  assert.doesNotThrow(() => g.step(CYCLE * 2));
+  assert.equal(rainelle.job, null);
+  teach(rainelle, {
+    verbe: "trier",
+    poste: "peu-importe",
+    source: from.id,
+    destination: zone.id,
+    condition: cultivarId,
+  });
+  assert.doesNotThrow(() => g.step(CYCLE * 2));
+  assert.equal(rainelle.job, null);
+});
+
+test("trier: destination capacity and source min are respected, exactly like transporter's own budget", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const from = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  const to = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  from.buffer[cultivarId] = 5;
+  from.min = 2;
+  to.buffer.other = 22; // capacity 24 (default) minus 22 already there = room for 2
+  teach(rainelle, {
+    verbe: "trier",
+    poste: "peu-importe",
+    source: from.id,
+    destination: to.id,
+    condition: cultivarId,
+  });
+  g.step(CYCLE);
+  // Budget is the smaller of the two limits (room at destination = 2, takeable from source =
+  // 5 - min(2) = 3): only 2 move, the source's own min floor never even gets exercised here.
+  assert.equal(from.buffer[cultivarId], 3);
+  assert.equal(to.buffer[cultivarId], 2);
+  assert.equal(Stations.panierTotal(to), 24);
+});
+
+test("the two remaining out-of-scope verbs (replanter/preparer) never crash and never start a job", () => {
+  for (const verbe of ["replanter", "preparer"]) {
     const g = new GardenState(null, 1000);
     const rainelle = bornRainelle(g);
     const zone = Stations.registerStation(g.s.campaignStations, "zone", {

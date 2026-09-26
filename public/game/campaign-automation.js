@@ -20,10 +20,10 @@
    reimplemented against a different data space rather than imported, since automation.js's own
    functions read `D.recipes[e.type]` and would need an unrelated recipe entry to mean anything.
 
-   Verb scope: "arroser"/"recolter" (C2.6c) and now "transporter" (C2.7) are implemented. The
-   two remaining verbs a Rainelle can be taught (replanter/preparer/trier, design §5's own
-   table) are validated as teachable since C2.4 but deliberately do nothing here — later epics
-   are where each gets its own tick behaviour. A taught-but-unimplemented verb is a silent
+   Verb scope: "arroser"/"recolter" (C2.6c), "transporter" (C2.7) and now "trier" (C7.6) are
+   implemented. The two remaining verbs a Rainelle can be taught (replanter/preparer, design §5's
+   own table) are validated as teachable since C2.4 but deliberately do nothing here — later
+   epics are where each gets its own tick behaviour. A taught-but-unimplemented verb is a silent
    no-op, not an error: teaching it already succeeded (C2.4/C2.5), so a Rainelle just standing
    idle is the correct, honest state until its epic lands — the readable "blocage" state a
    player would actually see is C2.8's job, not this one's.
@@ -287,21 +287,28 @@
   //     design's own example is a présentoir whose seuil "évite de vider la réserve
   //     alimentaire"). DEFAULT_PANIER_MIN is 0, so this is a no-op until some future command
   //     raises a panier's min above zero.
-  // `budget` is the largest amount this trajet may move in total this cycle, combining both
+  // `budget` is the largest amount a trajet may move in total this cycle, combining both
   // limits; each filtered key is moved up to what's left of that shared budget, then the budget
   // shrinks — so a trajet that would blow either limit moves only as much as it safely can
   // ("un blocage arrête proprement la production, sans détruire le stock", design §5) rather
   // than moving everything and overshooting, or moving nothing at all when a partial move is
   // safe. Reservation-by-construction: exactly like tickRecolter above, s.rainelles ticks in
-  // array order, so two transporteuses racing for the same headroom in one tick never double-
-  // count it — the first to run has already updated both paniers' buffers.
-  function tickTransporter(rainelle, s) {
+  // array order, so two Rainelles racing for the same headroom in one tick never double-count
+  // it — the first to run has already updated both paniers' buffers.
+  //
+  // Epic C7.6 (« Trier ») reuses this exact primitive rather than duplicating it: both verbs
+  // resolve a source/destination panier, treat "same panier" as a degenerate no-op, and move a
+  // set of filtered buffer keys under the same capacity/min budget — they differ only in which
+  // keys they are allowed to move, decided by their own caller (`pickKeys`, called once the
+  // paniers are resolved and the cycle has actually advanced, exactly the point `keys` was
+  // computed at before this split).
+  function tickPanierMove(rainelle, s, pickKeys) {
     const geste = rainelle.geste;
     const from = resolveKind(s, geste.source, "panier");
     const to = resolveKind(s, geste.destination, "panier");
     if (!from || !to || from === to) return;
     if (!advanceCycle(rainelle)) return;
-    const keys = geste.condition ? [geste.condition] : Object.keys(from.buffer);
+    const keys = pickKeys(from);
     const roomAtDestination = Math.max(
       0,
       to.capacity - Stations.panierTotal(to),
@@ -322,6 +329,34 @@
     }
   }
 
+  function tickTransporter(rainelle, s) {
+    const geste = rainelle.geste;
+    tickPanierMove(rainelle, s, (from) =>
+      geste.condition ? [geste.condition] : Object.keys(from.buffer),
+    );
+  }
+
+  // "Trier" (design §5, « arrivée mélangée au poste » → « une catégorie extraite vers le bac
+  // adjacent »). Reuses tickPanierMove exactly like tickTransporter above — same source/
+  // destination panier resolution, same degenerate same-panier no-op, same capacity/min budget —
+  // with two real differences, both required by the design table rather than chosen freely:
+  // (1) `condition` is *mandatory* here (design names "une catégorie", singular, as the
+  // operation itself), so an empty condition never even resolves the paniers or advances the
+  // cycle — the same "no job ever starts" posture already used for an unresolved station,
+  // checked before tickPanierMove is called at all; (2) `geste.poste` is deliberately left
+  // unread by this mechanic, the same choice already made for "transporter" and for the same
+  // reason (its own comment above): a panier-to-panier move has no notion of proximity/zone in
+  // this registry, and the design's own two-line table entry is satisfied entirely by the
+  // source/destination/condition triple already proven by transporter — inventing a zone
+  // resolution for `poste` here would add a proximity rule this epic's exit criterion never
+  // asks for. `PHRASE_BUILDERS.trier` (rainelles.js) still gives `poste` a real place in the
+  // taught phrase text; only the tick mechanics ignore it, exactly like transporter's own poste.
+  function tickTrier(rainelle, s) {
+    const geste = rainelle.geste;
+    if (!geste.condition) return;
+    tickPanierMove(rainelle, s, () => [geste.condition]);
+  }
+
   // One Rainelle, one tick. A null geste, or a verb this file doesn't implement yet (see header
   // comment), is a no-op — never an exception, never a silent mutation of `job`.
   function tickRainelle(rainelle, s) {
@@ -330,6 +365,7 @@
     if (geste.verbe === "arroser") tickArroser(rainelle, s);
     else if (geste.verbe === "recolter") tickRecolter(rainelle, s);
     else if (geste.verbe === "transporter") tickTransporter(rainelle, s);
+    else if (geste.verbe === "trier") tickTrier(rainelle, s);
   }
 
   // The smallest additive mechanism that gives "recolter" anything to ever collect: nothing else
