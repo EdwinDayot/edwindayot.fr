@@ -3666,3 +3666,37 @@ Aucun choix déjà confirmé par l'utilisateur dans `game-design.md` remis en ca
 **Pour le prochain déclenchement** : **C7.1** est l'unique epic détaillé `todo` à dépendances satisfaites de tout le backlog. Le prendre en Artisan moteur seul (aucun rendu, aucune narration) ; le lien saison → croissance reste hors de son critère de sortie, à ne pas y ajouter en cours de route.
 
 Commit : voir `git log` sur `maison-des-possibles` (message « Cartographe : premier lot de la phase 7, horloge saisonnière (C7.1) »). `git push origin maison-des-possibles` à confirmer par `git ls-remote origin` avant conclusion de ce déclenchement.
+
+## Déclenchement automatisé du 26 septembre 2026 — Epic C7.1 : horloge saisonnière (dérivation pure jour → saison)
+
+**Vérification anti-hallucination faite avant tout le reste.** Dernier epic « fait » du backlog en début de déclenchement : **C6.29**, commit `d5f56d1ca4be74acaec85b9a9a18b05e60d4cf80` — `git show --stat d5f56d1` confirme un commit réel (message « Epic C6.29 : porte de sortie de la phase 6, scénario de bout en bout », contenu cohérent avec l'entrée existante de `docs/campagne-backlog.md`/ce fichier). `npm ci && npm test` relancés indépendamment avant tout nouveau travail → **888/888**, zéro échec, identique au chiffre déjà consigné pour ce commit. Aucun bandeau de pause en tête de `docs/campagne-backlog.md` (vérifié, première ligne). `docs/campagne-anomalies.md` toujours absent (aucune anomalie à consigner). Aucun epic à l'état `bloqué` dans le backlog, donc pas trois blocages consécutifs. Le dernier commit réel de la branche (`git log --oneline -10`, HEAD) était **`b6b3e87`** (« Cartographe : premier lot de la phase 7, horloge saisonnière (C7.1) »), qui avait déjà détaillé **C7.1** comme seul epic `todo` à dépendances satisfaites (« rien ») de tout le backlog — choisi sans ambiguïté.
+
+**Implémenté directement par l'orchestrateur** (Artisan moteur pur, aucun rendu, aucune narration, mandat suffisamment borné pour une session unique — même précédent que C2.6a/b/c/C2.7). Exactement les deux fichiers probables du backlog, aucun écart :
+
+- Nouveau `public/game/campaign-seasons.js` (UMD, sur le modèle exact de `campaign-clock.js`) : `SEASONS = ["printemps", "ete", "automne", "hiver"]`, `DAYS_PER_SEASON = 10` nommé (jamais un nombre magique dispersé dans plusieurs fichiers, conformément à la clause littérale du critère de sortie), `CYCLE_DAYS = 40` dérivé (`SEASONS.length * DAYS_PER_SEASON`, jamais un second nombre magique dupliqué). `seasonForDay(campaignDay)` — une seule fonction pure, `Math.floor((campaignDay - 1) / DAYS_PER_SEASON) % SEASONS.length` — jamais de champ persisté (conforme à « la saison se dérive à la demande de `campaignDay`, jamais stockée en doublon »), donc aucune migration, aucune modification de `garden-state-lifecycle.js`/`garden-state-validate.js`.
+- Nouveau `tests/campaign-seasons.cjs` (5 tests) : énumération littérale des jours 1 à 121 (trois cycles complets plus un, exactement la couverture demandée par le critère de sortie) comparée à une valeur attendue recalculée indépendamment dans le test ; les huit frontières du premier cycle (1/10/11/20/21/30/31/40) vérifiées explicitement ; le rebouclage après le jour 40 vérifié à quatre points (41, 50, 51, et le début des cycles 3 et 4, jours 81 et 121) ; les trois constantes (`DAYS_PER_SEASON`, longueur de `SEASONS`, `CYCLE_DAYS`) vérifiées ; pureté vérifiée par appels répétés sur six jours choisis.
+- `package.json` : nouveau fichier de test ajouté à la liste explicite du script `test` (le script n'énumère pas par glob, leçon déjà tirée à C2.11).
+
+**Aucune balise `<script>` ajoutée à `public/index.html`, décision explicite plutôt qu'un oubli** : contrairement à `campaign-clock.js`/`campaign-stations.js` (chacun lu dès sa propre epic par `garden-state-validate.js`/`garden-state-lifecycle.js` ou par une commande réelle), rien ne consomme encore `campaign-seasons.js` côté navigateur aujourd'hui — vérifié (`grep -rn "campaign-seasons\|CampaignSeasons" public/*.js public/game/*.js` avant d'écrire cette entrée : aucune occurrence hors du module lui-même) — et le critère de sortie de cet epic l'énonce lui-même explicitement (« aucun champ nouveau n'est persisté... la saison se dérive à la demande »). Ajouter la balise maintenant aurait chargé un module mort dans la page sans qu'aucun test ne puisse vérifier un effet réel, l'inverse de la discipline « vérifié veut dire exécuté ». Un futur epic de rendu/UI qui affiche ou utilise la saison ajoutera cette balise en même temps que son propre câblage, comme `render-campaign-passage.js`/`render-campaign-house.js` l'ont fait pour leur propre module.
+
+**Résultat réel et complet de `npm test`** : **893/893** (888 existants + 5 nouveaux dans `tests/campaign-seasons.cjs`, zéro régression). Sortie complète :
+
+```
+# tests 893
+# suites 0
+# pass 893
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+```
+
+Épic Artisan moteur pur, aucun rendu Three.js/géométrie/matériau touché (une fonction pure de dérivation, jamais chargée par le navigateur) : `npm run test:browser`/`npm run test:visual` non requis, même exemption déjà documentée pour C2.6a/b/c/C2.7/C2.11. Aucune relecture narrative adverse requise (pas un epic de Scénariste, aucun texte introduit).
+
+`/code-review` (skill, niveau medium) exécuté sur le diff complet : aucun défaut relevé — l'absence de garde sur `campaignDay <= 0` dans `seasonForDay` a été explicitement examinée et jugée non nécessaire, l'invariant `campaignDay >= 1` étant déjà posé et validé ailleurs (`garden-state-validate.js`, depuis C2.2), jamais supposé sans vérification par la revue elle-même.
+
+Aucun choix déjà confirmé par l'utilisateur dans `game-design.md` remis en cause (Alma vivante ; nom des Rainelles ; culpabilisation de fin de campagne — non concernés par une horloge saisonnière). Aucune règle de `direction-artistique.md` modifiée (aucun rendu introduit par cet epic). Ne ferme aucune porte de phase (la phase 7 vient tout juste de recevoir son premier epic).
+
+**Pour le prochain déclenchement** : la phase 7 n'a plus aucun epic détaillé `todo` à dépendances satisfaites après C7.1 (le seul epic du premier lot Cartographe). Un futur déclenchement devra endosser à nouveau le rôle Cartographe pour détailler le second lot de la phase 7 (rendu/affichage de la saison, ou l'un des cinq autres thèmes déjà reconnus par le premier lot — extensions de maison, catalogue décoratif, tactile, optimisation, chaînes avancées/histoires secondaires), conformément à `orchestration.md`/`execution-continue.md`.
+
+Commit : voir `git log` sur `maison-des-possibles` (message « Epic C7.1 : horloge saisonnière, dérivation pure jour → saison »). `git push origin maison-des-possibles` à confirmer par `git ls-remote origin` avant conclusion de ce déclenchement.
