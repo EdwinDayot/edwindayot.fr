@@ -152,6 +152,14 @@
           }
           rm.group.position.set(r.x, y, r.z);
         }
+      // Epic C7.4: every specimen in the real save (s.specimens, C1.6) gets a persistent Group in
+      // the real scene, entirely delegated to render-specimens.js's own syncSpecimenModels (create
+      // new/remove disappeared/rebuild on a real stage change) rather than duplicated inline like
+      // the rainelle loop just above — that function's own registry-management logic is specific
+      // enough to this one case (a rebuild, never a mutation, on stage change) to warrant its own
+      // Node-tested module, see that file's header.
+      const RenderSpecimens = window.GardenRenderSpecimens;
+      if (RenderSpecimens) RenderSpecimens.syncSpecimenModels(this.specimenModels, this.scene, s);
       // Epic C5.13: every borne/zone/panier/habitat in the registry (campaign-stations.js) gets a
       // Group built once per station id and cached in `this.stationModels` — the exact
       // "build once, reposition/update on real change, never rebuild every frame" pattern

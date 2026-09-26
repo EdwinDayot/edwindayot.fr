@@ -283,19 +283,23 @@
       });
       // Shot 2, only if a real specimen the player actually planted exists (s.specimens, C1.6) —
       // built transiently for this shot only, reusing botany-hybrids.js's own organ library
-      // (never a second rendering system): no persistent per-specimen Group exists anywhere in the
-      // game yet (verified: render-flow.js's sync() never reads s.specimens), and building one
-      // permanently is a separate, larger epic this mandate does not ask for. Removed again by
-      // endEpilogueScene() below — this Group never outlives the scene.
+      // (never a second rendering system): a persistent per-specimen Group exists in the real
+      // scene since C7.4 (render-specimens.js), but this one-off framing shot still builds its own
+      // detached copy rather than reaching into that registry, since it is removed again by
+      // endEpilogueScene() below and must never outlive or alias the persistent Group. Epic C7.4
+      // also corrects the stage read below: `specimen.stage` itself is a raw field frozen at
+      // creation, stale since C7.2 gave growth its own real progression — the derived stage
+      // (Cultivars.specimenStage(s, specimen)) is the only source of truth a consumer should read.
       let transientSpecimen = null;
       const Hybrids = window.GardenBotanyHybrids;
-      if (Hybrids && s.specimens.length) {
+      const Cultivars = window.GardenCultivars;
+      if (Hybrids && Cultivars && s.specimens.length) {
         const specimen = s.specimens[0],
           cultivar = s.cultivars.find((c) => c.id === specimen.cultivarId);
         if (cultivar) {
           transientSpecimen = Hybrids.buildSpecimenGroup(
             cultivar,
-            specimen.stage ?? Hybrids.MATURE_STAGE,
+            Cultivars.specimenStage(s, specimen),
           );
           transientSpecimen.position.set(
             specimen.x,

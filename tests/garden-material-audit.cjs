@@ -255,6 +255,37 @@ const TRANSPARENT_ALLOWLIST = [
         };
       }
 
+      // Epic C7.4 (docs/campagne-backlog.md): persistent specimen rendering
+      // (render-specimens.js), exercised through this exact live-page scene graph AND the real
+      // sync() wiring, same reason as every block above — this audit is the real gate for a
+      // rendering epic, never a screenshot a model merely looks at. Two specimens of the SAME
+      // cultivar at two DIFFERENT derived growth stages (Cultivars.createSpecimen's own `stage`
+      // convenience param, C7.2 — no command plants a specimen at a chosen stage today, same
+      // posture the C5.11/C5.13 blocks above already use for state no command reaches yet),
+      // pushed directly into the live save so v.sync() actually builds/positions Groups through
+      // the exact code path a real session's own render loop (garden-frame.js's `A.view.sync()`)
+      // uses every frame. Positioned far off the playable area.
+      if (window.GardenGenetics && window.GardenCultivars && window.GardenApp.game) {
+        const s = window.GardenApp.game.s;
+        const Cultivars = window.GardenCultivars;
+        const f = window.GardenGenetics.founders[1];
+        const cultivar = Cultivars.createCultivar(s, { name: "Test C7.4", traits: f.traits });
+        const young = Cultivars.createSpecimen(s, {
+          cultivarId: cultivar.id,
+          x: 245,
+          z: 200,
+          stage: 0,
+        });
+        const mature = Cultivars.createSpecimen(s, {
+          cultivarId: cultivar.id,
+          x: 246.5,
+          z: 200,
+          stage: Cultivars.MATURE_STAGE,
+        });
+        v.sync();
+        window.__auditSpecimenIds = { young: young.id, mature: mature.id };
+      }
+
       // Sample a few times of day: a defect that only shows under one lighting angle (the
       // terrain-normal bug was exactly this — it read fine at some sun angles) must not hide.
       const times = [50, 300, 600, 900, 1150];
@@ -363,6 +394,27 @@ const TRANSPARENT_ALLOWLIST = [
           }
         : { found: false };
 
+      // Epic C7.4: confirms sync()'s new branch actually built and positioned both specimens
+      // through the real v.specimenModels registry (never a screenshot a model merely looks at) —
+      // a Group per specimen, added to the real scene, each carrying the derived stage
+      // buildSpecimenGroup itself recorded on group.userData, distinct from one another (a
+      // mature specimen's Group is scaled to 1, a stage-0 one is not — the exact visible
+      // difference this epic's rebuild-on-stage-change logic exists to produce).
+      let specimenWiring = { found: false };
+      if (window.__auditSpecimenIds) {
+        const ids = window.__auditSpecimenIds;
+        const youngSm = v.specimenModels.get(ids.young);
+        const matureSm = v.specimenModels.get(ids.mature);
+        specimenWiring = {
+          found: !!(youngSm && matureSm),
+          allInScene: [youngSm, matureSm].every((sm) => sm && sm.group.parent === v.scene),
+          youngStage: youngSm && youngSm.group.userData.stage,
+          matureStage: matureSm && matureSm.group.userData.stage,
+          youngScale: youngSm && youngSm.group.scale.x,
+          matureScale: matureSm && matureSm.group.scale.x,
+        };
+      }
+
       return {
         suspiciousTransparent,
         badNormals,
@@ -373,6 +425,7 @@ const TRANSPARENT_ALLOWLIST = [
         teachingWiring,
         passageWiring,
         giftWiring,
+        specimenWiring,
       };
     });
 
@@ -407,6 +460,12 @@ const TRANSPARENT_ALLOWLIST = [
     assert.equal(audit.giftWiring.inScene, true, "C6.21: the gift plant Group was never added to the real scene");
     assert.equal(audit.giftWiring.position[0], -13, "C6.21: gift plant Group x does not match the documented fixed position");
     assert.equal(audit.giftWiring.position[2], 9.5, "C6.21: gift plant Group z does not match the documented fixed position");
+
+    assert.equal(audit.specimenWiring.found, true, "C7.4: sync() never built a Group for one of the two live-state specimens");
+    assert.equal(audit.specimenWiring.allInScene, true, "C7.4: a specimen's Group was never added to the real scene");
+    assert.equal(audit.specimenWiring.youngStage, 0, "C7.4: the stage-0 specimen's Group does not record stage 0 on userData");
+    assert.equal(audit.specimenWiring.matureStage, 2, "C7.4: the mature specimen's Group does not record MATURE_STAGE on userData");
+    assert.ok(audit.specimenWiring.youngScale < audit.specimenWiring.matureScale, "C7.4: a young specimen's Group must be visibly smaller than a mature one's");
 
     assert.deepEqual(audit.nanMeshes, [], "Meshes with non-finite vertex positions: " + audit.nanMeshes.join(", "));
     assert.deepEqual(

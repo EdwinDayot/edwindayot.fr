@@ -47,6 +47,11 @@
       // id -> { kind, group } — same "build once, cache, reposition/update every sync" pattern as
       // `this.rainelleModels` just above.
       this.stationModels = new Map();
+      // Epic C7.4: one entry per specimen id (s.specimens, C1.6), id -> { group } — same
+      // "build once, cache, rebuild only on a real change, reposition every sync" pattern as
+      // `this.stationModels` just above (a specimen's Group is rebuilt, never mutated, when its
+      // derived growth stage changes; see render-specimens.js).
+      this.specimenModels = new Map();
       // Epic C2.5v-b: a single overlay Group for the "reviewing" teaching draft's resolved
       // trajectory (never one per station like rainelleModels/stationModels above — there is at
       // most one lesson in review at a time, garden-state-cmd-k.js's own "une leçon est déjà en

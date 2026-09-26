@@ -295,6 +295,12 @@
          itself only called later at world()-build time (render.js), so its only load-time
          requirement is loading after /vendor/three.min.js, same as those two sibling modules. -->
     <script src="/game/render-campaign-passage.js" defer></script>
+    <!-- Epic C7.4: persistent specimen rendering, self-contained beyond THREE and its own two
+         sibling modules (botany-hybrids.js/cultivars.js/terrain.js, all already loaded above) —
+         read lazily as `window.GardenRenderSpecimens` inside render-flow.js's sync(), so its only
+         load-time requirement is loading after those three and /vendor/three.min.js, same posture
+         as render-rainelles.js/render-campaign-stations.js above. -->
+    <script src="/game/render-specimens.js" defer></script>
     <script src="/game/render-scene.js" defer></script>
     <script src="/game/render-items.js" defer></script>
     <script src="/game/render-flow.js" defer></script>
