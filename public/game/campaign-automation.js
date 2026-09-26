@@ -63,7 +63,18 @@
    capacityLimit) — never for a borne without the flag, and never for a pass that watered nothing.
    FAST_CYCLE_SECONDS stays strictly below CYCLE_SECONDS so the existing persisted-job bound in
    garden-state-validate.js (`finite(r.job.remaining, 0, CampaignAutomation.CYCLE_SECONDS)`) still
-   holds without any change there. */
+   holds without any change there.
+
+   Epic C7.7 (design §12's own seasonal bonus table, "l'automne favorise les récoltes") reuses
+   this exact FAST_CYCLE_SECONDS/CYCLE_SECONDS pattern for "récolter", gated on
+   `GardenCampaignSeasons.seasonForDay(s.campaignDay) === "automne"` (campaign-seasons.js, C7.1)
+   instead of a borne flag — a freshly (re)started cycle just runs faster, never a change to what
+   doRecolter itself harvests. Never a penalty outside autumn (same "bonus, never slower" posture
+   already used by C7.3's spring growth bonus): a cycle started in another season keeps
+   CYCLE_SECONDS exactly as before this epic. A cycle already mid-count when the season turns
+   finishes at whatever duration it started with — advanceCycle never rescales a running
+   countdown, same rule already stated above for C5.4's borne flag. runNightWork/doRecolter stay
+   untouched: a resolved night has no per-second countdown to accelerate. */
 (function (root) {
   const C =
     typeof module !== "undefined"
@@ -81,6 +92,10 @@
     typeof module !== "undefined"
       ? require("./campaign-memory.js")
       : root.GardenCampaignMemory;
+  const Seasons =
+    typeof module !== "undefined"
+      ? require("./campaign-seasons.js")
+      : root.GardenCampaignSeasons;
 
   // How long one watering/harvest cycle takes, in simulated seconds (s.elapsed, never the wall
   // clock — same convention as every other campaign timer). No existing value in the codebase
@@ -257,7 +272,13 @@
     const geste = rainelle.geste;
     if (!resolveKind(s, geste.poste, "zone") || !resolveKind(s, geste.destination, "panier"))
       return;
-    if (!advanceCycle(rainelle)) return;
+    // Epic C7.7: same posture as C5.4's borne-flagged fast cycle for "arroser" — a freshly
+    // (re)started countdown picks FAST_CYCLE_SECONDS in autumn, CYCLE_SECONDS every other
+    // season. A cycle already mid-count when the season turns (via sleep, which advances
+    // s.campaignDay) simply finishes at whatever duration it started with — advanceCycle never
+    // rescales a running countdown, exactly like C5.4's own borne flag.
+    const autumn = Seasons.seasonForDay(s.campaignDay) === "automne";
+    if (!advanceCycle(rainelle, autumn)) return;
     doRecolter(rainelle, s);
   }
 

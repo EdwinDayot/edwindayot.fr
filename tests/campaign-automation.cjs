@@ -504,6 +504,134 @@ test("recolter: two récolteuses sharing a zone and a nearly-full panier never o
   assert.equal(Stations.panierTotal(panier), 1);
 });
 
+// Epic C7.7 (design §12, "l'automne favorise les récoltes") — same FAST_CYCLE_SECONDS/
+// CYCLE_SECONDS pattern already proven for "arroser" by C5.4, gated on
+// GardenCampaignSeasons.seasonForDay(s.campaignDay) instead of a borne flag. FAST is
+// recomputed independently from CampaignAutomation.FAST_CYCLE_SECONDS, never copied from the
+// code under test, per this file's own test-writing convention (see CYCLE at the top of this
+// file).
+const FAST = CampaignAutomation.FAST_CYCLE_SECONDS;
+
+test("recolter: a cycle started on an autumn day completes in FAST_CYCLE_SECONDS ticks, not CYCLE_SECONDS", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  g.s.campaignDay = 21; // seasonForDay(21) === "automne" (days 21-30, C7.1's own DAYS_PER_SEASON=10)
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", { x: 0, z: 0 });
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+  const specimen = Cultivars.createSpecimen(g.s, {
+    cultivarId,
+    x: 0,
+    z: 0,
+    stage: Cultivars.MATURE_STAGE,
+  });
+  Cultivars.setReadyToProduce(g.s, specimen, true);
+  teach(rainelle, {
+    verbe: "recolter",
+    poste: zone.id,
+    source: "peu-importe",
+    destination: panier.id,
+  });
+  g.step(FAST - 1);
+  assert.deepEqual(panier.buffer, {}, "not yet — the fast cycle hasn't completed");
+  g.step(1);
+  assert.equal(panier.buffer[cultivarId], 1, "exactly FAST_CYCLE_SECONDS ticks in autumn");
+});
+
+test("recolter: a cycle started outside autumn still completes in the ordinary CYCLE_SECONDS ticks", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  g.s.campaignDay = 1; // seasonForDay(1) === "printemps"
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", { x: 0, z: 0 });
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+  const specimen = Cultivars.createSpecimen(g.s, {
+    cultivarId,
+    x: 0,
+    z: 0,
+    stage: Cultivars.MATURE_STAGE,
+  });
+  Cultivars.setReadyToProduce(g.s, specimen, true);
+  teach(rainelle, {
+    verbe: "recolter",
+    poste: zone.id,
+    source: "peu-importe",
+    destination: panier.id,
+  });
+  g.step(CYCLE - 1);
+  assert.deepEqual(panier.buffer, {}, "not yet — no bonus outside autumn");
+  g.step(1);
+  assert.equal(panier.buffer[cultivarId], 1, "exactly CYCLE_SECONDS ticks outside autumn, never shorter");
+});
+
+test("recolter: a cycle already running when the season turns to autumn finishes at the duration it started with, never rescaled mid-flight", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  g.s.campaignDay = 1; // printemps: the cycle about to start picks CYCLE_SECONDS
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", { x: 0, z: 0 });
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+  const specimen = Cultivars.createSpecimen(g.s, {
+    cultivarId,
+    x: 0,
+    z: 0,
+    stage: Cultivars.MATURE_STAGE,
+  });
+  Cultivars.setReadyToProduce(g.s, specimen, true);
+  teach(rainelle, {
+    verbe: "recolter",
+    poste: zone.id,
+    source: "peu-importe",
+    destination: panier.id,
+  });
+  g.step(5); // cycle under way, mid-count, still on CYCLE_SECONDS
+  g.s.campaignDay = 21; // the season turns to automne mid-cycle, exactly like sleep advancing it
+  g.step(CYCLE - 5 - 1);
+  assert.deepEqual(panier.buffer, {}, "the running cycle isn't shortened by the season change");
+  g.step(1);
+  assert.equal(
+    panier.buffer[cultivarId],
+    1,
+    "the first cycle still takes the full CYCLE_SECONDS it started with",
+  );
+  // Now a fresh cycle starts, and campaignDay is already 21 (automne): it runs fast.
+  Cultivars.setReadyToProduce(g.s, specimen, true);
+  g.step(FAST - 1);
+  assert.equal(panier.buffer[cultivarId], 1, "second cycle not yet complete");
+  g.step(1);
+  assert.equal(panier.buffer[cultivarId], 2, "second cycle completed in FAST_CYCLE_SECONDS, now that the season is automne");
+});
+
+test("recolter: night resolution (runNightWork/doRecolter) harvests identically in autumn and outside it — the seasonal bonus is a day-cycle-speed effect only", () => {
+  const outcomes = [1, 21].map((day) => {
+    const g = new GardenState(null, 1000);
+    const rainelle = bornRainelle(g);
+    const cultivarId = g.s.cultivars[0].id;
+    g.s.campaignDay = day;
+    const zone = Stations.registerStation(g.s.campaignStations, "zone", { x: 0, z: 0 });
+    const panier = Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+    const specimen = Cultivars.createSpecimen(g.s, {
+      cultivarId,
+      x: 0,
+      z: 0,
+      stage: Cultivars.MATURE_STAGE,
+    });
+    Cultivars.setReadyToProduce(g.s, specimen, true);
+    teach(rainelle, {
+      verbe: "recolter",
+      poste: zone.id,
+      source: "peu-importe",
+      destination: panier.id,
+    });
+    assert.equal(g.command({ type: "setVeilleuse", zoneId: zone.id, active: true }).ok, true);
+    const worked = CampaignAutomation.runNightWork(g.s);
+    return { worked: worked.has(rainelle.id), harvested: Stations.panierTotal(panier) };
+  });
+  assert.deepEqual(outcomes[0], outcomes[1], "same night-work outcome whatever the season");
+  assert.equal(outcomes[0].worked, true);
+  assert.equal(outcomes[0].harvested, 1);
+});
+
 test("transporter: a full destination blocks the trajet entirely, leaving the source untouched", () => {
   const g = new GardenState(null, 1000);
   const rainelle = bornRainelle(g);
