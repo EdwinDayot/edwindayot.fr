@@ -24,12 +24,26 @@
      - s.campaignContracts (C6.4): a commercial contract was really signed at least once — engaging
        commercially without ever touching a veilleuse/prise still counts as "engaged", so
        everEngaged has to check all three independently rather than only the two lever journals.
-     - s.campaignStations.zones[].veilleuse / s.campaignStations.bornes[].priseFortDebit (C5.2/C5.4/
-       C6.2): whether a lever is still active *right now*, at the moment orientation() is read.
-     - s.campaignFlags (C6.9): the three real-cost renunciation flags (levier-veilleuse-coupee/
-       levier-prise-restituee/levier-contrat-reduit) — proof a lever was actually reversed with a
-       cost, never guessed from a lever simply being off (a lever can be off because it was never
-       turned on in the first place, which everEngaged already separates out below).
+     - s.campaignMemory.habitatTransformations (C5.1/C6.26): the third lever (design §11, "extension
+       standardisée sur un espace vivant") was really engaged at least once — an
+       extendZoneOverHabitat call always appends here (C6.26), the only fact this lever leaves
+       behind since it has no per-tick journal of its own (no nightlyActivity/waterWithdrawals
+       entry — see garden-state-cmd-y.js's own header comment on why). Read independently of the
+       other two engagement signals, same reasoning as campaignContracts above: a player who only
+       ever engages this third lever, never touching veilleuse/prise/contrat, must not fall through
+       to the "jamais engagé" branch below.
+     - s.campaignStations.zones[].veilleuse / .priseFortDebit / .extensionCommerciale
+       (C5.2/C5.4/C6.2/C6.26): whether a lever is still active *right now*, at the moment
+       orientation() is read — the third lever's "still active" reads the same
+       extensionCommerciale flag garden-state-cmd-y.js itself flips, never a re-derivation from
+       habitatTransformations (which stays true even after a real conversion, C6.27's
+       markHabitatTransformationReturned marks an entry returned but never removes it — only the
+       zone's own flag reflects "right now").
+     - s.campaignFlags (C6.9/C6.28): the three real-cost renunciation flags (levier-veilleuse-coupee/
+       levier-prise-restituee/levier-contrat-reduit) plus the third lever's own
+       (levier-extension-rendue, C6.28) — proof a lever was actually reversed with a cost, never
+       guessed from a lever simply being off (a lever can be off because it was never turned on in
+       the first place, which everEngaged already separates out below).
 
    Branch order, read literally off the backlog's own five-branch table:
      1. !everEngaged -> "durable" (never touched a lever or a contract at all — "joueur attentif dès
@@ -45,14 +59,21 @@
 
    Honest limits, documented rather than guessed (backlog's own): this derives only an internal
    string, never a text/scene/image (chapter 18's narration/rendering is a future epic once this
-   signal is real) ; it does not cover "la lecture différente du refus" (chapter 13/C6.6) nor
-   Memory.habitatTransformations (still reserved and never filled by any command since C5.1) — both
-   exist in the design but not yet in a usable engine form, left to a future refinement of this
-   function if a future parcours test (design §16) shows the current three orientations are not
-   enough, rather than guessing their weight now. Chapter 17's "protection contre une extension
-   lucrative" branch is not covered here either — closed for good by the Cartographe's own note
-   above this epic (structurally unreachable, s.campaignPassage.blocked can never become true again
-   once restored).
+   signal is real) ; it does not cover "la lecture différente du refus" (chapter 13/C6.6). Chapter
+   17's "protection contre une extension lucrative" branch is not covered here either — closed for
+   good by the Cartographe's own note above this epic (structurally unreachable,
+   s.campaignPassage.blocked can never become true again once restored).
+
+   Epic C6.28 revises this function (code-review finding, not a re-guess of the design): when this
+   epic first made the third lever's reversal narratively real (levier-extension-rendue), this
+   function still only knew about the first two levers — habitatTransformations was read nowhere,
+   so a playthrough that only ever engaged/reversed the third lever (extendZoneOverHabitat /
+   convertZoneToLivingSpace, C6.26/C6.27) with no veilleuse/prise/contrat ever touched fell through
+   to "!everEngaged -> durable", the right answer for the wrong reason (and the wrong answer
+   entirely — "intensive" — had that same player engaged the lever without ever reversing it: still
+   !everEngaged, still "durable"). Fixed by reading habitatTransformations/extensionCommerciale/
+   levier-extension-rendue exactly as symmetrically as the other two levers' own three signals,
+   documented inline above rather than bolted on as a special case.
 
    Epic C6.18 adds `canOpen(s)`, also pure/never mutating: true only once `s.campaignEpilogue`
    (garden-state-lifecycle.js/garden-state-validate.js, new this epic) has a real `unlocksOnDay`
@@ -93,6 +114,7 @@
     "levier-veilleuse-coupee",
     "levier-prise-restituee",
     "levier-contrat-reduit",
+    "levier-extension-rendue",
   ];
 
   // Pure: never mutates s. See header comment for the exact reading of each branch.
@@ -100,11 +122,12 @@
     const everEngaged =
       Object.keys(s.campaignMemory.nightlyActivity).length > 0 ||
       Object.keys(s.campaignMemory.waterWithdrawals).length > 0 ||
+      s.campaignMemory.habitatTransformations.length > 0 ||
       s.campaignContracts.length > 0;
     if (!everEngaged) return ORIENTATIONS.DURABLE;
 
     const anyLeverActive =
-      s.campaignStations.zones.some((z) => z.veilleuse) ||
+      s.campaignStations.zones.some((z) => z.veilleuse || z.extensionCommerciale) ||
       s.campaignStations.bornes.some((b) => b.priseFortDebit);
     const anyLeverReversed = LEVER_REVERSAL_FLAGS.some((flag) =>
       s.campaignFlags.includes(flag),

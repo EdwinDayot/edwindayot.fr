@@ -13,7 +13,12 @@ const Epilogue = require("../public/game/campaign-epilogue.js");
 
 function fixture(overrides = {}) {
   return {
-    campaignMemory: { nightlyActivity: {}, waterWithdrawals: {}, ...overrides.campaignMemory },
+    campaignMemory: {
+      nightlyActivity: {},
+      waterWithdrawals: {},
+      habitatTransformations: [],
+      ...overrides.campaignMemory,
+    },
     campaignContracts: overrides.campaignContracts || [],
     campaignStations: {
       zones: [],
@@ -47,6 +52,38 @@ test("everEngaged is proven by waterWithdrawals alone, with no contract and no n
   assert.notEqual(Epilogue.orientation(s), "durable", "engaged via waterWithdrawals alone must not read as untouched");
 });
 
+// Epic C6.28 (code-review finding): the third lever (design §11, "extension standardisée sur un
+// espace vivant", C6.26/C6.27) leaves no nightlyActivity/waterWithdrawals journal of its own — its
+// only engagement trace is Memory.habitatTransformations (appended by extendZoneOverHabitat).
+test("everEngaged is proven by habitatTransformations alone, with no contract/nightlyActivity/waterWithdrawals", () => {
+  const s = fixture({
+    campaignMemory: { habitatTransformations: [{ zoneId: "z1", habitatId: "h1", capacity: 4, day: 1 }] },
+  });
+  assert.notEqual(
+    Epilogue.orientation(s),
+    "durable",
+    "engaged via habitatTransformations alone must not read as untouched",
+  );
+});
+
+test("branch 2 also fires from a zone's extensionCommerciale alone (third lever still active, never reversed)", () => {
+  const s = fixture({
+    campaignMemory: { habitatTransformations: [{ zoneId: "z1", habitatId: "h1", capacity: 4, day: 1 }] },
+    campaignStations: { zones: [{ id: "z1", veilleuse: false, extensionCommerciale: true }], bornes: [] },
+    campaignFlags: [],
+  });
+  assert.equal(Epilogue.orientation(s), "intensive");
+});
+
+test("branch 3 also fires from levier-extension-rendue alone, once the zone is no longer extended", () => {
+  const s = fixture({
+    campaignMemory: { habitatTransformations: [{ zoneId: "z1", habitatId: "h1", capacity: 4, day: 1, returnedDay: 2 }] },
+    campaignStations: { zones: [{ id: "z1", veilleuse: false, extensionCommerciale: false }], bornes: [] },
+    campaignFlags: ["levier-extension-rendue"],
+  });
+  assert.equal(Epilogue.orientation(s), "durable");
+});
+
 test("branch 2 — a lever has served, is still active, no renunciation ever recognized: intensive", () => {
   const s = fixture({
     campaignMemory: { nightlyActivity: { r1: 3 }, waterWithdrawals: {} },
@@ -74,8 +111,13 @@ test("branch 3 — no lever active any more, at least one real renunciation reco
   assert.equal(Epilogue.orientation(s), "durable");
 });
 
-test("branch 3 fires identically for each of the three reversal flags taken alone", () => {
-  for (const flag of ["levier-veilleuse-coupee", "levier-prise-restituee", "levier-contrat-reduit"]) {
+test("branch 3 fires identically for each of the four reversal flags taken alone", () => {
+  for (const flag of [
+    "levier-veilleuse-coupee",
+    "levier-prise-restituee",
+    "levier-contrat-reduit",
+    "levier-extension-rendue",
+  ]) {
     const s = fixture({
       campaignMemory: { nightlyActivity: {}, waterWithdrawals: { b1: 1 } },
       campaignStations: { zones: [], bornes: [{ id: "b1", priseFortDebit: false }] },

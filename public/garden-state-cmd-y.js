@@ -26,6 +26,15 @@
    epic, once both are `fait` and proven useful in play — inventing a reveal now would not be
    reading the design, only guessing ahead of it.
 
+   Epic C6.28 adds that narrative accueil to convertZoneToLivingSpace's own success path (never to
+   extendZoneOverHabitat, same posture as C6.9's three levers — none of them reveal at activation,
+   only at reparation): gated on "archives-restaurees" (C6.7, same acte-VI sequencing anchor as the
+   other three levier-* reveals) and on the conversion actually succeeding. No separate usage
+   guard is needed beyond what this command already checks — a success here already requires
+   Memory.findActiveHabitatTransformation to find a still-open entry, which by construction can
+   only exist once extendZoneOverHabitat has really run (C6.26) — so "the lever really served" is
+   already proven by the command's own existing refusal, never a fact to re-derive.
+
    Epic C6.27 adds this lever's reparation: convertZoneToLivingSpace({zoneId, x, z}) is refused,
    without mutating anything, when zoneId doesn't resolve to a real zone, that zone's
    `extensionCommerciale` is already false (nothing to convert — same "a repeat/no-op is refused"
@@ -75,6 +84,10 @@
     typeof module !== "undefined"
       ? require("./game/campaign-house.js")
       : root.GardenCampaignHouse;
+  const Narrative =
+    typeof module !== "undefined"
+      ? require("./game/data-narrative.js")
+      : root.GardenNarrative;
   const util =
     typeof module !== "undefined"
       ? require("./garden-state-util.js")
@@ -140,6 +153,13 @@
         });
         Memory.markHabitatTransformationReturned(entry, s.campaignDay);
         st.message = "Zone reconvertie en espace de vie : un nouvel habitat a été aménagé.";
+        if (s.campaignFlags.includes("archives-restaurees")) {
+          const revealed = Narrative.pendingReveal(
+            s.campaignFlags,
+            "extensionConvertedToLivingSpace",
+          );
+          if (revealed) s.campaignFlags.push(revealed.id);
+        }
       }
       return null;
     },

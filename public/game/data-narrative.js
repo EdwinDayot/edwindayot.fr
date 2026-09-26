@@ -356,6 +356,26 @@
       title: "Une prise restituée",
       text: "La prise à fort débit est restituée. Le bassin commun cesse de baisser, sans remonter aussitôt.",
     },
+    // Epic C6.28 (design §11, tableau des trois leviers, troisième ligne "extension standardisée
+    // sur un espace vivant" ; réparation "déplacer des ateliers, conserver des passages..."). Révélée
+    // depuis garden-state-cmd-y.js's convertZoneToLivingSpace, même discipline que
+    // "levier-veilleuse-coupee"/"levier-prise-restituee" : gardée sur "archives-restaurees" et sur
+    // une conversion réellement réussie (jamais un appel refusé) — le refus déjà existant de C6.27
+    // sur toute zone jamais étendue commercialement suffit à garantir que le levier a réellement
+    // servi avant sa réparation, sans garde-fou d'usage séparé à inventer.
+    "levier-extension-rendue": {
+      id: "levier-extension-rendue",
+      trigger: "extensionConvertedToLivingSpace",
+      title: "Une extension rendue",
+      // Relecture adverse (design §11, "mémoire factuelle, sans score de vertu") : la première
+      // formulation ("l'habitat cédé retrouve sa place") surclamait le mécanisme réel — aucun
+      // habitat n'est restauré à son emplacement d'origine, un nouvel habitat de capacité
+      // équivalente est enregistré à une position choisie par le joueur (garden-state-cmd-y.js's
+      // convertZoneToLivingSpace, capacity: entry.capacity, x/z fournis par la commande). Corrigé
+      // pour ne constater que ce que le moteur fait réellement, sans inventer une restauration
+      // littérale du même lieu.
+      text: "L’extension commerciale s’efface : un nouvel espace de vie, de capacité équivalente à celle qui avait été cédée, est aménagé ; la zone perd la surface et les trajets qu’elle avait gagnés en échange.",
+    },
     // Epic C6.16 (design §10, chapitre 17 "Rendre le passage" ; §11, scène de référence "Rendre
     // le passage" : "Une Rainelle passe, s'assied et ne revient pas au poste. Le résultat de la
     // réparation n'appartient pas entièrement au joueur."). Révélée depuis les trois sites réels
