@@ -38,10 +38,21 @@
     typeof module !== "undefined"
       ? require("./game/campaign-house.js")
       : root.GardenCampaignHouse;
+  const Passage =
+    typeof module !== "undefined"
+      ? require("./game/campaign-passage.js")
+      : root.GardenCampaignPassage;
   const Memory =
     typeof module !== "undefined"
       ? require("./game/campaign-memory.js")
       : root.GardenCampaignMemory;
+  // Epic C6.18: read here only for ORIENTATIONS, to validate s.campaignEpilogue.orientation
+  // against the same three literal strings orientation(s)/openEpilogue actually produce, rather
+  // than duplicating them as a second literal list here.
+  const Epilogue =
+    typeof module !== "undefined"
+      ? require("./game/campaign-epilogue.js")
+      : root.GardenCampaignEpilogue;
   // Epic C1.5: read here to validate a pinned trait (AXES/founders), both on s.campaignPin
   // itself and on an optional pin attached to a pending campaignPot entry below.
   const Genetics =
@@ -371,6 +382,69 @@
         !count(s.campaignSeedBox.retrievals))
     )
       throw Error("Boîte de semences invalide.");
+    // Epic C6.12: blocked, same shape discipline as campaignSeedBox.seeded above. Epic C6.13 adds
+    // x/z, the passage's fixed point on the shared 0.5-unit navigation grid (campaign-passage.js's
+    // PASSAGE_POSITION) — same finite+grid-alignment check already applied to entities just above,
+    // never a semantic re-check of zone membership here: the point is fixed once and for all by
+    // fresh()/PASSAGE_POSITION, verified resolvable at that single source rather than on every load.
+    // x/z tolerate outright absence (a save made between C6.12 and C6.13 has campaignPassage but
+    // no position yet) the same way campaignHouse.furnitureMarks does above: only a *present but
+    // malformed* value throws, absence is migrated below instead.
+    if (
+      s.campaignPassage !== undefined &&
+      (typeof s.campaignPassage !== "object" ||
+        s.campaignPassage === null ||
+        typeof s.campaignPassage.blocked !== "boolean" ||
+        (s.campaignPassage.x !== undefined &&
+          (!Number.isFinite(s.campaignPassage.x) || (s.campaignPassage.x * 2) % 1)) ||
+        (s.campaignPassage.z !== undefined &&
+          (!Number.isFinite(s.campaignPassage.z) || (s.campaignPassage.z * 2) % 1)))
+    )
+      throw Error("Passage invalide.");
+    // Epic C6.18 (design §10, chapitre 18, second beat): unlocksOnDay/openedOnDay are day numbers
+    // (same >=1 discipline campaignDay itself is checked with, further below), orientation is null or exactly
+    // one of Epilogue.ORIENTATIONS's three values — never a fourth string a hand-edited or future
+    // save could otherwise smuggle in. orientation and openedOnDay are set together, exactly once,
+    // by openEpilogue (garden-state-cmd-x.js): never one real without the other. openedOnDay can
+    // never be set before unlocksOnDay is (Epilogue.canOpen's own gate; the command can never
+    // reach that state, but a hand-edited save could).
+    if (
+      s.campaignEpilogue !== undefined &&
+      (typeof s.campaignEpilogue !== "object" ||
+        s.campaignEpilogue === null ||
+        (s.campaignEpilogue.unlocksOnDay !== null &&
+          (!count(s.campaignEpilogue.unlocksOnDay) ||
+            s.campaignEpilogue.unlocksOnDay < 1)) ||
+        (s.campaignEpilogue.orientation !== null &&
+          !Object.values(Epilogue.ORIENTATIONS).includes(
+            s.campaignEpilogue.orientation,
+          )) ||
+        (s.campaignEpilogue.openedOnDay !== null &&
+          (!count(s.campaignEpilogue.openedOnDay) ||
+            s.campaignEpilogue.openedOnDay < 1)) ||
+        (s.campaignEpilogue.orientation === null) !==
+          (s.campaignEpilogue.openedOnDay === null) ||
+        (s.campaignEpilogue.openedOnDay !== null &&
+          s.campaignEpilogue.unlocksOnDay === null) ||
+        // Epic C6.20: gift is null or an object naming a real founding species (botany-genetics.js's
+        // founders, never a fictional id) and a real visitor (data.js's buildings, never an invented
+        // name) — same "read against the real catalogue rather than duplicate a literal list"
+        // posture already applied to orientation against Epilogue.ORIENTATIONS above. gift can never
+        // be real before openedOnDay is (frozen on the same success path, garden-state-cmd-x.js).
+        (s.campaignEpilogue.gift !== undefined &&
+          s.campaignEpilogue.gift !== null &&
+          (typeof s.campaignEpilogue.gift !== "object" ||
+            !Genetics.founders.some(
+              (f) => f.id === s.campaignEpilogue.gift.speciesId,
+            ) ||
+            !D.buildings.some(
+              (b) => b.visitorId === s.campaignEpilogue.gift.giverId,
+            ))) ||
+        (s.campaignEpilogue.gift !== undefined &&
+          s.campaignEpilogue.gift !== null &&
+          s.campaignEpilogue.openedOnDay === null))
+    )
+      throw Error("Épilogue de campagne invalide.");
     if (
       s.specimens !== undefined &&
       (!Array.isArray(s.specimens) ||
@@ -399,6 +473,35 @@
         Math.max(...s.specimens.map((sp) => Number(sp.id.slice(2))))
     )
       throw Error("Identifiants de spécimen invalides.");
+    // Epic C6.4: a contract's id must be unique, its cultivarId must resolve to a real cultivar
+    // (same discipline as a specimen's own cultivarId just above), and quota/pricePerUnit must be
+    // the same positive-integer shape garden-state-cmd-r.js's signContract already enforces at
+    // creation — validate() re-checks it rather than trusting a hand-edited save.
+    if (
+      s.campaignContracts !== undefined &&
+      (!Array.isArray(s.campaignContracts) ||
+        new Set(s.campaignContracts.map((ct) => ct?.id)).size !==
+          s.campaignContracts.length ||
+        s.campaignContracts.some(
+          (ct) =>
+            !ct ||
+            !/^ct\d+$/.test(ct.id) ||
+            !s.cultivars?.some((c) => c.id === ct.cultivarId) ||
+            !count(ct.quota) ||
+            ct.quota < 1 ||
+            !count(ct.pricePerUnit) ||
+            ct.pricePerUnit < 1,
+        ))
+    )
+      throw Error("Contrat commercial invalide.");
+    if (s.contractNextId !== undefined && !count(s.contractNextId))
+      throw Error("Contrat commercial invalide.");
+    if (
+      s.campaignContracts?.length &&
+      s.contractNextId <=
+        Math.max(...s.campaignContracts.map((ct) => Number(ct.id.slice(2))))
+    )
+      throw Error("Identifiants de contrat invalides.");
     if (
       s.campaignDay !== undefined &&
       (!count(s.campaignDay) || s.campaignDay < 1)
@@ -450,7 +553,10 @@
             // must be a boolean when present — see rainelles.js's createRainelle comment.
             (r.founder !== undefined && typeof r.founder !== "boolean") ||
             // Epic C5.10: x/z are optional (see badRainellePosition's own comment).
-            badRainellePosition(r.x, r.z),
+            badRainellePosition(r.x, r.z) ||
+            // Epic C6.15: settledAt is optional (a pre-epic save has none yet, migrated below)
+            // but must be a boolean when present — see rainelles.js's createRainelle comment.
+            (r.settledAt !== undefined && typeof r.settledAt !== "boolean"),
         ))
     )
       throw Error("Rainelle invalide.");
@@ -461,6 +567,15 @@
     if (
       s.rainelles?.length &&
       s.rainelles.filter((r) => r.founder === true).length > 1
+    )
+      throw Error("Rainelle invalide.");
+    // Epic C6.15 (design §10, chapitre 17, sixième temps) : at most one Rainelle can ever be
+    // settled at the passage, same invariant discipline as founder just above — never a save with
+    // two, whether hand-edited or from a future bug, since selectRainelleToSettle itself refuses
+    // to return a candidate once any Rainelle already carries the mark.
+    if (
+      s.rainelles?.length &&
+      s.rainelles.filter((r) => r.settledAt === true).length > 1
     )
       throw Error("Rainelle invalide.");
     if (s.rainelleNextId !== undefined && !count(s.rainelleNextId))
@@ -618,6 +733,18 @@
           list.some((st) => st.veilleuse !== undefined && typeof st.veilleuse !== "boolean")
         )
           throw Error("Registre de stations invalide.");
+        // Epic C6.26: extensionCommerciale is optional so a pre-epic zone still loads (defaulted
+        // to false below, same posture as veilleuse just above); when present, it must be a real
+        // boolean, never a truthy stand-in.
+        if (
+          kind === "zone" &&
+          list.some(
+            (st) =>
+              st.extensionCommerciale !== undefined &&
+              typeof st.extensionCommerciale !== "boolean",
+          )
+        )
+          throw Error("Registre de stations invalide.");
         // Epic C5.4: priseFortDebit is optional so a pre-epic borne still loads (defaulted to
         // false below, same posture as a zone's veilleuse at C5.2); when present, it must be a
         // real boolean, never a truthy stand-in.
@@ -687,10 +814,12 @@
     // Epic C5.1/C5.2/C5.3: campaignMemory is a bounded journal (campaign-memory.js), never an
     // arbitrary object — rest/firstGesture/nightlyActivity/overexertion only ever key an id that
     // actually resolves to a real s.rainelles entry (never a stale/hand-edited reference), births
-    // is a flat unique list of such ids, manualInterventions a bare count, and the four still-
-    // reserved fields (no epic writes real values into them yet, see campaign-memory.js's own
-    // header comment) are only type-checked against their fresh() shape so a future epic's first
-    // real write still loads.
+    // is a flat unique list of such ids, manualInterventions a bare count. waterWithdrawals/
+    // contractsFed/habitatTransformations were reserved the same way but are now real, written
+    // fields (C5.4/C6.4/C6.26 respectively, each validated against its own real shape below);
+    // unsoldStock alone is still only type-checked against its fresh() shape (no epic writes real
+    // values into it, see campaign-memory.js's own header comment for why) so a future epic's
+    // first real write still loads.
     if (s.campaignMemory !== undefined) {
       const M = s.campaignMemory;
       const rainelleIds = new Set((s.rainelles || []).map((r) => r?.id));
@@ -699,6 +828,23 @@
       // against campaignStations.bornes instead of s.rainelles.
       const borneIds = new Set(
         (s.campaignStations?.bornes || []).map((b) => b?.id),
+      );
+      // Epic C6.26: habitatTransformations' zoneId must resolve to a real registered zone (the
+      // zone itself is never removed by extendZoneOverHabitat, only flagged) — same "must resolve
+      // to a real registered entry" discipline as waterWithdrawals' borneIds above. habitatId, in
+      // contrast, is deliberately never checked against a live registry: the whole point of this
+      // entry is that the habitat it names has already been removed (Stations.removeHabitat) by
+      // the time it is recorded, so it can never resolve to anything current — only its type
+      // (a non-empty string) is checked below.
+      const zoneIds = new Set(
+        (s.campaignStations?.zones || []).map((z) => z?.id),
+      );
+      // Epic C6.4: contractsFed is keyed by contract id, not Rainelle/borne id — same "must
+      // resolve to a real registered entry" discipline as waterWithdrawals above, plus its value
+      // can never exceed the contract's own fixed quota (garden-state-cmd-r.js's deliverContract
+      // never records more than that, via campaign-contracts.js's deliverableCount).
+      const contractsById = new Map(
+        (s.campaignContracts || []).map((ct) => [ct?.id, ct]),
       );
       if (
         typeof M !== "object" ||
@@ -741,11 +887,49 @@
         Object.entries(M.waterWithdrawals).some(
           ([id, n]) => !borneIds.has(id) || !count(n),
         ) ||
+        // Epic C6.26: habitatTransformations now holds real entries — each one the record of a
+        // successful extendZoneOverHabitat (garden-state-cmd-y.js). zoneId must resolve to a real,
+        // still-registered zone (see zoneIds above); habitatId is only type-checked (a non-empty
+        // string, deliberately never resolved — see the comment on zoneIds above for why);
+        // capacity must be finite and at least MIN_HABITAT_CAPACITY (it is a real habitat's own
+        // former capacity, which could never have been registered below that floor, C3.3); day
+        // must be a valid campaignDay count. Entries from before this epic simply don't exist (the
+        // field has been an empty array since C5.1), so no optional/undefined branch is needed
+        // here, unlike overexertion/persistentGestureIds above.
+        // Epic C6.27: returnedDay is optional per entry (undefined = still active, the only shape
+        // C6.26 alone could ever produce) — when present, only a valid campaignDay count is
+        // checked, same "type only, never re-derived" posture as day itself; which entry is
+        // "the" active one for a zone is campaign-memory.js's own
+        // findActiveHabitatTransformation's concern, not this validator's.
         !Array.isArray(M.habitatTransformations) ||
+        M.habitatTransformations.some(
+          (h) =>
+            typeof h !== "object" ||
+            h === null ||
+            !zoneIds.has(h.zoneId) ||
+            typeof h.habitatId !== "string" ||
+            !h.habitatId ||
+            !finite(h.capacity, Stations.MIN_HABITAT_CAPACITY, Infinity) ||
+            !count(h.day) ||
+            (h.returnedDay !== undefined && !count(h.returnedDay)),
+        ) ||
         typeof M.unsoldStock !== "object" ||
         M.unsoldStock === null ||
-        typeof M.contractsFed !== "object" ||
-        M.contractsFed === null ||
+        // Epic C6.4: contractsFed is now a real, written field, but stays optional here exactly
+        // like overexertion/persistentGestureIds above — reserved with an empty default since
+        // C5.1, so a save can validly carry a campaignMemory that predates this epic's own
+        // migration fill-in. When present: keyed against real contract ids, and additionally
+        // never exceeding the id's own fixed quota (see contractsById just above), same
+        // discipline as waterWithdrawals.
+        (M.contractsFed !== undefined &&
+          (typeof M.contractsFed !== "object" ||
+            M.contractsFed === null ||
+            Object.entries(M.contractsFed).some(
+              ([id, n]) =>
+                !contractsById.has(id) ||
+                !count(n) ||
+                n > contractsById.get(id).quota,
+            ))) ||
         // Epic C5.7: persistentGestureIds is optional here, same reasoning as overexertion above
         // (a save from between C5.1/C5.6 and C5.7 already has campaignMemory but never this
         // field) — the post-clone migration below fills it in. When present, same "flat, unique,
@@ -796,12 +980,15 @@
     // Epic C5.10: x/z migrate per rainelle to `null` (no position yet), same reasoning as job/
     // bourgeon just above — a pre-epic rainelle only lacks these two fields, never guessed from
     // a habitat/spawn coordinate here (that real assignment is C5.11's own job).
+    // Epic C6.15: settledAt migrates per rainelle to `false` (never settled), same reasoning as
+    // x/z just above — a pre-epic rainelle only lacks this one field, never guessed true.
     result.rainelles = (result.rainelles ?? []).map((r, i) => ({
       job: null,
       bourgeon: null,
       founder: i === 0,
       x: null,
       z: null,
+      settledAt: false,
       ...r,
     }));
     result.rainelleNextId ??= 1;
@@ -839,8 +1026,10 @@
     );
     // Epic C5.2: veilleuse migrates per zone, same reasoning as a panier's buffer/capacity/min
     // just above — a pre-epic zone only lacks this one field, defaulted off (no free night work).
+    // Epic C6.26: extensionCommerciale migrates per zone, same reasoning as veilleuse just above —
+    // a pre-epic zone only lacks this one field, defaulted off (no free habitat preemption).
     result.campaignStations.zones = (result.campaignStations.zones ?? []).map(
-      (z) => ({ veilleuse: false, ...z }),
+      (z) => ({ veilleuse: false, extensionCommerciale: false, ...z }),
     );
     // Epic C5.4: priseFortDebit migrates per borne, same reasoning as a zone's veilleuse just
     // above — a pre-epic borne only lacks this one field, defaulted off (no free flow boost).
@@ -867,6 +1056,35 @@
     // (created between C5.1/C5.6 and C5.7) migrates to an empty list — never guessed from
     // overexertion history that never recorded which Rainelle was actually caught persisting.
     result.campaignMemory.persistentGestureIds ??= [];
+    // Epic C6.4: a save with an existing campaignMemory but no contractsFed field yet (created
+    // before this epic) migrates to an empty map — never guessed from a delivery that was never
+    // recorded. campaignContracts/contractNextId migrate the same "simply absent before this
+    // epic" way as specimens/cultivars did at their own introduction.
+    result.campaignMemory.contractsFed ??= {};
+    result.campaignContracts ??= [];
+    result.contractNextId ??= 1;
+    // Epic C6.12: a pre-epic save simply has no passage state yet — defaults blocked, same
+    // "simply absent before this epic" posture as campaignContracts/contractNextId just above.
+    result.campaignPassage ??= { blocked: true };
+    // Epic C6.13: a save created between C6.12 and C6.13 has campaignPassage but no x/z yet —
+    // same two-level "field added to an existing object" migration as campaignHouse.furnitureMarks
+    // above, defaulted to the one real position (PASSAGE_POSITION) rather than a placeholder,
+    // since there has only ever been one passage position, never a per-save random draw.
+    result.campaignPassage.x ??= Passage.PASSAGE_POSITION.x;
+    result.campaignPassage.z ??= Passage.PASSAGE_POSITION.z;
+    // Epic C6.18: a pre-epic save simply has no epilogue state yet — nothing has settled, nothing
+    // can be open, same "simply absent before this epic" posture as campaignPassage/campaignContracts
+    // above.
+    result.campaignEpilogue ??= {
+      unlocksOnDay: null,
+      orientation: null,
+      openedOnDay: null,
+    };
+    // Epic C6.20: a save from between C6.18 and C6.20 already has campaignEpilogue but no gift
+    // yet — same two-level "field added to an existing object" migration as campaignPassage.x/z
+    // above, defaulted to null (nothing offered before this epic existed, exactly like a fresh
+    // save's own default), never guessed as already-open.
+    result.campaignEpilogue.gift ??= null;
     return result;
   }
   if (typeof module !== "undefined") module.exports = { validate };

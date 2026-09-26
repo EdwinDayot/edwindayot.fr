@@ -10,7 +10,15 @@
    push here" split as every other narrative trigger in -f.js/-i.js/-n.js. Mutating
    s.campaignFlags on a failed command is deliberate: the refusal itself *is* the in-fiction
    beat the design names ("montrée dès les premières tentatives"), not a side effect of a
-   successful teach. */
+   successful teach.
+
+   Epic C6.6 (design §10, chapitre 13 "Le premier non"): the same MULTIPLY_REFUSAL, once a
+   "variete-suivante-*" flag (C6.5) already exists and the Rainelle refused actually carries a
+   bourgeon (rainelle.bourgeon === true), also fires a second, distinct one-time reveal
+   ("premier-non-signe"/"premier-non-interrogation", data-narrative.js) — the design's own
+   "c'est le mouvement déjà vu lors de son refus d'automultiplication", revisited later in the
+   campaign rather than a new gesture. See garden-state-cmd-k.js's demonstrateGesture for the
+   other entry point that can produce this same refusal. */
 (function (root) {
   const Rainelles =
     typeof module !== "undefined"
@@ -42,6 +50,15 @@
               "firstMultiplyRefusalSeen",
             );
             if (revealed) s.campaignFlags.push(revealed.id);
+            const signal = Narrative.chapter13Signal(
+              s.campaignFlags,
+              rainelle,
+              s.campaignMemory,
+            );
+            if (signal) {
+              const premierNon = Narrative.pendingReveal(s.campaignFlags, signal);
+              if (premierNon) s.campaignFlags.push(premierNon.id);
+            }
           }
           return fail(r.error);
         }

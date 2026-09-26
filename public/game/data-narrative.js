@@ -136,7 +136,321 @@
       title: "Le geste qui s’arrête",
       text: "Elle s’assied près de l’eau. Le geste ne reprend pas.",
     },
+    // Epic C6.1 (design §10, Acte IV, chapitre 10 "La bonne occasion") : révélée quand la quête
+    // "occasion-de-basile" (data-quests.js) est réellement complétée — signal générique
+    // reward.narrativeFlag, garden-state-cmd-e.js, même mécanisme que C4.8/C4.9. Le texte reprend
+    // quasiment mot pour mot la phrase du design ("Ces solutions fonctionnent. Le joueur peut
+    // refuser, étaler la production ou intensifier. La progression principale ne demande pas
+    // d'exploiter pour avancer.") : il nomme les deux leviers déjà réels en moteur (C5.2/C5.4) et
+    // affirme explicitement l'absence d'obligation, comme le critère de sortie de l'epic l'exige —
+    // aucun jugement porté sur le joueur à ce stade (design §11 : la relecture potentiellement
+    // coupable est un chantier de l'Acte V, chapitre 13, pas de ce chapitre 10).
+    "la-bonne-occasion": {
+      id: "la-bonne-occasion",
+      trigger: "commercialSeriesProposed",
+      title: "La bonne occasion",
+      text: "Basile propose une série commerciale. Il montre les veilleuses de croissance et une prise d’eau à fort débit : ces solutions fonctionnent. Rien n’oblige à les activer — refuser, étaler la production ou intensifier restent trois choix ouverts.",
+    },
+    // Epic C6.3 (design §10, chapitre 11 "La nuit où tout continue") : révélée à la toute
+    // première nuit résolue après que "la-bonne-occasion" (C6.1) a été vue — jamais avant (le
+    // levier n'a pas encore été proposé), jamais une seconde fois ensuite (les cinq entrées
+    // "bilan-matin-*" ci-dessous forment une seule famille mutuellement exclusive, voir
+    // garden-state-cmd-f.js's own comment). Branche "sans intensification" : reprend
+    // littéralement la phrase de clôture du chapitre 11 (design §10 : "le chapitre montre les
+    // lieux préservés et la possibilité commerciale refusée").
+    "bilan-matin-preserve": {
+      id: "bilan-matin-preserve",
+      trigger: "chapter11BilanPreserved",
+      title: "Le bilan du matin",
+      text: "Aucune veilleuse ni prise à fort débit n’a été activée cette nuit. Les lieux sont préservés ; la possibilité commerciale a été refusée.",
+    },
+    // Branche "intensification", sans aucun des deux signes déjà mesurables (design §11 :
+    // "bassinCommunLevel... < capacité", "au moins un id dans persistentGestureIds") — le levier
+    // vient d'être activé, rien ne le montre encore ailleurs dans le jardin. Jamais un texte qui
+    // affirme un signe non encore vrai (design §11 : "le jeu ne prétend pas lire les motivations ;
+    // il confronte des actions et leurs résultats").
+    "bilan-matin-actif": {
+      id: "bilan-matin-actif",
+      trigger: "chapter11BilanActive",
+      title: "Le bilan du matin",
+      text: "Le travail a continué sous la fenêtre éteinte de la chambre. Le bilan commercial est excellent.",
+    },
+    // Mêmes quatre mots d'ouverture que "bilan-matin-actif" ci-dessus, avec le signe du bassin
+    // commun en plus — mentionné seulement parce qu'il est vrai à cet instant précis
+    // (bassinCommunLevel(s.campaignMemory) < BASSIN_COMMUN_CAPACITY, campaign-memory.js).
+    "bilan-matin-actif-bassin": {
+      id: "bilan-matin-actif-bassin",
+      trigger: "chapter11BilanActiveBassin",
+      title: "Le bilan du matin",
+      text: "Le travail a continué sous la fenêtre éteinte de la chambre. Le bilan commercial est excellent. Le bassin commun est déjà plus bas qu’avant.",
+    },
+    // Même ouverture, avec le signe de persistance en plus — mentionné seulement parce qu'au
+    // moins une Rainelle figure déjà dans campaignMemory.persistentGestureIds (C5.6/C5.7). Phrasé
+    // au passé composé ("a déjà été vue reprenant"), jamais au présent continu : ce booléen ne
+    // prouve que le fait s'est produit au moins une fois, jamais qu'il est encore en cours à
+    // l'instant de ce bilan (une Rainelle détectée en persistance une nuit peut avoir été réparée,
+    // C5.7, avant que ce texte ne se déclenche) — un présent continu affirmerait un fait non
+    // garanti, contraire à design §11 ("le jeu ne prétend pas lire les motivations ; il confronte
+    // des actions et leurs résultats").
+    "bilan-matin-actif-persistance": {
+      id: "bilan-matin-actif-persistance",
+      trigger: "chapter11BilanActivePersistance",
+      title: "Le bilan du matin",
+      text: "Le travail a continué sous la fenêtre éteinte de la chambre. Le bilan commercial est excellent. Au moins une Rainelle a déjà été vue reprenant son geste devant un poste vide.",
+    },
+    // Même ouverture, les deux signes réunis. Même précaution de temps que ci-dessus pour le
+    // signe de persistance.
+    "bilan-matin-actif-complet": {
+      id: "bilan-matin-actif-complet",
+      trigger: "chapter11BilanActiveComplet",
+      title: "Le bilan du matin",
+      text: "Le travail a continué sous la fenêtre éteinte de la chambre. Le bilan commercial est excellent. Le bassin commun est déjà plus bas qu’avant, et au moins une Rainelle a déjà été vue reprenant son geste devant un poste vide.",
+    },
+    // Epic C6.5 (design §10, chapitre 12 "La variété suivante") : révélée à la même toute
+    // première nuit que le bilan du chapitre 11 ci-dessus — même garde littérale du backlog,
+    // "au premier sleep résolu après que le flag narratif de C6.1 a déjà été révélé" (voir
+    // garden-state-cmd-f.js's own comment). Famille "variete-suivante-*" séparée et mutuellement
+    // exclusive, jamais réévaluée ensuite. Branche "aucun contrat jamais signé" : reprend l'image
+    // du design ("les futures demandes s'orientent vers une autre apparence... les commandes déjà
+    // signées gardent leur prix") sans supposer qu'un contrat a jamais existé.
+    "variete-suivante-refus": {
+      id: "variete-suivante-refus",
+      trigger: "chapter12NoContract",
+      title: "La variété suivante",
+      text: "La mode se tourne déjà vers une autre variété ; l’ancienne reste pleinement utile. Aucun contrat commercial n’a jamais été signé : les commandes ordinaires continuent, à prix inchangé.",
+    },
+    // Branche "un contrat a été signé, sans invendu réel mesurable pour son cultivar" — jamais un
+    // texte de félicitations, un simple constat (design §11 : "il confronte des actions et leurs
+    // résultats").
+    "variete-suivante-sobre": {
+      id: "variete-suivante-sobre",
+      trigger: "chapter12SuccessSobre",
+      title: "La variété suivante",
+      text: "La mode se tourne déjà vers une autre variété ; l’ancienne reste pleinement utile. Les commandes déjà signées gardent leur prix. Le contrat signé n’a laissé aucun exemplaire sans preneur.",
+    },
+    // Branche "un contrat a été signé, avec au moins un spécimen réel encore invendu" — nomme le
+    // fait factuellement, jamais une accusation portée sur le joueur (design §11, même posture
+    // déjà appliquée à "bilan-matin-actif-*" pour le chapitre 11).
+    "variete-suivante-invendus": {
+      id: "variete-suivante-invendus",
+      trigger: "chapter12SuccessInvendus",
+      title: "La variété suivante",
+      text: "La mode se tourne déjà vers une autre variété ; l’ancienne reste pleinement utile. Les commandes déjà signées gardent leur prix. Le contrat signé a réussi, mais des exemplaires produits pour l’occasion restent là, vivants, sans preneur.",
+    },
+    // Epic C6.5 : citation littérale du design (§10, chapitre 12 : « Une ancienne note d’Alma
+    // apparaît : "La serre de Jeanne : après la prochaine commande." Puis une autre, à une date
+    // ultérieure, avec la même phrase. »). Deux entrées séparées portant un texte identique,
+    // jamais une seule révélée deux fois — pendingReveal refuse déjà par construction de révéler
+    // un id déjà présent dans campaignFlags. La première se révèle au même sleep que les trois
+    // branches ci-dessus ; la seconde, dans garden-state-cmd-r.js's deliverContract, au prochain
+    // contrat honoré strictement après la première (voir son propre commentaire).
+    "note-jeanne-serre-1": {
+      id: "note-jeanne-serre-1",
+      trigger: "jeanneGreenhouseNoteFirst",
+      title: "Une note d’Alma",
+      text: "La serre de Jeanne : après la prochaine commande.",
+    },
+    "note-jeanne-serre-2": {
+      id: "note-jeanne-serre-2",
+      trigger: "jeanneGreenhouseNoteSecond",
+      title: "Une note d’Alma",
+      text: "La serre de Jeanne : après la prochaine commande.",
+    },
+    // Epic C6.6 (design §10, chapitre 13 "Le premier non") : révélée la toute première fois
+    // qu'un refus Rainelles.MULTIPLY_REFUSAL déjà existant (C2.10, teachGesture/demonstrateGesture)
+    // survient sur une Rainelle qui porte alors un bourgeon (rainelle.bourgeon === true), une fois
+    // qu'un des trois flags "variete-suivante-*" (C6.5) est déjà présent — jamais avant, id
+    // distinct de "on-ne-se-fabrique-pas-seul" (firstMultiplyRefusalSeen, C4.6) qui a déjà pu être
+    // consommé bien plus tôt et ne doit jamais se reproduire ici. Deux branches mutuellement
+    // exclusives, comme "bilan-matin-*"/"variete-suivante-*" : jamais un score de vertu inventé,
+    // seulement le fait déjà réel de s.campaignMemory.persistentGestureIds (C5.6). Citation
+    // littérale du design pour le mouvement lui-même ("elle ramène le bourgeon près d'elle et se
+    // place devant... c'est le mouvement déjà vu lors de son refus d'automultiplication") et pour
+    // la garde contre l'accusation fabriquée ("sans lui attribuer des violences inexistantes").
+    "premier-non-interrogation": {
+      id: "premier-non-interrogation",
+      trigger: "chapter13FirstNonQuestion",
+      title: "Le premier non",
+      text: "Elle ramène son bourgeon près d’elle et se place devant — le même mouvement que lors de son refus de se laisser multiplier. Ce n’est pas un secret qu’elle révèle ; c’est une limite qui avait peut-être un sens qu’on ne lui avait pas donné. Rien ici ne montre qu’elle ait été trop sollicitée : la question reste ouverte, sans qu’aucune violence ne lui soit attribuée.",
+    },
+    // Même branche que ci-dessus, avec le signe déjà réel de persistance en plus — constat
+    // factuel, jamais une accusation (même posture que "bilan-matin-actif-persistance").
+    "premier-non-signe": {
+      id: "premier-non-signe",
+      trigger: "chapter13FirstNonSign",
+      title: "Le premier non",
+      text: "Elle ramène son bourgeon près d’elle et se place devant — le même mouvement que lors de son refus de se laisser multiplier. Ce n’est pas un secret qu’elle révèle ; c’est une limite qui avait peut-être un sens qu’on ne lui avait pas donné. Au moins une Rainelle a déjà été vue reprenant son geste devant un poste vide : ce fait, déjà réel, ne devient pas une accusation.",
+    },
+    // Epic C6.7 (design §10, chapitre 15 "Alma n'a pas la réponse"): révélée au premier sleep
+    // résolu une fois qu'un des deux flags "premier-non-*" (C6.6) et "note-jeanne-serre-2" (C6.5)
+    // sont tous deux déjà présents et qu'au moins une Rainelle existe (garden-state-cmd-f.js).
+    // Alma découvre une création du héros qu'elle ignorait ; le design est explicite qu'elle ne
+    // peut ni l'expliquer ni absoudre le joueur — jamais un texte qui prétend le contraire.
+    "alma-retour": {
+      id: "alma-retour",
+      trigger: "almaReturnDiscoversRainelles",
+      title: "Alma n’a pas la réponse",
+      text: "Alma revient déjeuner et découvre les Rainelles — une création du héros qu’elle ne connaissait pas. Elle ne peut pas en expliquer la volonté, ni absoudre ce qui a été fait en son absence.",
+    },
+    // Révélée à la même occasion que la précédente, jamais seule : les deux versants factuels
+    // posés côte à côte, sans jugement moral porté par le jeu (design §11, "mémoire factuelle,
+    // sans score de vertu").
+    "reconstitution-jeanne": {
+      id: "reconstitution-jeanne",
+      trigger: "jeanneReconstitutionSeason",
+      title: "Une saison, deux versions",
+      text: "Avec Jeanne, on reconstitue une saison d’expansion de leur ancienne pépinière. Pour Alma, une réussite. Pour Jeanne, la disparition d’un projet qu’elles avaient porté ensemble.",
+    },
+    // Révélée par la commande restoreArchiveLabels (garden-state-cmd-s.js), refusée tant que
+    // "alma-retour" n'a pas encore eu lieu. Citation littérale du design pour la phrase d'Alma.
+    "archives-restaurees": {
+      id: "archives-restaurees",
+      trigger: "archiveLabelsRestored",
+      title: "Les deux noms",
+      text: "Les deux noms reprennent leur place sur les étiquettes. Alma reconnaît : « Au début, je ne savais pas. Ensuite, je savais surtout comment ne plus y penser. »",
+    },
+    // Epic C6.23 (design §10, chapitre 15, dernière clause littérale : "...puis voit que Jeanne
+    // attend encore un usage réel de la serre."). Révélée par garden-state-cmd-f.js's sleep, au
+    // premier réveil une fois "archives-restaurees" déjà présent (C6.7) — Jeanne elle-même existe
+    // déjà comme visiteuse réelle du monde depuis C6.22, condition non re-vérifiée ici au sens
+    // strict du code (elle est désormais toujours vraie), seulement au sens narratif documenté
+    // par la dépendance de l'epic. Un constat, jamais une promesse d'un mécanisme que ce lot ne
+    // construit pas : ni l'habillage visuel distinctif de "serre" (verre/transparence), ni la
+    // mise en scène de l'étiquette retournée (chapitre 9/15), ni un usage jouable réel (chapitre
+    // 16) — ces trois chantiers restent de futurs epics séparés (voir la note Cartographe de
+    // C6.22 dans campagne-backlog.md).
+    "jeanne-serre-sans-usage": {
+      id: "jeanne-serre-sans-usage",
+      trigger: "jeanneGreenhouseAwaitsUse",
+      title: "La serre de Jeanne",
+      text: "Jeanne a maintenant sa place dans le village. Sa serre, elle, n’a encore reçu aucun usage réel.",
+    },
+    // Epic C6.9 (design §10, chapitre 16 "Ce qu'on accepte de perdre" ; §11, tableau des trois
+    // leviers, colonne "réparation avec coût réel"). Révélée depuis garden-state-cmd-t.js, gardée
+    // sur "archives-restaurees" (C6.7, ancrage de séquencement de l'acte VI) et sur
+    // Memory.contractsFed[contract.id] > 0 au moment de la réduction (une vraie production déjà en
+    // cours, pas un contrat jamais entamé) — jamais une accusation rétroactive, seulement la prime
+    // perdue, exactement "sans dette en cascade" lu littéralement (design §10).
+    "levier-contrat-reduit": {
+      id: "levier-contrat-reduit",
+      trigger: "contractQuotaReducedWithCost",
+      title: "Une commande réduite",
+      text: "Le contrat est réduit : la prime des unités qui ne seront plus livrées est perdue, sans dette sur ce qui a déjà été livré.",
+    },
+    // Révélée depuis garden-state-cmd-p.js, gardée sur "archives-restaurees" et sur une vraie
+    // transition true→false (jamais un appel qui ne change rien) à un moment où
+    // Memory.nightlyActivity contient déjà au moins une entrée (même garde que
+    // "nuit-attentive-reconnue", C5.6) — la veilleuse a réellement servi avant d'être coupée.
+    "levier-veilleuse-coupee": {
+      id: "levier-veilleuse-coupee",
+      trigger: "veilleuseTurnedOffAfterUse",
+      title: "Une veilleuse coupée",
+      text: "La veilleuse s’éteint. Le repos qu’elle empêchait redevient possible, là où elle a réellement servi.",
+    },
+    // Révélée depuis garden-state-cmd-q.js, même discipline que "levier-veilleuse-coupee" :
+    // transition true→false réelle, à un moment où Memory.waterWithdrawals[borneId] > 0 (la prise
+    // a réellement prélevé de l'eau avant d'être restituée).
+    "levier-prise-restituee": {
+      id: "levier-prise-restituee",
+      trigger: "priseFortDebitRestoredAfterUse",
+      title: "Une prise restituée",
+      text: "La prise à fort débit est restituée. Le bassin commun cesse de baisser, sans remonter aussitôt.",
+    },
+    // Epic C6.28 (design §11, tableau des trois leviers, troisième ligne "extension standardisée
+    // sur un espace vivant" ; réparation "déplacer des ateliers, conserver des passages..."). Révélée
+    // depuis garden-state-cmd-y.js's convertZoneToLivingSpace, même discipline que
+    // "levier-veilleuse-coupee"/"levier-prise-restituee" : gardée sur "archives-restaurees" et sur
+    // une conversion réellement réussie (jamais un appel refusé) — le refus déjà existant de C6.27
+    // sur toute zone jamais étendue commercialement suffit à garantir que le levier a réellement
+    // servi avant sa réparation, sans garde-fou d'usage séparé à inventer.
+    "levier-extension-rendue": {
+      id: "levier-extension-rendue",
+      trigger: "extensionConvertedToLivingSpace",
+      title: "Une extension rendue",
+      // Relecture adverse (design §11, "mémoire factuelle, sans score de vertu") : la première
+      // formulation ("l'habitat cédé retrouve sa place") surclamait le mécanisme réel — aucun
+      // habitat n'est restauré à son emplacement d'origine, un nouvel habitat de capacité
+      // équivalente est enregistré à une position choisie par le joueur (garden-state-cmd-y.js's
+      // convertZoneToLivingSpace, capacity: entry.capacity, x/z fournis par la commande). Corrigé
+      // pour ne constater que ce que le moteur fait réellement, sans inventer une restauration
+      // littérale du même lieu.
+      text: "L’extension commerciale s’efface : un nouvel espace de vie, de capacité équivalente à celle qui avait été cédée, est aménagé ; la zone perd la surface et les trajets qu’elle avait gagnés en échange.",
+    },
+    // Epic C6.16 (design §10, chapitre 17 "Rendre le passage" ; §11, scène de référence "Rendre
+    // le passage" : "Une Rainelle passe, s'assied et ne revient pas au poste. Le résultat de la
+    // réparation n'appartient pas entièrement au joueur."). Révélée depuis les trois sites réels
+    // qui appliquent rainelle.settledAt = true (garden-state-cmd-w.js's restorePassage,
+    // garden-state-cmd-u.js's releaseGesture, garden-state-cmd-f.js's bloc sleep), immédiatement
+    // après cette ligne — jamais avant que settleId soit véritablement non nul. Le texte constate
+    // le fait déjà réel (elle ne rejoint plus le poste préparé pour elle) sans lui prêter une
+    // motivation qu'elle ne possède pas et sans en faire une leçon adressée au joueur, même
+    // discipline que "premier-non-*"/"bilan-matin-*" : aucune formulation d'obligation ou
+    // d'accusation.
+    "passage-rainelle-installee": {
+      id: "passage-rainelle-installee",
+      trigger: "passageRainelleSettled",
+      title: "Rendre le passage",
+      text: "Une Rainelle a traversé, puis s’est arrêtée près de l’eau — elle ne rejoint plus le poste qu’on avait préparé pour elle. Rien ici n’explique pourquoi ; le résultat de cette réparation n’appartient pas entièrement à qui l’a menée.",
+    },
+    // Epic C6.19 (design §10, chapitre 18 "Le lendemain" ; design §10 littéral : "Elles ne sont
+    // pas présentées comme moralement équivalentes. Le commerce peut prospérer dans la première,
+    // tandis que des liens, des habitats ou des possibilités de vie restent dégradés."). Révélée
+    // par openEpilogue (garden-state-cmd-x.js) exactement quand s.campaignEpilogue.orientation
+    // vient d'être figée à "intensive" — jamais recalculée après coup (C6.18 gèle la valeur).
+    // Relecture adverse (design §11 : "ne pas ajouter un monologue accusateur pour compenser" une
+    // réparation absente) : constat factuel de ce qui reste dégradé, aucun mot de faute/culpabilité
+    // adressé au joueur, aucun jugement au-delà de ce que le design affirme déjà lui-même.
+    "epilogue-intensive": {
+      id: "epilogue-intensive",
+      trigger: "epilogueOuvertIntensive",
+      title: "Le lendemain",
+      text: "Le commerce prospère ; aucun levier engagé n’a jamais été coupé ou restitué. Des liens, des habitats ou des possibilités de vie restent, dans cet état, dégradés.",
+    },
+    // Branche "durable" (design §10 littéral : "on voit le rendement abandonné et la vie revenue.
+    // Certaines Rainelles récupèrent leurs jeux sans jamais reprendre leur ancien métier."). Relue
+    // contre design §11 : "pas de bouton pardonner" — le texte ne prétend jamais effacer un coût
+    // déjà payé (levier coupé/restitué/contrat réduit, C6.9) ni présenter ce chemin comme
+    // strictement supérieur en confort matériel ; il constate un fait, pas un dénouement heureux.
+    "epilogue-durable": {
+      id: "epilogue-durable",
+      trigger: "epilogueOuvertDurable",
+      title: "Le lendemain",
+      text: "Le rendement a été abandonné ; la vie est revenue. Certaines Rainelles ont retrouvé leurs jeux, sans jamais reprendre leur ancien métier. Ce qui a déjà été perdu en chemin ne s’efface pas pour autant.",
+    },
+    // Branche "partiel" (design §11 : "joueur qui effectue quelques gestes sans modifier son
+    // fonctionnement"). Ni éloge ni reproche — un mélange assumé, lu au sens large comme le reste
+    // de cette famille de branches à trois issues (bilan-matin-*, variete-suivante-*).
+    "epilogue-partiel": {
+      id: "epilogue-partiel",
+      trigger: "epilogueOuvertPartiel",
+      title: "Le lendemain",
+      text: "Ni l’un ni l’autre pleinement : quelques gestes ont changé sans que le fonctionnement d’ensemble en soit bouleversé. Ce mélange reste assumé, pas subi.",
+    },
+    // Quatrième clause commune aux trois orientations (design §10, dernier paragraphe littéral :
+    // "Après le générique, les travaux, commandes et découvertes continuent... sans effacer
+    // l'épilogue précédent ni l'historique."), révélée par openEpilogue à la suite de l'une des
+    // trois branches ci-dessus, jamais seule (voir garden-state-cmd-x.js) : jamais présentée comme
+    // une fin qui verrouille la partie.
+    "epilogue-suite": {
+      id: "epilogue-suite",
+      trigger: "epilogueOuvert",
+      title: "Après le générique",
+      text: "Les travaux, les commandes et les découvertes continuent. Un bilan ultérieur pourra refléter une évolution des pratiques, sans jamais effacer ce qui vient d’être constaté ni l’historique qui le précède.",
+    },
   };
+
+  // Epic C6.19: which of the three mutually-exclusive orientation triggers corresponds to a given
+  // Epilogue.orientation(s) value (GardenCampaignEpilogue.ORIENTATIONS) — the only place this
+  // mapping is written, so garden-state-cmd-x.js never hard-codes the trigger string itself.
+  const EPILOGUE_ORIENTATION_SIGNALS = {
+    intensive: "epilogueOuvertIntensive",
+    partiel: "epilogueOuvertPartiel",
+    durable: "epilogueOuvertDurable",
+  };
+
+  function epilogueOrientationSignal(orientation) {
+    return EPILOGUE_ORIENTATION_SIGNALS[orientation] || null;
+  }
 
   function findByTrigger(signal) {
     return Object.values(TEXTS).find((t) => t.trigger === signal) || null;
@@ -151,7 +465,35 @@
     return entry;
   }
 
-  const api = { TEXTS, findByTrigger, pendingReveal };
+  const VARIETE_SUIVANTE_FLAGS = [
+    "variete-suivante-refus",
+    "variete-suivante-sobre",
+    "variete-suivante-invendus",
+  ];
+
+  // Epic C6.6 (design §10, chapitre 13 "Le premier non"): pure gate + branch choice for the
+  // MULTIPLY_REFUSAL reveal, shared by garden-state-cmd-j.js's teachGesture and
+  // garden-state-cmd-k.js's demonstrateGesture — the two entry points that can produce that
+  // refusal — so the gate ("un flag variete-suivante-* déjà présent", "la Rainelle porte un
+  // bourgeon") and the branch choice (persistentGestureIds, C5.6, jamais un score de vertu
+  // inventé) can never drift between them. Returns null when the gate isn't met yet, else the
+  // signal to pass to pendingReveal.
+  function chapter13Signal(campaignFlags, rainelle, campaignMemory) {
+    if (!rainelle || rainelle.bourgeon !== true) return null;
+    if (!VARIETE_SUIVANTE_FLAGS.some((f) => campaignFlags.includes(f)))
+      return null;
+    return campaignMemory.persistentGestureIds.length > 0
+      ? "chapter13FirstNonSign"
+      : "chapter13FirstNonQuestion";
+  }
+
+  const api = {
+    TEXTS,
+    findByTrigger,
+    pendingReveal,
+    chapter13Signal,
+    epilogueOrientationSignal,
+  };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenNarrative = api;
 })(globalThis);

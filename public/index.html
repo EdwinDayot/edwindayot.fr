@@ -35,6 +35,12 @@
     <script src="/game/data.js" defer></script>
     <script src="/game/gauge.js" defer></script>
     <script src="/game/river.js" defer></script>
+    <!-- Epic C6.13: construction.js (next script) now reads root.GardenCampaignPassage at its own
+         execution time (the conditional obstacle in obstacles()), so campaign-passage.js must load
+         before it — moved here from further below (right after campaign-contracts.js, where C6.12
+         first placed it) for exactly this, same "load before every reader" discipline already
+         applied to every other campaign module in this file. Still no dependency of its own. -->
+    <script src="/game/campaign-passage.js" defer></script>
     <script src="/game/construction.js" defer></script>
     <script src="/game/irrigation.js" defer></script>
     <script src="/game/irrigation-sim.js" defer></script>
@@ -93,7 +99,20 @@
          own comment) — caught this time before shipping, by the same targeted browser check that
          epic's own comment describes running for every campaign module moved here. -->
     <script src="/game/campaign-memory.js" defer></script>
-    <!-- Epic C2.6c: campaign-automation.js reads root.GardenConstruction (line 38 above),
+    <!-- Epic C6.4: campaign-contracts.js has no dependency of its own (pure, over plain
+         contract/specimen data) but is read by garden-state-cmd-r.js further below at that
+         script's own execution time — loaded here anyway, right after campaign-memory.js, to
+         avoid the exact class of missing-script ordering bug documented throughout this file. -->
+    <script src="/game/campaign-contracts.js" defer></script>
+    <!-- Epic C6.17: campaign-epilogue.js has no dependency of its own (pure, over plain
+         campaignMemory/campaignContracts/campaignStations/campaignFlags data already loaded by the
+         scripts above). Epic C6.18 gives it its first real browser readers — garden-state-
+         validate.js/-lifecycle.js and garden-state-cmd-x.js's openEpilogue, all further below —
+         loaded here anyway, right after campaign-contracts.js, for the same reason every other pure
+         campaign module in this file is loaded ahead of any real reader: avoiding the exact class of
+         missing-script ordering bug documented throughout this file, before one exists. -->
+    <script src="/game/campaign-epilogue.js" defer></script>
+    <!-- Epic C2.6c: campaign-automation.js reads root.GardenConstruction (line 44 above),
          root.GardenCampaignStations and root.GardenCultivars (both above) at its own
          script-execution time, and is itself read the same way by garden-state-validate.js
          (CYCLE_SECONDS) and garden-state.js (tickRainelle/updateSpecimenReadiness) below — so it
@@ -131,6 +150,14 @@
          long after every script has loaded, so this file's own position only has to satisfy its
          own dependencies, not hud-panel-rows.js's. -->
     <script src="/game/campaign-observation.js" defer></script>
+    <!-- Epic C2.5v-a: campaign-teaching-trajectory.js reads root.GardenConstruction and
+         root.GardenCampaignStations (both loaded much earlier above) at its own
+         script-execution time — no reader exists yet (C2.5v-b's job, same "posed, not wired"
+         posture already used by rainelle-movement.js before C5.11 and by campaign-stations.js's
+         own registerStation before any command called it), loaded here anyway right after its
+         last real dependency to avoid the exact class of missing-script ordering bug documented
+         throughout this file. -->
+    <script src="/game/campaign-teaching-trajectory.js" defer></script>
     <!-- Epic C1.5: moved here from much further below (its previous position after garden-
          state-cmd-e.js): garden-state-validate.js now also reads root.GardenGenetics (AXES,
          founders, to validate a pinned trait) at script-execution time, the same ordering fix
@@ -165,7 +192,9 @@
          validate.js, see the C2.4/C2.6c comments above) since validate.js needs both too; they
          remain before garden-state-cmd-f.js/-i.js/-j.js below, which also read root.GardenRainelles/
          root.GardenCultivars at their own execution time, same ordering requirement as
-         botany-genetics.js/-pot.js above. -->
+         botany-genetics.js/-pot.js above. Epic C6.15 adds a further dependency to
+         garden-state-cmd-f.js alone, root.GardenRainelleMovement, already loaded much earlier
+         above too (see the C5.10 comment there). -->
     <script src="/garden-state-cmd-f.js" defer></script>
     <script src="/garden-state-cmd-g.js" defer></script>
     <script src="/garden-state-cmd-h.js" defer></script>
@@ -189,6 +218,36 @@
     <!-- Epic C5.4: garden-state-cmd-q.js reads root.GardenCampaignStations at its own execution
          time, loaded much earlier above (see the C2.6a comment there). -->
     <script src="/garden-state-cmd-q.js" defer></script>
+    <!-- Epic C6.4: garden-state-cmd-r.js reads root.GardenCampaignContracts/root.GardenCampaignMemory
+         at its own execution time, both loaded much earlier above. -->
+    <script src="/garden-state-cmd-r.js" defer></script>
+    <!-- Epic C6.7: garden-state-cmd-s.js reads root.GardenNarrative at its own execution time,
+         already loaded much earlier above. -->
+    <script src="/garden-state-cmd-s.js" defer></script>
+    <!-- Epic C6.8: garden-state-cmd-t.js reads root.GardenCampaignContracts at its own execution
+         time, already loaded much earlier above (see the C6.4 comment there). -->
+    <script src="/garden-state-cmd-t.js" defer></script>
+    <!-- Epic C6.10: garden-state-cmd-u.js reads root.GardenCampaignStations at its own execution
+         time, already loaded much earlier above (see the C2.6a comment there). Epic C6.15 adds a
+         second dependency, root.GardenRainelleMovement, already loaded much earlier above too
+         (see the C5.10 comment there). -->
+    <script src="/garden-state-cmd-u.js" defer></script>
+    <!-- Epic C6.11: garden-state-cmd-v.js reads root.GardenCampaignStations at its own execution
+         time, already loaded much earlier above (see the C2.6a comment there). -->
+    <script src="/garden-state-cmd-v.js" defer></script>
+    <!-- Epic C6.12: garden-state-cmd-w.js reads root.GardenCampaignPassage at its own execution
+         time, loaded just above (see the C6.12 comment there). Epic C6.15 adds a second
+         dependency, root.GardenRainelleMovement, already loaded much earlier above too (see the
+         C5.10 comment there). -->
+    <script src="/garden-state-cmd-w.js" defer></script>
+    <!-- Epic C6.18: garden-state-cmd-x.js reads root.GardenCampaignEpilogue at its own execution
+         time, already loaded much earlier above (see the C6.17 comment there). -->
+    <script src="/garden-state-cmd-x.js" defer></script>
+    <!-- Epic C6.26: garden-state-cmd-y.js reads root.GardenCampaignStations and
+         root.GardenCampaignMemory at its own execution time, both already loaded much earlier
+         above (see the C2.6a and C5.1 comments there). Epic C6.28 adds a read of
+         root.GardenNarrative, also already loaded much earlier (see the C4.1 comment there). -->
+    <script src="/garden-state-cmd-y.js" defer></script>
     <script src="/game/save.js" defer></script>
     <script src="/garden-models.js" defer></script>
     <script src="/garden-models-leaf.js" defer></script>
@@ -218,6 +277,17 @@
          `window.GardenRenderCampaignStations` inside render-flow.js's sync(), so its only load-time
          requirement is loading after /vendor/three.min.js, same as those two sibling modules. -->
     <script src="/game/render-campaign-stations.js" defer></script>
+    <!-- Epic C2.5v-b: the "reviewing" teaching draft's real-world trajectory overlay, same
+         self-contained-beyond-THREE posture as render-campaign-stations.js just above — read
+         lazily as `window.GardenRenderCampaignTeaching` inside render-flow.js's sync(), so its
+         only load-time requirement is loading after /vendor/three.min.js. -->
+    <script src="/game/render-campaign-teaching.js" defer></script>
+    <!-- Epic C6.14: the chapter-17 passage point, self-contained beyond THREE like
+         render-campaign-house.js/render-campaign-stations.js above — read lazily as
+         `window.GardenRenderCampaignPassage` inside render-houses.js's buildCampaignPassage(),
+         itself only called later at world()-build time (render.js), so its only load-time
+         requirement is loading after /vendor/three.min.js, same as those two sibling modules. -->
+    <script src="/game/render-campaign-passage.js" defer></script>
     <script src="/game/render-scene.js" defer></script>
     <script src="/game/render-items.js" defer></script>
     <script src="/game/render-flow.js" defer></script>
@@ -288,10 +358,25 @@
       />
       <input
         id="cultivar-rename-input"
+        class="hud-text-input"
         type="text"
         maxlength="40"
         autocomplete="off"
         aria-label="Nouveau nom du cultivar"
+        hidden
+      />
+      <!-- Epic C2.5v-b: a second, generalized instance of C1.4's "HTML for what Canvas doesn't do
+           well" text field above — kept as its own element (never repurposing
+           cultivar-rename-input) so a rename-in-flight and a teaching field/phrase edit can never
+           collide over the same dataset. garden-boot.js sets dataset.kind ("teaching-field" or
+           "teaching-phrase") to decide what committing its value actually does. -->
+      <input
+        id="campaign-text-input"
+        class="hud-text-input"
+        type="text"
+        maxlength="240"
+        autocomplete="off"
+        aria-label="Champ du geste enseigné"
         hidden
       />
     </main>

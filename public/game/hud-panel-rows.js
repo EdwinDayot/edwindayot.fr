@@ -28,10 +28,16 @@
             pw - (r.alternate ? 220 : 145),
             10,
           );
-          if (r.action)
-            this.button(
-              "row-" + i,
-              r.action === "confirm-cutting"
+          if (r.action) {
+            // Epic C6.2: unlike every other action here, veilleuse/prise-à-fort-débit toggle
+            // between two opposite labels depending on the station's own current state
+            // (design C6.2's own criterion: "le libellé du bouton reflète l'état courant") —
+            // the row itself computes that label (hud-panel.js) since this switch has no access
+            // to campaignStations, the same "row supplies its own text, this file only lays it
+            // out" split already used for r.title/r.detail.
+            const buttonText =
+              r.buttonLabel ||
+              (r.action === "confirm-cutting"
                 ? "Confirmer"
                 : r.action === "trade"
                   ? "Échanger"
@@ -57,7 +63,24 @@
                                       ? "Dormir"
                                       : r.action === "observation-step"
                                         ? "Avancer"
-                                        : "Choisir",
+                                        : r.action === "begin-teaching"
+                                          ? "Regarde-moi"
+                                          : r.action === "teaching-cycle-verb"
+                                            ? "Choisir un verbe"
+                                            : r.action === "teaching-edit-field"
+                                            ? "Modifier"
+                                            : r.action === "demonstrate-teaching"
+                                              ? "Démontrer"
+                                              : r.action === "revise-phrase-edit"
+                                                ? "Corriger"
+                                                : r.action === "confirm-teaching"
+                                                  ? "Confirmer"
+                                                  : r.action === "cancel-teaching"
+                                                    ? "Annuler"
+                                                    : "Choisir");
+            const btn = this.button(
+              "row-" + i,
+              buttonText,
               x + pw - 105,
               ry + 18,
               77,
@@ -66,7 +89,13 @@
               r.data || {},
               false,
               r.disabled,
-            ).label = r.title + ". " + r.detail;
+            );
+            // buttonText is what's actually drawn on the button (what a player/a test reads);
+            // .label is overwritten right after to a richer title+detail summary, unrelated to
+            // this addition (predates C6.2, kept as-is).
+            btn.buttonText = buttonText;
+            btn.label = r.title + ". " + r.detail;
+          }
           if (r.alternate)
             this.button(
               "alternate-" + i,

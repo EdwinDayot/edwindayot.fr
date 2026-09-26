@@ -39,6 +39,10 @@
     typeof module !== "undefined"
       ? require("./campaign-scenes.js")
       : root.GardenCampaignScenes;
+  const Passage =
+    typeof module !== "undefined"
+      ? require("./campaign-passage.js")
+      : root.GardenCampaignPassage;
 
   const { LOCATIONS } = Scenes;
 
@@ -106,7 +110,15 @@
   //     of its own between source and destination.
   // "repos"/"habitat" both resolve to the nearest registered habitat from the Rainelle's current
   // position, or the documented fallback when none is registered yet (see FALLBACK_POSITION).
+  // Epic C6.15 (design §10, chapitre 17, sixième temps : "une Rainelle rejoint la mare et n'en
+  // revient pas"): a Rainelle already settled at the passage (rainelle.settledAt) always targets
+  // that fixed point, whatever `location` the caller passes — POSTE/REPOS/HABITAT no longer have
+  // any effect on her, exactly the critère de sortie's own words ("quelle que soit la location
+  // transmise"). Checked before the geste/POSTE branch below since a settled Rainelle already has
+  // `geste === null` (settling only ever happens to one, see selectRainelleToSettle) and would
+  // otherwise fall through to the habitat branch instead.
   function targetPosition(s, rainelle, location) {
+    if (rainelle.settledAt) return Passage.PASSAGE_POSITION;
     const geste = rainelle.geste;
     if (location === LOCATIONS.POSTE && geste) {
       if (geste.verbe === "arroser" || geste.verbe === "recolter") {
@@ -251,6 +263,28 @@
     rainelle.z = z;
   }
 
+  // Epic C6.15: pure decision only — never mutates `s`, exactly the backlog's own words ("décide,
+  // sans muter directement l'état"). The caller (garden-state-cmd-w.js's restorePassage,
+  // garden-state-cmd-u.js's releaseGesture — the only two mutations that can ever complete the
+  // condition below) applies `settledAt = true` to the returned id once its own mutation has
+  // already succeeded, same "decide here, mutate there" split cmd-w.js/cmd-u.js already keep for
+  // every other command in this file's neighbourhood.
+  //
+  // True (a candidate id) only the very first time the passage is open, at least one Rainelle has
+  // no gesture (`geste === null`), and no Rainelle has settled yet — checked in that order so a
+  // still-blocked passage or an already-settled save short-circuits without scanning `s.rainelles`
+  // twice. Candidate selection is by `s.rainelles` array order, the same stable "first by array
+  // order" priority campaign-scenes.js's own selectSceneRainelle already documents for a
+  // simultaneous claim — never a new sort, never `priorityOf`'s numeric id ordering (that one is
+  // reserved for a live movement contest between Rainelles already positioned, not this one-off
+  // selection).
+  function selectRainelleToSettle(s) {
+    if (s.campaignPassage.blocked) return null;
+    if (s.rainelles.some((r) => r.settledAt)) return null;
+    const candidate = s.rainelles.find((r) => r.geste === null);
+    return candidate ? candidate.id : null;
+  }
+
   const api = {
     MAX_WAIT_STEPS,
     FALLBACK_POSITION,
@@ -258,6 +292,7 @@
     routeTo,
     resolveStep,
     ensurePosition,
+    selectRainelleToSettle,
   };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenRainelleMovement = api;

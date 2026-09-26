@@ -51,6 +51,29 @@
       // changes (repairHouseSpace, garden-state-cmd-l.js) instead of every ~0.25s tick.
       this.campaignHouseAccueilStatus = house?.spaces?.accueil?.status;
     },
+    // Epic C6.14: the chapter-17 passage point (campaign-passage.js, C6.12/C6.13) had a real
+    // world position and an effective navigation obstacle but no representation and no scene call
+    // site before this — same gap, same "world-build time, called from render.js's world()"
+    // pattern buildCampaignHouse() just above already fills for the refuge house.
+    // window.GardenCampaignPassage/window.GardenRenderCampaignPassage are read lazily here (not
+    // top-level consts) for the same script-order-independence reason buildCampaignHouse reads
+    // window.GardenRenderCampaignHouse lazily.
+    buildCampaignPassage() {
+      const Passage = window.GardenCampaignPassage,
+        RenderPassage = window.GardenRenderCampaignPassage;
+      if (!Passage || !RenderPassage) return;
+      if (this.campaignPassageGroup) this.scene.remove(this.campaignPassageGroup);
+      const blocked = !!this.game.s.campaignPassage?.blocked;
+      this.campaignPassageGroup = RenderPassage.buildPassageGroup(blocked);
+      const x = Passage.PASSAGE_POSITION.x,
+        z = Passage.PASSAGE_POSITION.z;
+      this.campaignPassageGroup.position.set(x, Terrain.terrainHeight(x, z), z);
+      this.scene.add(this.campaignPassageGroup);
+      // Cached so render-flow.js's sync() can rebuild only when this one field actually changes
+      // (restorePassage, garden-state-cmd-w.js) instead of every ~0.25s tick — same pattern as
+      // campaignHouseAccueilStatus just above.
+      this.campaignPassageBlocked = blocked;
+    },
     // A gable end: rectangle-plus-triangle profile (eave to eave, up to the
     // ridge) extruded to `thickness`, so the wall actually follows the roof
     // pitch instead of a full-height rectangular block the sloped roof
@@ -91,6 +114,23 @@
         stoneDark = (this.stoneDark ??= M.mat(0x8f8a76)),
         trim = M.mat(b.accent),
         roofMat = M.mat(b.roofColor || 0x5c4632),
+        // Epic C6.24 (docs/campagne-backlog.md) : le seul bâtiment portant
+        // b.greenhouse (Jeanne, C6.22) échange le mur plat stone contre le
+        // verre déjà en usage pour l'objet « Serre » du jardin libre
+        // (render-scene.js, même teinte/opacité/rugosité à l'identique,
+        // déjà couvert par TRANSPARENT_ALLOWLIST/cbe8e2 dans
+        // tests/garden-material-audit.cjs — élargi à ce second site).
+        // wallMat ne remplace stone que sur les quatre panneaux plats
+        // (arrière, deux murs latéraux, façade) ; les pignons triangulaires
+        // (gableGeometry, ci-dessous) et le toit gardent stone/roofMat
+        // inchangés, comme documenté dans la limite honnête de l'epic.
+        wallMat = b.greenhouse
+          ? (this.greenhouseWallGlass ??= M.mat(0xcbe8e2, {
+              transparent: true,
+              opacity: 0.4,
+              roughness: 0.15,
+            }))
+          : stone,
         frontW = w2 - doorHalf;
       const floor = this.shape(
         group,
@@ -113,15 +153,18 @@
       // plus a triangular cap that actually follows the roof pitch (see
       // gableGeometry above) instead of a rectangle reaching the ridge
       // height along the whole depth.
-      this.shape(group, "box", stone, [0, WALL_H / 2, d2], [b.w, WALL_H, 0.16]);
+      this.shape(group, "box", wallMat, [0, WALL_H / 2, d2], [b.w, WALL_H, 0.16]);
       this.shape(
         group,
         "box",
-        stone,
+        wallMat,
         [-w2, WALL_H / 2, 0],
         [0.16, WALL_H, b.d],
       );
-      this.shape(group, "box", stone, [w2, WALL_H / 2, 0], [0.16, WALL_H, b.d]);
+      this.shape(group, "box", wallMat, [w2, WALL_H / 2, 0], [0.16, WALL_H, b.d]);
+      // The triangular gable cap always stays opaque stone, greenhouse or
+      // not (see the wallMat comment above): only the eave-height wall
+      // panels below it turn to glass.
       const gable = this.gableGeometry(0.16, d2, WALL_H, b.roofHeight);
       this.shape(group, gable, stone, [-w2, 0, 0]);
       this.shape(group, gable, stone, [w2, 0, 0]);
@@ -130,7 +173,7 @@
         this.shape(
           group,
           "box",
-          stone,
+          wallMat,
           [side * (doorHalf + frontW / 2), WALL_H / 2, -d2],
           [frontW, WALL_H, 0.16],
         );

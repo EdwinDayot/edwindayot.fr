@@ -130,6 +130,18 @@
         }
         break;
       }
+      // Epic C6.21: the real trigger point openEpilogue (C6.18/C6.19/C6.20) lacked until now
+      // (verified: no occurrence anywhere in this file before this epic) — same "execute the real
+      // command first, only stage the camera/panel on success" shape as "confirm-night"/
+      // "begin-teaching" above.
+      case "open-epilogue": {
+        const result = A.execute({ type: "openEpilogue" });
+        if (result.ok) {
+          A.closePanel();
+          if (A.view.beginEpilogueScene()) A.openPanel("epilogue-scene");
+        }
+        break;
+      }
       case "inspect": {
         const e = data.id
           ? A.target(data.id)
@@ -194,6 +206,117 @@
       // same one campaign-observation.js's own CYCLE_SECONDS re-exports for the row's label).
       case "observation-step":
         if (A.paused) A.game.step(GardenCampaignAutomation.CYCLE_SECONDS);
+        break;
+      // Epic C6.2: the only real point of entry to setVeilleuse/setPriseFortDebit (C5.2/C5.4) —
+      // both commands already existed and were already reachable from GardenState.command()
+      // directly (every test since C5.2/C5.4 calls them that way), but no dispatch case ever
+      // called either one, so a player had no way to actually flip either flag. Unlike "setting"
+      // above (which recomputes the flip here, `!A.game.s.settings[data.key]`), `data.active` is
+      // computed once by the row itself at draw time (hud-panel.js, `!zone.veilleuse`/
+      // `!borne.priseFortDebit`) and forwarded as-is — this file only relays it to the command.
+      case "toggle-veilleuse":
+        A.execute({
+          type: "setVeilleuse",
+          zoneId: data.zoneId,
+          active: data.active,
+        });
+        break;
+      case "toggle-prise-fort-debit":
+        A.execute({
+          type: "setPriseFortDebit",
+          borneId: data.borneId,
+          active: data.active,
+        });
+        break;
+      // Epic C2.5v-b (C2.5's own screen/trajectory/camera, deferred from C2.5 — see
+      // garden-state-cmd-k.js's header comment): the real trigger the mandate requires, wired
+      // exactly like "confirm-night"'s own beginGestureScene call site just below in this file —
+      // execute the real command, and only on success stage the camera/panel. A.teachingDraft is
+      // client-only scratch (never persisted, never read by GardenState) that gathers the five
+      // gesture fields the player fills in one at a time before demonstrateGesture is ever called
+      // — the same "ephemeral UI state on A, not on s" posture already used by A.cutting/A.build.
+      case "begin-teaching": {
+        const result = A.execute({ type: "beginTeaching", id: data.id });
+        if (result.ok) {
+          // Same "close the panel it was triggered from, then open the new one" shape as
+          // "confirm-night" above — closePanel() here runs while A.panel is still "observation",
+          // before s.campaignTeaching's own guard in garden-cmd.js would ever apply to it.
+          A.closePanel();
+          A.teachingDraft = {
+            verbe: "",
+            poste: "",
+            source: "",
+            destination: "",
+            condition: "",
+          };
+          A.view.beginGestureScene({ rainelleId: data.id, kind: "teaching" });
+          A.openPanel("teaching");
+        }
+        break;
+      }
+      // Verbe is one of a short, fixed list (Rainelles.VERBS) — cycling through it avoids either
+      // a free-text field that could never validate against it, or six extra rows (one per verb)
+      // crowding the panel; same "no abstraction the criterion doesn't need" restraint the mandate
+      // asks for.
+      case "teaching-cycle-verb": {
+        if (!A.teachingDraft) break;
+        const VERBS = window.GardenRainelles.VERBS,
+          i = VERBS.indexOf(A.teachingDraft.verbe);
+        A.teachingDraft.verbe = VERBS[(i + 1) % VERBS.length];
+        break;
+      }
+      // poste/source/destination/condition stay free text today (rainelles.js's own header
+      // comment: "opaque identifier strings... no player-facing place names exist yet") —
+      // demonstrateGesture itself is unchanged by this epic (still validates shape only, never
+      // against campaign-stations.js's registry), so this reuses the exact same free-text pattern
+      // rather than building a new in-world station-picker the criterion doesn't ask for. The
+      // "Stations connues" row (hud-panel.js) lists real ids so a player has something correct to
+      // type, without a new selection mechanism.
+      case "teaching-edit-field": {
+        if (!A.teachingDraft) break;
+        const input = $("campaign-text-input");
+        input.maxLength = 40;
+        input.value = A.teachingDraft[data.field] || "";
+        input.dataset.kind = "teaching-field";
+        input.dataset.field = data.field;
+        input.setAttribute("aria-label", "Champ « " + data.field + " » du geste enseigné");
+        input.hidden = false;
+        input.focus();
+        input.select();
+        break;
+      }
+      case "demonstrate-teaching": {
+        if (!A.teachingDraft) break;
+        // Only clear the client scratch on success — a validation failure (empty field, unknown
+        // verb...) must leave what the player already typed in place, exactly like every other
+        // form-shaped command in this file reports its failure via A.announce without discarding
+        // input.
+        if (A.execute({ type: "demonstrateGesture", ...A.teachingDraft }).ok)
+          A.teachingDraft = null;
+        break;
+      }
+      case "revise-phrase-edit": {
+        const teaching = A.game.s.campaignTeaching;
+        if (!teaching || teaching.step !== "reviewing") break;
+        const input = $("campaign-text-input");
+        input.maxLength = 240;
+        input.value = teaching.draft.phrase;
+        input.dataset.kind = "teaching-phrase";
+        delete input.dataset.field;
+        input.setAttribute("aria-label", "Corriger la phrase enseignée");
+        input.hidden = false;
+        input.focus();
+        input.select();
+        break;
+      }
+      case "confirm-teaching":
+        if (A.execute({ type: "confirmTeaching" }).ok) A.closePanel();
+        break;
+      // closePanel() itself already cancels a still-open lesson (garden-cmd.js) — calling it here
+      // after cancelTeaching has already run is a harmless no-op guard, not a double command.
+      case "cancel-teaching":
+        A.execute({ type: "cancelTeaching" });
+        A.closePanel();
         break;
       case "rescue":
         A.execute({ type: "rescue" });

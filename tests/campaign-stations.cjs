@@ -48,7 +48,15 @@ test("registerStation assigns a stable, kind-prefixed id and appends to the righ
   assert.deepEqual(borne, { id: "b1", x: 1, z: 2, priseFortDebit: false });
   // Epic C5.2: a zone also carries its `veilleuse` flag at creation, off by default (design §11's
   // "veilleuses de croissance" — see campaign-stations.js's own comment on registerStation).
-  assert.deepEqual(zone, { id: "z1", x: 3, z: 4, veilleuse: false });
+  // Epic C6.26: and its `extensionCommerciale` flag, also off by default (design §11's third
+  // lever, "extension standardisée sur un espace vivant").
+  assert.deepEqual(zone, {
+    id: "z1",
+    x: 3,
+    z: 4,
+    veilleuse: false,
+    extensionCommerciale: false,
+  });
   // Epic C2.6c: a panier also carries an empty buffer at creation (design §5's "récolter...
   // dépose dans un panier"; see campaign-stations.js's own comment on registerStation).
   // Epic C2.8: capacity/min too (design §5's "réglage avancé... minimum et maximum").

@@ -18,6 +18,10 @@
     typeof module !== "undefined"
       ? require("./game/campaign-memory.js")
       : root.GardenCampaignMemory;
+  const Passage =
+    typeof module !== "undefined"
+      ? require("./game/campaign-passage.js")
+      : root.GardenCampaignPassage;
   function fresh(now) {
     return {
       version: 3,
@@ -176,6 +180,32 @@
       // Epic C5.1: bounded journal of campaign-layer events/aggregates (design §11, "mémoire
       // factuelle bornée") — see campaign-memory.js's own header comment for its shape and why.
       campaignMemory: Memory.freshMemory(),
+      // Epic C6.4 (design §10, chapitre 12): at most one open contract at a time (design/backlog
+      // scope note), but closed contracts are kept rather than removed — a flat history, same
+      // "append-only, never pruned" posture as specimens/cultivars/rainelles above. Empty on a
+      // fresh save — no contract is ever signed automatically.
+      campaignContracts: [],
+      contractNextId: 1,
+      // Epic C6.12 (design §10, chapitre 17): blocked by default — the chapter presents restoring
+      // it as a real repair, never a starting given. restorePassage (garden-state-cmd-w.js) is the
+      // single, one-way transition to false. Epic C6.13 adds the fixed x/z position on the shared
+      // navigation grid — PASSAGE_POSITION, defined once in campaign-passage.js and reused here
+      // rather than duplicated, see that module's own header comment for how it was chosen and
+      // verified against GardenGeometry.zoneAt before being fixed.
+      campaignPassage: { blocked: true, ...Passage.PASSAGE_POSITION },
+      // Epic C6.18 (design §10, chapitre 18, second beat): unset on a fresh save — nothing has
+      // settled yet, so there is nothing to observe or freeze. `unlocksOnDay` is set exactly once,
+      // additively, by the same three sites that already set `rainelle.settledAt = true`
+      // (garden-state-cmd-f.js/-u.js/-w.js, C6.15); `orientation`/`openedOnDay` are set together,
+      // exactly once, by openEpilogue (garden-state-cmd-x.js) once Epilogue.canOpen(s) is true.
+      // Epic C6.20 adds `gift`, frozen on that same success path (Epilogue.gift()) — unset here
+      // for the same reason: nothing has been offered before the epilogue actually opens.
+      campaignEpilogue: {
+        unlocksOnDay: null,
+        orientation: null,
+        openedOnDay: null,
+        gift: null,
+      },
     };
   }
   function migrate(old, now = Date.now()) {

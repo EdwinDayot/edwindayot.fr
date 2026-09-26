@@ -10,7 +10,13 @@ const { chromium } = require("playwright"),
 // on this list that is found transparent, or off this list expected to be opaque but isn't,
 // fails the audit — additions require a one-line reason, not a silent pass.
 const TRANSPARENT_ALLOWLIST = [
-  { color: "cbe8e2", reason: "greenhouse glass panel (render-scene.js)" },
+  {
+    color: "cbe8e2",
+    reason:
+      "greenhouse glass panel (render-scene.js free-garden object; also " +
+      "reused at the same hex/opacity/roughness by render-houses.js's " +
+      "buildHouse() for a b.greenhouse building's wall panels, epic C6.24)",
+  },
   { color: "6d9365", opacityMax: 0.15, reason: "vision-radius ground overlay (render-world.js)" },
 ];
 
@@ -171,6 +177,84 @@ const TRANSPARENT_ALLOWLIST = [
         window.__auditStationIds = { activeBorne: activeBorne.id, activeZone: activeZone.id, panier: panier.id, habitat: habitat.id };
       }
 
+      // Epic C2.5v-b (docs/campagne-backlog.md): a "reviewing" teaching draft's real-world
+      // trajectory overlay (C2.5v-a's resolveTrajectory, rendered by
+      // render-campaign-teaching.js/render-flow.js's sync()), exercised through this exact
+      // live-page scene graph, same reason as every block above — this audit is the real gate for
+      // a rendering epic, never a screenshot a model merely looks at. Reuses the exact stations
+      // the C5.13 block just above already registered (real, resolvable ids) instead of a second,
+      // redundant registry. No command sets s.campaignTeaching to "reviewing" outside the real
+      // four-moment flow (garden-state-cmd-k.js) yet, so it is pushed directly into the live save,
+      // same posture every block above already uses for state no command places yet.
+      if (window.__auditStationIds && window.GardenRenderCampaignTeaching && window.GardenApp.game) {
+        const s = window.GardenApp.game.s;
+        const ids = window.__auditStationIds;
+        s.campaignTeaching = {
+          rainelleId: "audit-c5.11-rainelle",
+          step: "reviewing",
+          draft: {
+            verbe: "arroser",
+            poste: ids.activeZone,
+            source: ids.activeBorne,
+            destination: ids.panier,
+            condition: "",
+            phrase: "Test d'audit.",
+            trajectory: [ids.activeBorne, ids.activeZone, ids.panier],
+          },
+        };
+        v.sync();
+      }
+
+      // Epic C6.14 (docs/campagne-backlog.md): the chapter-17 passage point (campaign-passage.js,
+      // C6.12/C6.13), exercised through this exact live-page scene graph AND the real sync()/
+      // command wiring, same reason as every block above — this audit is the real gate for a
+      // rendering epic, never a screenshot a model merely looks at. A fresh save already carries
+      // a real, blocked s.campaignPassage (C6.12/C6.13) — render-houses.js's
+      // buildCampaignPassage() ran once already at world()-build time, before this script even
+      // runs, so the initial blocked Group is read here rather than built in isolation. The real
+      // `restorePassage` command (garden-state-cmd-w.js) then flips it, and v.sync()'s own
+      // reactive check (render-flow.js) is exercised to confirm the Group rebuilds to the open
+      // state through the real wiring, never hand-constructed for this check.
+      let passageWiring = { found: false };
+      if (window.GardenCampaignPassage && window.GardenRenderCampaignPassage && window.GardenApp.game) {
+        const blockedGroup = v.campaignPassageGroup;
+        const initiallyBlocked = blockedGroup ? blockedGroup.userData.blocked : null;
+        const initialPosition = blockedGroup ? blockedGroup.position.toArray() : null;
+        window.GardenApp.game.command({ type: "restorePassage" });
+        v.sync();
+        const openGroup = v.campaignPassageGroup;
+        passageWiring = {
+          found: !!(blockedGroup && openGroup),
+          initiallyBlocked,
+          initialPosition,
+          rebuiltOpen: openGroup ? openGroup.userData.blocked === false : false,
+          sameGroupInstance: blockedGroup === openGroup,
+          inScene: openGroup ? openGroup.parent === v.scene : false,
+          expectedX: window.GardenCampaignPassage.PASSAGE_POSITION.x,
+          expectedZ: window.GardenCampaignPassage.PASSAGE_POSITION.z,
+        };
+      }
+
+      // Epic C6.21 (docs/campagne-backlog.md): the epilogue's gifted young plant
+      // (s.campaignEpilogue.gift, C6.20), exercised through this exact live-page scene graph AND
+      // the real sync() wiring, same reason as every block above — this audit is the real gate for
+      // a rendering epic, never a screenshot a model merely looks at. No command reaches
+      // s.campaignEpilogue.gift in a fresh save's own default state (it starts null), so it is
+      // pushed directly into the live save, same posture as the C5.11/C5.13 blocks above for state
+      // no command places yet at this point in the page's life — the real openEpilogue command
+      // path itself is exercised end to end by tests/campaign-chapter18-epilogue-scene-browser.cjs.
+      let giftWiring = { found: false };
+      if (window.GardenGenetics && window.GardenApp.game) {
+        const s = window.GardenApp.game.s;
+        s.campaignEpilogue.gift = { speciesId: "aster-des-vents", giverId: "iris" };
+        v.sync();
+        giftWiring = {
+          found: !!v.epilogueGiftModel,
+          inScene: v.epilogueGiftModel ? v.epilogueGiftModel.parent === v.scene : false,
+          position: v.epilogueGiftModel ? v.epilogueGiftModel.position.toArray() : null,
+        };
+      }
+
       // Sample a few times of day: a defect that only shows under one lighting angle (the
       // terrain-normal bug was exactly this — it read fine at some sun angles) must not hide.
       const times = [50, 300, 600, 900, 1150];
@@ -265,7 +349,31 @@ const TRANSPARENT_ALLOWLIST = [
         };
       }
 
-      return { suspiciousTransparent, badNormals, nanMeshes, materialCount: seen.size, wiring, stationWiring };
+      // Epic C2.5v-b: confirms sync()'s new branch actually built and added the trajectory
+      // overlay through the real wiring, same "not just constructible in isolation" confirmation
+      // as C5.13's stationWiring above (isolated construction is already covered by
+      // tests/campaign-teaching-render.cjs).
+      const teachingWiring = v.teachingTrajectoryModel
+        ? {
+            found: true,
+            inScene: v.teachingTrajectoryModel.parent === v.scene,
+            tileCount: v.teachingTrajectoryModel.children.length,
+            hex: v.teachingTrajectoryModel.children[0]?.material.color.getHexString(),
+            opacity: v.teachingTrajectoryModel.children[0]?.material.opacity,
+          }
+        : { found: false };
+
+      return {
+        suspiciousTransparent,
+        badNormals,
+        nanMeshes,
+        materialCount: seen.size,
+        wiring,
+        stationWiring,
+        teachingWiring,
+        passageWiring,
+        giftWiring,
+      };
     });
 
     if (consoleErrors.length)
@@ -280,6 +388,25 @@ const TRANSPARENT_ALLOWLIST = [
     assert.equal(audit.stationWiring.allInScene, true, "C5.13: a station Group was never added to the real scene");
     assert.equal(audit.stationWiring.borneActiveEmissive, 0.35, "C5.13: an active borne's bead is not emissive at the documented signal intensity");
     assert.equal(audit.stationWiring.zoneActiveEmissive, 0.35, "C5.13: an active zone's lamp is not emissive at the documented signal intensity");
+
+    assert.equal(audit.teachingWiring.found, true, "C2.5v-b: sync() never built the teaching trajectory overlay Group");
+    assert.equal(audit.teachingWiring.inScene, true, "C2.5v-b: the trajectory overlay Group was never added to the real scene");
+    assert.ok(audit.teachingWiring.tileCount >= 3, "C2.5v-b: expected at least one tile per resolved station point");
+    assert.equal(audit.teachingWiring.hex, "6d9365", "C2.5v-b: the overlay must reuse the documented 'survol de portée' hex, not an invented tint");
+    assert.ok(audit.teachingWiring.opacity <= 0.15, "C2.5v-b: overlay opacity exceeds the documented allowlist ceiling for color 6d9365");
+
+    assert.equal(audit.passageWiring.found, true, "C6.14: sync() never built a Group for the campaign passage point");
+    assert.equal(audit.passageWiring.initiallyBlocked, true, "C6.14: a fresh save's passage should render blocked by default");
+    assert.equal(audit.passageWiring.initialPosition[0], audit.passageWiring.expectedX, "C6.14: passage Group x does not match PASSAGE_POSITION.x");
+    assert.equal(audit.passageWiring.initialPosition[2], audit.passageWiring.expectedZ, "C6.14: passage Group z does not match PASSAGE_POSITION.z");
+    assert.equal(audit.passageWiring.rebuiltOpen, true, "C6.14: sync() never rebuilt the passage Group to the open/franchissable state after restorePassage");
+    assert.equal(audit.passageWiring.sameGroupInstance, false, "C6.14: the passage Group should be rebuilt (not mutated in place) on a blocked-state change, same pattern as buildCampaignHouse");
+    assert.equal(audit.passageWiring.inScene, true, "C6.14: the rebuilt passage Group was never added to the real scene");
+
+    assert.equal(audit.giftWiring.found, true, "C6.21: sync() never built the epilogue gift plant Group once s.campaignEpilogue.gift froze");
+    assert.equal(audit.giftWiring.inScene, true, "C6.21: the gift plant Group was never added to the real scene");
+    assert.equal(audit.giftWiring.position[0], -13, "C6.21: gift plant Group x does not match the documented fixed position");
+    assert.equal(audit.giftWiring.position[2], 9.5, "C6.21: gift plant Group z does not match the documented fixed position");
 
     assert.deepEqual(audit.nanMeshes, [], "Meshes with non-finite vertex positions: " + audit.nanMeshes.join(", "));
     assert.deepEqual(

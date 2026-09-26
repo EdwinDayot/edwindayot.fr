@@ -12,7 +12,11 @@
    the overexertion streak update to that same block (up on a worked night, down on a rested one —
    see campaign-memory.js's own header comment). Epic C5.7 adds the réparation detection
    (campaign-scenes.js's detectRepairedGestures), read *after* that same streak update — see its
-   own comment below for why the order matters. */
+   own comment below for why the order matters. Epic C6.3 adds the chapter 11 "bilan matinal"
+   reveal; Epic C6.5 adds, right after it and gated on the same "la-bonne-occasion" flag, the
+   chapter 12 "variété suivante" reveal and the first of the two "note de Jeanne" reveals (its
+   second half lives in garden-state-cmd-r.js's deliverContract). Epic C6.7 adds, right after
+   that, the chapter 15 "retour d'Alma" reveal (see below). */
 (function (root) {
   const Genetics =
     typeof module !== "undefined"
@@ -46,6 +50,14 @@
     typeof module !== "undefined"
       ? require("./game/campaign-scenes.js")
       : root.GardenCampaignScenes;
+  const Contracts =
+    typeof module !== "undefined"
+      ? require("./game/campaign-contracts.js")
+      : root.GardenCampaignContracts;
+  const RainelleMovement =
+    typeof module !== "undefined"
+      ? require("./game/rainelle-movement.js")
+      : root.GardenRainelleMovement;
   const M = {
     commandSegF(c, ctx, st) {
       const { s, fail } = st;
@@ -155,6 +167,37 @@
           Memory.recordBirth(s.campaignMemory, born.id);
         }
         s.campaignNursery = [];
+        // Epic C6.15 (found by /code-review before this epic's own commit: neither restorePassage
+        // nor releaseGesture is ever called by "sleep" itself, so a Rainelle born right here —
+        // frog encounter above, or a bourgeon resolved in the loop just above, both created with
+        // geste null — could already satisfy the settling condition (passage already open, no one
+        // settled yet) without either of this epic's own two entry points ever running again to
+        // notice her: restorePassage is one-way and refuses once already open, releaseGesture
+        // refuses on a Rainelle whose geste is already null. Checked once here, after both birth
+        // loops above, same "decide there (pure), mutate here" split already applied to
+        // garden-state-cmd-w.js/-u.js.
+        //
+        // Epic C6.16: same reveal as garden-state-cmd-w.js's restorePassage/garden-state-cmd-u.js's
+        // releaseGesture — "passageRainelleSettled" (data-narrative.js), fired only once settleId
+        // is really non-null, never before.
+        //
+        // Epic C6.18: same third settling site as garden-state-cmd-w.js/-u.js's own C6.18 comment
+        // — s.campaignEpilogue.unlocksOnDay = s.campaignDay + 3, only if still null, only once
+        // settleId is really non-null. Read here before this same command's own `s.campaignDay +=
+        // 1` further below: a Rainelle settling from tonight's birth counts tonight (the day about
+        // to end), not the day about to start, same "posed at the moment observed" posture as
+        // every other campaignMemory entry recorded earlier in this same command.
+        const settleId = RainelleMovement.selectRainelleToSettle(s);
+        if (settleId) {
+          s.rainelles.find((r) => r.id === settleId).settledAt = true;
+          const settledRevealed = Narrative.pendingReveal(
+            s.campaignFlags,
+            "passageRainelleSettled",
+          );
+          if (settledRevealed) s.campaignFlags.push(settledRevealed.id);
+          if (s.campaignEpilogue.unlocksOnDay === null)
+            s.campaignEpilogue.unlocksOnDay = s.campaignDay + 3;
+        }
         // Epic C5.1/C5.2: every Rainelle that already existed before tonight's resolution either
         // did real night work under an active veilleuse (workedIds, recorded above by
         // runNightWork's own effect and here by recordNightlyActivity) or rested — the two are
@@ -244,6 +287,130 @@
               rainelleId: Scenes.selectSceneRainelle(repairedIds),
             });
           }
+        }
+        // Epic C6.3 (design §10, chapitre 11 "La nuit où tout continue") : évalué une seule fois
+        // par partie, à la toute première nuit résolue après que le texte de C6.1 ("la-bonne-
+        // occasion") a déjà été vu — jamais avant (le levier n'a pas encore été proposé), jamais
+        // une seconde fois ensuite. Les cinq entrées "bilan-matin-*" de data-narrative.js forment
+        // une seule famille mutuellement exclusive : le garde ci-dessous vérifie qu'aucune d'elles
+        // n'a encore été révélée avant d'en choisir une, jamais après (une partie ne repasse
+        // jamais par ce bloc une deuxième fois, contrairement à persistance/réparation qui se
+        // réévaluent chaque nuit).
+        if (
+          s.campaignFlags.includes("la-bonne-occasion") &&
+          !s.campaignFlags.some((f) => f.startsWith("bilan-matin-"))
+        ) {
+          const leverActive =
+            s.campaignStations.zones.some((z) => z.veilleuse) ||
+            s.campaignStations.bornes.some((b) => b.priseFortDebit);
+          let signal;
+          if (!leverActive) {
+            signal = "chapter11BilanPreserved";
+          } else {
+            const bassinLow =
+              Memory.bassinCommunLevel(s.campaignMemory) <
+              Memory.BASSIN_COMMUN_CAPACITY;
+            const hasPersistence =
+              s.campaignMemory.persistentGestureIds.length > 0;
+            signal =
+              bassinLow && hasPersistence
+                ? "chapter11BilanActiveComplet"
+                : bassinLow
+                  ? "chapter11BilanActiveBassin"
+                  : hasPersistence
+                    ? "chapter11BilanActivePersistance"
+                    : "chapter11BilanActive";
+          }
+          const revealed = Narrative.pendingReveal(s.campaignFlags, signal);
+          if (revealed) s.campaignFlags.push(revealed.id);
+        }
+        // Epic C6.5 (design §10, chapitre 12 "La variété suivante") : évalué à la même toute
+        // première nuit que le bilan du chapitre 11 ci-dessus, même garde littérale du backlog
+        // ("au premier sleep résolu après que le flag narratif de C6.1 a déjà été révélé") — une
+        // famille "variete-suivante-*" séparée et mutuellement exclusive, jamais réévaluée
+        // ensuite (même garde-avant-choix que bilan-matin-* juste au-dessus).
+        if (
+          s.campaignFlags.includes("la-bonne-occasion") &&
+          !s.campaignFlags.some((f) => f.startsWith("variete-suivante-"))
+        ) {
+          // Écart assumé et documenté ici, pas deviné : le critère de sortie de l'epic évoque
+          // "Memory.unsoldStock[cultivarId]", mais campaign-memory.js documente lui-même (C6.4)
+          // que ce champ reste réservé et toujours vide — la vraie réponse dérivée est
+          // Contracts.unsoldStock(s.specimens, cultivarId), exactement comme deliverContract
+          // (garden-state-cmd-r.js) la calcule déjà. Lire littéralement le champ jamais rempli
+          // aurait rendu la branche (c) inatteignable. "Le contrat" désigné par le critère est le
+          // dernier signé (s.campaignContracts n'est jamais vidé — un contrat honoré y reste,
+          // seul son quota atteint le ferme) : à ce stade très amont de l'acte IV, il n'y en a
+          // normalement jamais plus d'un, mais cette lecture reste correcte même si un second a
+          // déjà été signé après que le premier a atteint son quota.
+          const lastContract =
+            s.campaignContracts[s.campaignContracts.length - 1] || null;
+          let signal;
+          if (!lastContract) {
+            signal = "chapter12NoContract";
+          } else {
+            const unsold = Contracts.unsoldStock(
+              s.specimens,
+              lastContract.cultivarId,
+            );
+            signal =
+              unsold > 0 ? "chapter12SuccessInvendus" : "chapter12SuccessSobre";
+          }
+          const varieteRevealed = Narrative.pendingReveal(
+            s.campaignFlags,
+            signal,
+          );
+          if (varieteRevealed) s.campaignFlags.push(varieteRevealed.id);
+          // Design §10, chapitre 12 : « Une ancienne note d'Alma apparaît... Puis une autre, à
+          // une date ultérieure, avec la même phrase. » Première révélation ici, au même sleep
+          // que les trois branches ci-dessus ; la seconde vit dans garden-state-cmd-r.js's
+          // deliverContract, au prochain contrat honoré strictement après celle-ci (jamais ici :
+          // ce même sleep ne peut pas aussi être "ultérieur" à lui-même).
+          const jeanneRevealed = Narrative.pendingReveal(
+            s.campaignFlags,
+            "jeanneGreenhouseNoteFirst",
+          );
+          if (jeanneRevealed) s.campaignFlags.push(jeanneRevealed.id);
+        }
+        // Epic C6.7 (design §10, chapitre 15 "Alma n'a pas la réponse"): at the first sleep once
+        // both upstream conditions hold — one of the two "premier-non-*" flags (C6.6) and
+        // "note-jeanne-serre-2" (C6.5, the second honoured contract) — and at least one Rainelle
+        // exists, reveal both chapter-15 texts together. Not a mutually-exclusive family like
+        // bilan-matin-*/variete-suivante-* above: each entry's own pendingReveal call is already
+        // idempotent (refuses an id already in campaignFlags), so no extra guard-before-choose is
+        // needed — a later sleep with the gate still true simply reveals nothing more, each text
+        // exactly once.
+        if (
+          s.campaignFlags.some((f) => f.startsWith("premier-non-")) &&
+          s.campaignFlags.includes("note-jeanne-serre-2") &&
+          s.rainelles.length > 0
+        ) {
+          const almaRevealed = Narrative.pendingReveal(
+            s.campaignFlags,
+            "almaReturnDiscoversRainelles",
+          );
+          if (almaRevealed) s.campaignFlags.push(almaRevealed.id);
+          const jeanneReconstRevealed = Narrative.pendingReveal(
+            s.campaignFlags,
+            "jeanneReconstitutionSeason",
+          );
+          if (jeanneReconstRevealed)
+            s.campaignFlags.push(jeanneReconstRevealed.id);
+        }
+        // Epic C6.23 (design §10, chapitre 15, dernière clause littérale). At the first sleep
+        // once "archives-restaurees" (C6.7, restoreArchiveLabels) is already present, reveal the
+        // closing chapter-15 constat: Jeanne, already a real visitor since C6.22, still has no
+        // real use for her greenhouse. Gated purely on the flag, never re-checking Jeanne's
+        // existence in code — she is unconditionally a real D.buildings entry since C6.22, so
+        // that condition is always true now (see the epic's own dependency note in
+        // campagne-backlog.md: "jamais une dépendance de code au sens strict").
+        if (s.campaignFlags.includes("archives-restaurees")) {
+          const jeanneGreenhouseRevealed = Narrative.pendingReveal(
+            s.campaignFlags,
+            "jeanneGreenhouseAwaitsUse",
+          );
+          if (jeanneGreenhouseRevealed)
+            s.campaignFlags.push(jeanneGreenhouseRevealed.id);
         }
         // Epic C2.2: the atomic night bilan. "sleep" is the single command a scripted 23h
         // transition and a voluntary early bedtime ("dormir plus tôt", design §3) both end up

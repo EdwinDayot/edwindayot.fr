@@ -176,6 +176,29 @@
       reward: { narrativeFlag: "waterPathRestored", potCapacity: 2 },
       requires: [],
     },
+    // Épic C6.1 (design §10, Acte IV, chapitre 10 "La bonne occasion") : npcId "basile", déjà réel
+    // (data-buildings.js, role "vendor", déjà porteur de "fibres-de-basile" depuis C4.7 — une
+    // seconde quête sur le même npcId, même précédent que "lea" avec first-harvest/first-drip/
+    // table-longue-lea). requires: ["brume-d-ines"] fixe le point d'entrée de l'Acte IV à la
+    // dernière quête écrite de l'Acte III (voir la note de Cartographe de campagne-backlog.md pour
+    // le raisonnement complet — aucune condition plus proche du texte du design n'existe encore en
+    // données). Objective item deliberately "cutting:pilea" quantity 1, même écart honnête que
+    // C4.2/C4.5/C4.7/C4.9 : aucun item "série commerciale" dédié n'existe dans le catalogue, le
+    // design l'autorise explicitement (§8, dernier paragraphe : "les détails de ces rencontres
+    // peuvent changer pendant l'écriture").
+    // reward.narrativeFlag réutilise le mécanisme générique depuis C4.8 pour révéler le texte du
+    // chapitre 10. Aucun autre reward : setVeilleuse/setPriseFortDebit (C5.2/C5.4) restent
+    // utilisables sans aucune condition — cette quête ne fait qu'annoncer les deux leviers déjà
+    // fonctionnels en moteur, jamais les débloquer ni les restreindre (voir sa propre entrée de
+    // campagne-backlog.md : "leur ajouter une condition romprait les tests déjà verts de
+    // C5.8/C5.15, qui les appellent directement sans jamais poser ce flag").
+    "occasion-de-basile": {
+      npcId: "basile",
+      title: "Basile propose une série commerciale",
+      objective: { type: "deliver", item: "cutting:pilea", quantity: 1 },
+      reward: { narrativeFlag: "commercialSeriesProposed" },
+      requires: ["brume-d-ines"],
+    },
   };
   P.quests = quests;
   if (typeof module !== "undefined") module.exports = { quests };

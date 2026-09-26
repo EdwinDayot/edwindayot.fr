@@ -1,0 +1,169 @@
+/* Campaign end-of-game orientation, part of the campaign layer (UMD: node module / browser
+   GardenCampaignEpilogue).
+
+   Epic C6.17 (design §10, chapitre 18 : « Trois orientations sont possibles : production toujours
+   intensive, accommodements partiels ou transformation durable » ; design §11, the system must
+   distinguish "au moins quatre parcours : joueur attentif dès le départ ; joueur qui découvre les
+   dégâts et change ; joueur qui effectue quelques gestes sans modifier son fonctionnement ; joueur
+   qui assume et poursuit l'intensification" — the three chapter-18 orientations are the condensed
+   version of those four parcours). The Cartographe's thirteenth-lot note (campagne-backlog.md)
+   found every signal this needs already real and filled in the engine — no new save field, no
+   migration: a pure derivation, same "dérivé plutôt que stocké" posture already applied to
+   Memory.bassinCommunLevel (C5.4) and Contracts.unsoldStock (C6.4), so this can never drift from
+   the real state it reads.
+
+   "intensive"/"partiel"/"durable" are this epic's own chosen identifiers — the design fixes no
+   literal keyword for the three orientations, only their French descriptions above.
+
+   `orientation(s)` never mutates its argument (called freely from a future epilogue screen/test at
+   any point in a real playthrough, not just once at chapter 18). Reads only:
+     - s.campaignMemory.nightlyActivity / s.campaignMemory.waterWithdrawals (C5.2/C5.4/C6.2): a
+       lever was really *used* at least once, never merely toggled on with nothing to act on — same
+       "posséder une veilleuse éteinte ne compte pas comme une nuit de travail" strictness already
+       applied throughout campaign-memory.js.
+     - s.campaignContracts (C6.4): a commercial contract was really signed at least once — engaging
+       commercially without ever touching a veilleuse/prise still counts as "engaged", so
+       everEngaged has to check all three independently rather than only the two lever journals.
+     - s.campaignMemory.habitatTransformations (C5.1/C6.26): the third lever (design §11, "extension
+       standardisée sur un espace vivant") was really engaged at least once — an
+       extendZoneOverHabitat call always appends here (C6.26), the only fact this lever leaves
+       behind since it has no per-tick journal of its own (no nightlyActivity/waterWithdrawals
+       entry — see garden-state-cmd-y.js's own header comment on why). Read independently of the
+       other two engagement signals, same reasoning as campaignContracts above: a player who only
+       ever engages this third lever, never touching veilleuse/prise/contrat, must not fall through
+       to the "jamais engagé" branch below.
+     - s.campaignStations.zones[].veilleuse / .priseFortDebit / .extensionCommerciale
+       (C5.2/C5.4/C6.2/C6.26): whether a lever is still active *right now*, at the moment
+       orientation() is read — the third lever's "still active" reads the same
+       extensionCommerciale flag garden-state-cmd-y.js itself flips, never a re-derivation from
+       habitatTransformations (which stays true even after a real conversion, C6.27's
+       markHabitatTransformationReturned marks an entry returned but never removes it — only the
+       zone's own flag reflects "right now").
+     - s.campaignFlags (C6.9/C6.28): the three real-cost renunciation flags (levier-veilleuse-coupee/
+       levier-prise-restituee/levier-contrat-reduit) plus the third lever's own
+       (levier-extension-rendue, C6.28) — proof a lever was actually reversed with a cost, never
+       guessed from a lever simply being off (a lever can be off because it was never turned on in
+       the first place, which everEngaged already separates out below).
+
+   Branch order, read literally off the backlog's own five-branch table:
+     1. !everEngaged -> "durable" (never touched a lever or a contract at all — "joueur attentif dès
+        le départ").
+     2. anyLeverActive && !anyLeverReversed -> "intensive" (a lever has served, is still on, no
+        renunciation ever recognized — "joueur qui assume et poursuit l'intensification").
+     3. !anyLeverActive && anyLeverReversed -> "durable" (no lever active any more, at least one
+        real, recognized renunciation — "joueur qui découvre les dégâts et change").
+     4. everything else (a lever still on despite a renunciation elsewhere, or a lever that served
+        then was turned off without any of C6.9's three reveals ever having had the chance to fire)
+        -> "partiel", read broadly per the backlog: a mixed or incomplete signal, never guessed
+        toward either extreme.
+
+   Honest limits, documented rather than guessed (backlog's own): this derives only an internal
+   string, never a text/scene/image (chapter 18's narration/rendering is a future epic once this
+   signal is real) ; it does not cover "la lecture différente du refus" (chapter 13/C6.6). Chapter
+   17's "protection contre une extension lucrative" branch is not covered here either — closed for
+   good by the Cartographe's own note above this epic (structurally unreachable,
+   s.campaignPassage.blocked can never become true again once restored).
+
+   Epic C6.28 revises this function (code-review finding, not a re-guess of the design): when this
+   epic first made the third lever's reversal narratively real (levier-extension-rendue), this
+   function still only knew about the first two levers — habitatTransformations was read nowhere,
+   so a playthrough that only ever engaged/reversed the third lever (extendZoneOverHabitat /
+   convertZoneToLivingSpace, C6.26/C6.27) with no veilleuse/prise/contrat ever touched fell through
+   to "!everEngaged -> durable", the right answer for the wrong reason (and the wrong answer
+   entirely — "intensive" — had that same player engaged the lever without ever reversing it: still
+   !everEngaged, still "durable"). Fixed by reading habitatTransformations/extensionCommerciale/
+   levier-extension-rendue exactly as symmetrically as the other two levers' own three signals,
+   documented inline above rather than bolted on as a special case.
+
+   Epic C6.18 adds `canOpen(s)`, also pure/never mutating: true only once `s.campaignEpilogue`
+   (garden-state-lifecycle.js/garden-state-validate.js, new this epic) has a real `unlocksOnDay`
+   (set the moment a Rainelle actually settles at the passage, C6.15 — see garden-state-cmd-f.js/
+   -u.js/-w.js's own comments for the three sites), the current day has reached it, and the
+   epilogue has not already been opened (`openedOnDay` still null) — `openEpilogue`
+   (garden-state-cmd-x.js) is the only place this can ever move from false to true, freezing
+   `orientation(s)`'s result at that exact moment rather than leaving it live.
+
+   Epic C6.20 adds `gift()`, reused by `openEpilogue` on its one success path to freeze
+   `s.campaignEpilogue.gift` (design §10, chapitre 18, last paragraph: "une jeune plante offerte
+   par un habitant peut rejoindre la maison : elle n'a pas été créée par le héros"). The design
+   fixes neither the species nor the giver, so both are this epic's own explicit, documented
+   choice — never a guess deferred to a future epic, never a value invented outside the two real
+   catalogues that already exist:
+     - speciesId "aster-des-vents": the one founding species (botany-genetics.js) whose palette
+       family (violet) direction-artistique.md already reserves and names for exactly this species
+       ("aster/violet non encore utilisé en jeu... à réserver pour l'Aster des vents") without ever
+       putting it on screen — this gift is that reservation's first real use, and its violet also
+       keeps the gifted plant visually distinct from anything the player has bred (the founder
+       palettes players actually reach through the pot lean green/warm, see C1.8's own six).
+     - giverId "iris": the only NPC in data-buildings.js whose role is "botanist" — offering a
+       plant is literally what that role already means in data-roles.js, so no other real
+       visitorId reads as coherently. Jeanne, named in the design at chapters 15/18, was not yet
+       a real visitorId when this epic fixed the choice; Épic C6.22 has since added her as one
+       (fondation seule — no distinct visual/narrative role beyond a generic resident), but that
+       does not by itself give a reason to move the gift here: this choice stays "iris", unrevised,
+       until a future epic gives an explicit design reason to reconsider it.
+     Both are fixed for every game (no derivation from orientation/seed/id): the design gives no
+     reason a gift species or giver should vary by playthrough, and inventing one now would be a
+     guess this epic has no basis for — left to a future epic if a real reason to vary ever shows
+     up. `gift()` takes no argument and returns a fresh object each call (never a shared mutable
+     reference two saves could alias). */
+(function (root) {
+  const ORIENTATIONS = { INTENSIVE: "intensive", PARTIEL: "partiel", DURABLE: "durable" };
+
+  const LEVER_REVERSAL_FLAGS = [
+    "levier-veilleuse-coupee",
+    "levier-prise-restituee",
+    "levier-contrat-reduit",
+    "levier-extension-rendue",
+  ];
+
+  // Pure: never mutates s. See header comment for the exact reading of each branch.
+  function orientation(s) {
+    const everEngaged =
+      Object.keys(s.campaignMemory.nightlyActivity).length > 0 ||
+      Object.keys(s.campaignMemory.waterWithdrawals).length > 0 ||
+      s.campaignMemory.habitatTransformations.length > 0 ||
+      s.campaignContracts.length > 0;
+    if (!everEngaged) return ORIENTATIONS.DURABLE;
+
+    const anyLeverActive =
+      s.campaignStations.zones.some((z) => z.veilleuse || z.extensionCommerciale) ||
+      s.campaignStations.bornes.some((b) => b.priseFortDebit);
+    const anyLeverReversed = LEVER_REVERSAL_FLAGS.some((flag) =>
+      s.campaignFlags.includes(flag),
+    );
+
+    if (anyLeverActive && !anyLeverReversed) return ORIENTATIONS.INTENSIVE;
+    if (!anyLeverActive && anyLeverReversed) return ORIENTATIONS.DURABLE;
+    return ORIENTATIONS.PARTIEL;
+  }
+
+  // Pure: never mutates s. See header comment (Epic C6.18) for what each field of
+  // s.campaignEpilogue means and who writes it.
+  function canOpen(s) {
+    return (
+      s.campaignEpilogue.unlocksOnDay !== null &&
+      s.campaignDay >= s.campaignEpilogue.unlocksOnDay &&
+      s.campaignEpilogue.openedOnDay === null
+    );
+  }
+
+  // Fixed for every game — see header comment for why "aster-des-vents"/"iris" are this epic's
+  // own explicit, documented choice rather than a derivation. Returns a fresh object every call.
+  const GIFT_SPECIES_ID = "aster-des-vents";
+  const GIFT_GIVER_ID = "iris";
+  function gift() {
+    return { speciesId: GIFT_SPECIES_ID, giverId: GIFT_GIVER_ID };
+  }
+
+  const api = {
+    ORIENTATIONS,
+    orientation,
+    canOpen,
+    gift,
+    GIFT_SPECIES_ID,
+    GIFT_GIVER_ID,
+  };
+  if (typeof module !== "undefined") module.exports = api;
+  else root.GardenCampaignEpilogue = api;
+})(globalThis);

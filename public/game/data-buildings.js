@@ -179,6 +179,63 @@
       roofColor: 0x5c4632,
       roofHeight: 2.7,
     },
+    // Épic C6.22 (campagne, phase 6) : fondation seule — Jeanne comme
+    // visitorId réel et son bâtiment, tous deux prérequis nommés par
+    // C6.5/C6.7/C6.20-C6.21 mais jamais posés jusqu'ici (voir le lot
+    // Cartographe qui a précédé cet epic). Rôle "resident" générique,
+    // comme hugo/zoe/villageois-*: aucune habillage "serre" distinctif
+    // tenté ici (verre/transparence, chapitre 9/15), délibérément laissé
+    // à un futur epic une fois cette fondation posée et vérifiée.
+    // Position {3,32} vérifiée contre le moteur réel (geometry.js/
+    // terrain.js/construction.js), pas devinée : zone 4 (coin de
+    // village), marge ≥1.8 unité de tout wallCircle de bâtiment existant
+    // (le plus proche : villageois-2), ≥5 unités de toute ressource, hors
+    // du rayon d'obstacle du passage du chapitre 17 ({-6,30}, ~9 unités),
+    // route piétonne réelle confirmée depuis le portail (C.approach).
+    // Teintes toutes reprises telles quelles de bâtiments déjà en usage
+    // (iris/ines), aucune couleur inventée : direction-artistique.md.
+    {
+      visitorId: "jeanne",
+      cx: 3,
+      cz: 32,
+      accent: 0x5f8f6a,
+      personColor: 0xe8d4a0,
+      role: "resident",
+      // Epic C6.25: the "resident" role's optional narrativeAction (data-roles.js)
+      // is what reaches restoreArchiveLabels (C6.7, garden-state-cmd-s.js) from a
+      // real player action — that command existed since C6.7 but no interaction
+      // ever called it (grep confirmed empty before this epic). Gated on
+      // "alma-retour" (already narrated by then) and self-closing once spent.
+      // Divergence from the backlog's own critère de sortie, verified against the
+      // real code rather than assumed: the text names "archiveLabelsRestored" as
+      // the flag to watch for, but that string is only garden-state-cmd-s.js's
+      // internal Narrative.pendingReveal *trigger* signal — the id actually
+      // pushed to s.campaignFlags is the narrative entry's own id,
+      // "archives-restaurees" (data-narrative.js, entry "archives-restaurees",
+      // trigger: "archiveLabelsRestored"). doneFlag below uses the real
+      // persisted id; using the trigger name instead would never match and the
+      // action would never self-close.
+      roleData: {
+        line: "trie de vieux carnets, près de la serre commune",
+        narrativeAction: {
+          flag: "alma-retour",
+          doneFlag: "archives-restaurees",
+          command: "restoreArchiveLabels",
+          label: "E · Restaurer les étiquettes",
+          activeStatus:
+            "peut aider à restaurer les deux noms sur les étiquettes",
+          doneStatus: "les étiquettes portent de nouveau les deux noms",
+        },
+      },
+      roofColor: 0x4a5a42,
+      // Epic C6.24 : seul bâtiment de visiteur à porter ce knob — lu par
+      // render-houses.js's buildHouse() pour remplacer this.mat.stone par le
+      // verre déjà en usage pour l'objet « Serre » du jardin libre sur les
+      // quatre panneaux de mur plats (arrière, deux murs latéraux, façade) ;
+      // pignons triangulaires (gableGeometry) et toit restent stone/roofColor
+      // inchangés (voir la limite honnête de C6.24 dans campagne-backlog.md).
+      greenhouse: true,
+    },
   ].map(
     ({
       visitorId,
@@ -192,6 +249,7 @@
       roofColor,
       roofHeight,
       chimney,
+      greenhouse,
     }) => ({
       visitorId,
       x: cx,
@@ -201,6 +259,7 @@
       roofHeight: roofHeight || ROOF_H,
       roofColor,
       chimney: !!chimney,
+      greenhouse: !!greenhouse,
       accent,
       personColor,
       role,
@@ -222,6 +281,7 @@
     zoe: "Zoé · sieste",
     "villageois-1": "Villageois 1 · coin de village",
     "villageois-2": "Villageois 2 · coin de village",
+    jeanne: "Jeanne · carnets",
   };
   const visitors = buildings.map((b) => ({
     id: b.visitorId,

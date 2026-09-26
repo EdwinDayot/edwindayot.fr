@@ -14,13 +14,23 @@
       // own clock check notices gameSeconds reset to 0 and ends nightfall on its own the next
       // frame), so this ordering just means a queued gesture scene never has to wait a frame
       // behind nightfall's still-active target.
+      // Epic C6.21: epilogueScene ranks alongside gestureScene (a brief mise-en-scène target),
+      // ahead of nightfall — the two realistically never overlap in practice (the epilogue can
+      // only ever open once a Rainelle has already settled at the passage, C6.15/C6.18, well past
+      // any point nightfall's own transition would still be running), but the ordering costs
+      // nothing and keeps every scripted-camera sibling in one shared, documented priority chain.
+      // currentEpilogueShot() (render-items.js) derives the live shot from elapsed time alone —
+      // this file never tracks or advances the sequence itself.
+      const epilogueShot = this.currentEpilogueShot();
       const target = this.inspection
         ? this.inspection.center.clone()
         : this.gestureScene
           ? this.gestureScene.center.clone()
-          : this.nightfall
-            ? this.nightfall.center.clone()
-            : new T.Vector3(this.position.x, 0.4, this.position.z - 1.7);
+          : epilogueShot
+            ? epilogueShot.center.clone()
+            : this.nightfall
+              ? this.nightfall.center.clone()
+              : new T.Vector3(this.position.x, 0.4, this.position.z - 1.7);
       if (this.inspection) {
         if (this.ratio < 1) target.y -= this.inspection.span * 0.16;
         else
@@ -48,11 +58,13 @@
         ? this.inspection.span
         : this.gestureScene
           ? this.gestureScene.span
-          : this.nightfall
-            ? this.nightfall.span
-            : this.overview
-              ? Math.max(19, 22 / this.ratio)
-              : this.span * (this.ratio < 1 ? 1.12 : 1);
+          : epilogueShot
+            ? epilogueShot.span
+            : this.nightfall
+              ? this.nightfall.span
+              : this.overview
+                ? Math.max(19, 22 / this.ratio)
+                : this.span * (this.ratio < 1 ? 1.12 : 1);
       this.camera.top = span / 2;
       this.camera.bottom = -span / 2;
       this.camera.left = (-span * this.ratio) / 2;

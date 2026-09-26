@@ -52,6 +52,34 @@
     }
   });
   renameInput.addEventListener("blur", confirmRename);
+  // Epic C2.5v-b: the second free-form text field (see index.html's own comment on
+  // #campaign-text-input) — same commit-on-Enter/blur, cancel-on-Escape shape as renameInput
+  // above, but what committing means depends on `dataset.kind` (set by garden-dispatch.js's
+  // "teaching-edit-field"/"revise-phrase-edit"): a teaching field is client-only scratch state
+  // (A.teachingDraft, gathered before demonstrateGesture is ever called) while the phrase is
+  // already real, persisted draft state, corrected through the real reviseGesturePhrase command.
+  const campaignInput = $("campaign-text-input");
+  const confirmCampaignInput = () => {
+    if (campaignInput.hidden) return;
+    const kind = campaignInput.dataset.kind,
+      field = campaignInput.dataset.field,
+      value = campaignInput.value;
+    campaignInput.hidden = true;
+    if (kind === "teaching-field" && A.teachingDraft) A.teachingDraft[field] = value;
+    else if (kind === "teaching-phrase") A.execute({ type: "reviseGesturePhrase", phrase: value });
+  };
+  campaignInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      confirmCampaignInput();
+      A.canvas.focus({ preventScroll: true });
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      campaignInput.hidden = true;
+      A.canvas.focus({ preventScroll: true });
+    }
+  });
+  campaignInput.addEventListener("blur", confirmCampaignInput);
   window.addEventListener("keydown", (e) => {
     if (
       e.ctrlKey ||

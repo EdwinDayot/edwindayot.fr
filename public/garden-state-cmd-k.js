@@ -18,7 +18,12 @@
    Epic C4.6 (design §10, chapitre 6): demonstrateGesture is the other entry point that can
    produce Rainelles.MULTIPLY_REFUSAL (garden-state-cmd-j.js's teachGesture is the first) — same
    one-time narrative reveal fired here, so whichever path the player tries first is the one that
-   shows it. */
+   shows it.
+
+   Epic C6.6 (design §10, chapitre 13 "Le premier non"): the same refusal, once chapter 12's own
+   flag exists and the refused Rainelle carries a bourgeon, also fires the "premier-non-*" reveal
+   — see garden-state-cmd-j.js's header comment and data-narrative.js's chapter13Signal, shared by
+   both entry points so the gate can never drift between them. */
 (function (root) {
   const Rainelles =
     typeof module !== "undefined"
@@ -60,6 +65,21 @@
               "firstMultiplyRefusalSeen",
             );
             if (revealed) s.campaignFlags.push(revealed.id);
+            // Epic C6.6: unlike teachGesture (garden-state-cmd-j.js), the Rainelle taught here
+            // isn't looked up until confirmTeaching — resolved here too, read-only, purely to
+            // evaluate the chapter 13 gate (rainelle.bourgeon).
+            const rainelle = s.rainelles.find(
+              (r) => r.id === s.campaignTeaching.rainelleId,
+            );
+            const signal = Narrative.chapter13Signal(
+              s.campaignFlags,
+              rainelle,
+              s.campaignMemory,
+            );
+            if (signal) {
+              const premierNon = Narrative.pendingReveal(s.campaignFlags, signal);
+              if (premierNon) s.campaignFlags.push(premierNon.id);
+            }
           }
           return fail(error);
         }

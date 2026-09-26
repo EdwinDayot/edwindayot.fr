@@ -221,6 +221,18 @@
           if (entry)
             rows.push({ title: entry.title, detail: entry.text, action: null });
         }
+        // Epic C6.21 (design §10, chapitre 18): the real trigger point openEpilogue (C6.18) lacked
+        // until now — visible only once Epilogue.canOpen(m.s) is true, same "no row at all before
+        // the predicate holds" posture as the pending-cultivar rows above, rather than an always-
+        // present disabled row (unlike the always-relevant per-Rainelle "Regarde-moi" rows in the
+        // "observation" panel below, this action simply does not exist yet before its gate opens).
+        const Epilogue = window.GardenCampaignEpilogue;
+        if (Epilogue?.canOpen(m.s))
+          rows.push({
+            title: "Ouvrir l'épilogue",
+            detail: "Le domaine, dans l'état où tu l'as laissé.",
+            action: "open-epilogue",
+          });
       } else if (m.panel === "nightfall") {
         // Epic C2.2v (design §3: "le jeu propose de préparer ou de confirmer le pot dans un
         // écran suspendu... il reste possible de ne rien croiser"). Shows whatever sowPot
@@ -266,6 +278,111 @@
               : "persistance-geste-vide"
           ];
         if (entry) rows.push({ title: entry.title, detail: entry.text });
+      } else if (m.panel === "epilogue-scene") {
+        // Epic C6.21 (design §10, chapitre 18). Read-only, same shape as "gesture-scene" above:
+        // holds the exact two narrative texts already revealed on the same successful openEpilogue
+        // call (C6.19 — the orientation's own text, keyed "epilogue-" + orientation, plus the
+        // common "epilogue-suite" closing clause always revealed alongside it, garden-state-cmd-
+        // x.js) while render-items.js's beginEpilogueScene() keeps the camera on its wide shot —
+        // never a second, independent text. No bespoke "skip" button: Échap already closes any
+        // panel and ends the scene the same way (garden-cmd.js's closePanel calling
+        // endEpilogueScene).
+        const Narrative = window.GardenNarrative,
+          orientationEntry =
+            Narrative?.TEXTS["epilogue-" + m.s.campaignEpilogue.orientation],
+          suiteEntry = Narrative?.TEXTS["epilogue-suite"];
+        if (orientationEntry)
+          rows.push({ title: orientationEntry.title, detail: orientationEntry.text });
+        if (suiteEntry) rows.push({ title: suiteEntry.title, detail: suiteEntry.text });
+      } else if (m.panel === "teaching") {
+        // Epic C2.5v-b (design §5's own "quatre moments" screen, deferred from C2.5 — see
+        // garden-state-cmd-k.js's header comment): the three literal rendering clauses C2.5v's
+        // status names — phrase display/correction, real-world trajectory preview, camera scene —
+        // all read straight from the real command state (s.campaignTeaching), never a duplicate.
+        // The camera scene itself (beginGestureScene/endGestureScene, C5.14) and the trajectory
+        // overlay (render-flow.js's sync()) are wired at their own call sites, not from here — this
+        // function only ever builds rows, same separation every other panel branch keeps.
+        const teaching = m.s.campaignTeaching;
+        if (!teaching)
+          rows.push({
+            title: "Aucune leçon en cours",
+            detail: "Reviens depuis le panneau d'observation, ligne d'une Rainelle.",
+          });
+        else {
+          const rainelle = m.s.rainelles.find((r) => r.id === teaching.rainelleId);
+          rows.push({
+            title: `« Regarde-moi » — ${rainelle?.name || teaching.rainelleId}`,
+            detail: "Le temps s'arrête le temps de la leçon.",
+          });
+          if (teaching.step === "watching") {
+            const Rainelles = window.GardenRainelles,
+              draft = m.teachingDraft || {};
+            rows.push({
+              title: "Verbe",
+              detail: draft.verbe || "(à choisir)",
+              action: "teaching-cycle-verb",
+            });
+            for (const [field, label] of [
+              ["poste", "Poste"],
+              ["source", "Source"],
+              ["destination", "Destination"],
+              ["condition", "Condition (optionnelle)"],
+            ])
+              rows.push({
+                title: label,
+                detail: draft[field] || "(vide)",
+                action: "teaching-edit-field",
+                data: { field },
+              });
+            // Epic C2.6a's own gap (still true today, see its header comment): poste/source/
+            // destination/condition are free text, never validated against the real station
+            // registry — this read-only reference row is the cheapest way to give a player
+            // something correct to type without building a new in-world selection mechanism the
+            // criterion doesn't ask for.
+            const St = m.s.campaignStations,
+              ids = (arr) => (arr.length ? arr.map((x) => x.id).join(", ") : "aucune");
+            rows.push({
+              title: "Stations connues",
+              detail: `Bornes : ${ids(St.bornes)}. Zones : ${ids(St.zones)}. Paniers : ${ids(St.paniers)}.`,
+            });
+            rows.push({
+              title: "Démontrer le geste",
+              detail: "Propose une phrase et un essai de trajectoire, à corriger ensuite.",
+              action: "demonstrate-teaching",
+              disabled:
+                !Rainelles.VERBS.includes(draft.verbe) ||
+                !draft.poste ||
+                !draft.source ||
+                !draft.destination,
+            });
+          } else {
+            const Trajectory = window.GardenCampaignTeachingTrajectory,
+              resolved = Trajectory
+                ? Trajectory.resolveTrajectory(m.s, teaching.draft.trajectory)
+                : { ok: false, error: "" };
+            rows.push({
+              title: "Phrase proposée",
+              detail: teaching.draft.phrase,
+              action: "revise-phrase-edit",
+            });
+            rows.push({
+              title: "Trajectoire dans le monde",
+              detail: resolved.ok
+                ? `Visible au sol, en surbrillance (${resolved.points.length} étape(s)).`
+                : `Non localisable pour l'instant : ${resolved.error}`,
+            });
+            rows.push({
+              title: "Confirmer l'enseignement",
+              detail: "Applique le geste à la Rainelle et reprend le temps.",
+              action: "confirm-teaching",
+            });
+          }
+          rows.push({
+            title: "Annuler la leçon",
+            detail: "Reprend le temps sans rien enseigner.",
+            action: "cancel-teaching",
+          });
+        }
       } else if (m.panel === "visitor")
         for (const r of m.s.requests)
           rows.push({
@@ -299,6 +416,51 @@
         // whole time this panel sits open while the game is paused, its main use case for
         // stepping), so recomputing only when it actually moves loses no accuracy and matches
         // rainelle-movement.js's own recomputation cadence instead of outpacing it.
+        //
+        // Epic C2.5v-b: the real trigger the mandate requires ("un vrai point de déclenchement...
+        // probablement une action depuis la ligne d'une Rainelle dans le panneau d'observation") —
+        // one row per Rainelle, never memoized with the rest of this panel below (its `disabled`
+        // state depends on m.s.campaignTeaching, which can flip without s.elapsed moving, exactly
+        // the same reason the step button below stays outside the elapsed-memoized cache too).
+        for (const r of m.s.rainelles)
+          rows.push({
+            title: `Rainelle ${r.name || r.id}`,
+            detail: r.geste
+              ? `Geste appris : ${r.geste.verbe}. « Regarde-moi » pour lui en enseigner un autre.`
+              : "Aucun geste appris pour l'instant. « Regarde-moi » pour lui en enseigner un.",
+            action: "begin-teaching",
+            data: { id: r.id },
+            disabled: !!m.s.campaignTeaching,
+          });
+        // Epic C6.2: the transfer rows built into the cache below already display veilleuse/
+        // priseFortDebit (design §5's "un mode d'observation en lecture seule" — C2.9), but no
+        // command ever reached them (verified: no setVeilleuse/setPriseFortDebit call site in
+        // this file before this epic) — the exact same "moteur posé avant l'écran qui l'atteint"
+        // gap C2.5v-b already closed for teaching. Kept out of the elapsed-memoized cache below
+        // for the same reason as the Rainelle rows just above: setVeilleuse/setPriseFortDebit
+        // (garden-state-cmd-p.js/-q.js) never advance s.elapsed themselves (only a real tick
+        // does), so a row cached on s.elapsed would keep showing the pre-click label until the
+        // next tick landed instead of reflecting the click immediately.
+        for (const zone of m.s.campaignStations.zones)
+          rows.push({
+            title: `Zone ${zone.id} — veilleuse`,
+            detail: zone.veilleuse
+              ? "Allumée : la zone continue de travailler la nuit."
+              : "Éteinte : la zone se repose la nuit.",
+            action: "toggle-veilleuse",
+            data: { zoneId: zone.id, active: !zone.veilleuse },
+            buttonLabel: zone.veilleuse ? "Éteindre" : "Allumer",
+          });
+        for (const borne of m.s.campaignStations.bornes)
+          rows.push({
+            title: `Borne ${borne.id} — prise à fort débit`,
+            detail: borne.priseFortDebit
+              ? "Activée : le débit augmente au prix du bassin commun."
+              : "Désactivée : débit normal, le bassin commun ne baisse pas pour cette borne.",
+            action: "toggle-prise-fort-debit",
+            data: { borneId: borne.id, active: !borne.priseFortDebit },
+            buttonLabel: borne.priseFortDebit ? "Éteindre" : "Allumer",
+          });
         if (!this._observationCache || this._observationCache.elapsed !== m.s.elapsed) {
           const Observation = window.GardenCampaignObservation;
           const KIND_LABELS = { borne: "Borne", zone: "Zone", panier: "Panier" };

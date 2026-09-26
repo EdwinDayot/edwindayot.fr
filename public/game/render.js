@@ -47,6 +47,19 @@
       // id -> { kind, group } — same "build once, cache, reposition/update every sync" pattern as
       // `this.rainelleModels` just above.
       this.stationModels = new Map();
+      // Epic C2.5v-b: a single overlay Group for the "reviewing" teaching draft's resolved
+      // trajectory (never one per station like rainelleModels/stationModels above — there is at
+      // most one lesson in review at a time, garden-state-cmd-k.js's own "une leçon est déjà en
+      // cours" guard). `teachingTrajectoryKey` is the JSON of the last trajectory id list the
+      // Group was built from, so sync() rebuilds only on a real change, same posture as
+      // buildCampaignHouse's own campaignHouseAccueilStatus field.
+      this.teachingTrajectoryModel = null;
+      this.teachingTrajectoryKey = null;
+      // Epic C6.21: the epilogue's gifted young plant (s.campaignEpilogue.gift, C6.20) — a single,
+      // non-collection persistent model, same shape as this.teachingTrajectoryModel above rather
+      // than a per-id Map like rainelleModels/stationModels, since a game only ever has exactly
+      // one gift, frozen exactly once (openEpilogue is one-way, C6.18).
+      this.epilogueGiftModel = null;
       this.zoneModels = [];
       this.nodes = new Map();
       this.routes = [];
@@ -159,6 +172,7 @@
       this.buildActors();
       this.buildHouses();
       this.buildCampaignHouse();
+      this.buildCampaignPassage();
     }
     // y is an offset above the real ground height at (point.x, point.z), not
     // an absolute world Y — every caller already means "N units above where

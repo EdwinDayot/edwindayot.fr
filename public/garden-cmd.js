@@ -39,8 +39,21 @@
     // guarantee design §14 asks for ("permettre de raccourcir une scène"). No-ops when no scene
     // is playing, same guard shape as endInspection() above.
     A.view.endGestureScene();
+    // Epic C6.21: same no-op-when-inactive guard as endInspection/endGestureScene above — the
+    // epilogue scene has no auto-timeout (render-items.js's own beginEpilogueScene comment), so
+    // Échap/the × button is its only way to end early.
+    A.view.endEpilogueScene();
+    // Epic C2.5v-b: closing the "teaching" screen any other way than the dedicated Confirmer/
+    // Annuler buttons (Échap, the × button, opening a different panel) must not strand
+    // s.campaignTeaching mid-review with the campaign clock paused forever — same "no dead end"
+    // guarantee endGestureScene/endInspection above already give every other panel. A no-op once
+    // confirmTeaching/cancelTeaching has already cleared it: garden-dispatch.js's own
+    // "confirm-teaching"/"cancel-teaching" call this function AFTER their own command already ran.
+    if (A.panel === "teaching" && A.game.s.campaignTeaching)
+      A.execute({ type: "cancelTeaching" });
     A.panel = "";
     A.cutting = null;
+    A.teachingDraft = null;
     A.resetInput();
     A.canvas.focus({ preventScroll: true });
     A.selectSlot(A.activeSlot);
@@ -227,6 +240,26 @@
     A.view.endInspection();
     A.view.endNightfallTransition();
     A.view.endGestureScene();
+    // Epic C6.21: same reasoning as endGestureScene/endInspection above (an in-progress epilogue
+    // scene must never survive into a newly loaded game) — endEpilogueScene() also removes this
+    // scene's own transient specimen, but never the persistent gift model itself, which is why
+    // resetEpilogueGift() (below) is a separate, explicit call, same split as endGestureScene
+    // versus resetTeachingTrajectory just below it.
+    A.view.endEpilogueScene();
+    // Epic C6.21: an imported/restored save can carry a DIFFERENT s.campaignEpilogue.gift (a
+    // different founder species, or none yet) than the one the current gift plant, if any, was
+    // built from — render-flow.js's sync() only ever builds this model once per app lifetime
+    // (guarded on "not yet built", never on which game it belongs to), so it never rebuilds on its
+    // own across two different games. Reset explicitly, same posture as resetTeachingTrajectory.
+    A.view.resetEpilogueGift();
+    // Epic C2.5v-b: an imported/restored save can carry a completely different campaignStations
+    // registry (different ids resolving to different real positions) than the one the current
+    // overlay, if any, was built from — reset it explicitly rather than trust sync()'s own
+    // "rebuild only when draft.trajectory's id list changes" cache key, which could otherwise
+    // coincidentally match across two unrelated games (station ids are assigned from the same
+    // deterministic per-registry counters, b0/z0/pn0... in both).
+    A.view.resetTeachingTrajectory();
+    A.teachingDraft = null;
     A.nightSequence = false;
     A.cancelBuild();
     A.game = next;
