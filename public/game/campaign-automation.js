@@ -240,12 +240,12 @@
     let count = 0;
     for (const specimen of s.specimens) {
       if (count >= limit) break;
-      if (!Cultivars.isMature(specimen) || !specimen.readyToProduce) continue;
+      if (!Cultivars.isMature(s, specimen) || !specimen.readyToProduce) continue;
       if (C.distance(zone, specimen) > ZONE_WORK_RANGE) continue;
       if (total >= panier.capacity) break;
       panier.buffer[specimen.cultivarId] =
         (panier.buffer[specimen.cultivarId] || 0) + 1;
-      Cultivars.setReadyToProduce(specimen, false);
+      Cultivars.setReadyToProduce(s, specimen, false);
       total++;
       count++;
       harvested = true;
@@ -345,8 +345,8 @@
   // not an attempt at one; a fuller model is future work, not this epic's.
   function updateSpecimenReadiness(s) {
     for (const specimen of s.specimens)
-      if (Cultivars.isMature(specimen) && !specimen.readyToProduce)
-        Cultivars.setReadyToProduce(specimen, true);
+      if (Cultivars.isMature(s, specimen) && !specimen.readyToProduce)
+        Cultivars.setReadyToProduce(s, specimen, true);
   }
 
   // Epic C5.2 (design §11, "veilleuses de croissance... continuent de travailler la nuit"): called

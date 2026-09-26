@@ -149,7 +149,7 @@ test("doRecolter under runNightWork: past the overexertion threshold, only FATIG
   const specimens = [0, 1, 2].map(() =>
     Cultivars.createSpecimen(g.s, { cultivarId, x: 0, z: 0, stage: Cultivars.MATURE_STAGE }),
   );
-  for (const sp of specimens) Cultivars.setReadyToProduce(sp, true);
+  for (const sp of specimens) Cultivars.setReadyToProduce(g.s, sp, true);
   teach(g, rainelle.id, { verbe: "recolter", poste: zone.id, source: "x", destination: panier.id });
   assert.equal(g.command({ type: "setVeilleuse", zoneId: zone.id, active: true }).ok, true);
   g.s.campaignMemory.overexertion[rainelle.id] = Memory.OVEREXERTION_THRESHOLD + 1;

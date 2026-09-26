@@ -46,6 +46,7 @@ test("createSpecimen assigns a stable id and appends the specimen to s.specimens
     x: 2.5,
     z: -1,
     stage: 0,
+    plantedAt: 0,
     moistureAt: 0,
     readyToProduce: false,
   });

@@ -110,7 +110,7 @@
       return { kind: "poste-manquant", message: "Poste introuvable : vérifie la zone et le panier." };
     const ready = s.specimens.some(
       (sp) =>
-        Cultivars.isMature(sp) &&
+        Cultivars.isMature(s, sp) &&
         sp.readyToProduce &&
         C.distance(zone, sp) <= Automation.ZONE_WORK_RANGE,
     );

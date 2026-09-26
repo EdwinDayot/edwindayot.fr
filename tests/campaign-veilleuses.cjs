@@ -123,8 +123,8 @@ test("sleep: recolter under a veilleuse still respects the destination panier's 
   panier.capacity = 1;
   const a = Cultivars.createSpecimen(g.s, { cultivarId, x: 0, z: 0, stage: Cultivars.MATURE_STAGE });
   const b = Cultivars.createSpecimen(g.s, { cultivarId, x: 0, z: 0, stage: Cultivars.MATURE_STAGE });
-  Cultivars.setReadyToProduce(a, true);
-  Cultivars.setReadyToProduce(b, true);
+  Cultivars.setReadyToProduce(g.s, a, true);
+  Cultivars.setReadyToProduce(g.s, b, true);
   teach(g, rainelle.id, { verbe: "recolter", poste: zone.id, source: "x", destination: panier.id });
   assert.equal(g.command({ type: "setVeilleuse", zoneId: zone.id, active: true }).ok, true);
 

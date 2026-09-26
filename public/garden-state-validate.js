@@ -459,9 +459,19 @@
             !count(sp.stage) ||
             (sp.moistureAt !== undefined &&
               !finite(sp.moistureAt, 0, Number.MAX_SAFE_INTEGER)) ||
+            // Epic C7.2: plantedAt can legitimately be negative (createSpecimen backdates it for
+            // a specimen created with an explicit non-zero `stage`, a setup convenience — see
+            // its own comment), so this only checks it is a real finite number, no lower bound
+            // like moistureAt's own check above.
+            (sp.plantedAt !== undefined &&
+              !finite(
+                sp.plantedAt,
+                -Number.MAX_SAFE_INTEGER,
+                Number.MAX_SAFE_INTEGER,
+              )) ||
             (sp.readyToProduce !== undefined &&
               typeof sp.readyToProduce !== "boolean") ||
-            (sp.readyToProduce === true && !Cultivars.isMature(sp)),
+            (sp.readyToProduce === true && !Cultivars.isMature(s, sp)),
         ))
     )
       throw Error("Spécimen invalide.");
@@ -956,8 +966,13 @@
     // undefined so specimenMoisture/setReadyToProduce always see a well-formed specimen.
     // moistureAt defaults to "fully moist as of right now" (the save's own s.elapsed) rather
     // than 0, so a specimen from before this epic doesn't retroactively look bone dry.
+    // Epic C7.2: plantedAt migrates the same way, and for the same reason — a specimen saved
+    // before this epic only lacks this one field. It defaults to s.elapsed (never 0), so an
+    // existing specimen doesn't retroactively look like it was just planted and instantly become
+    // mature at load — specimenStage(s, sp) on a freshly migrated specimen is exactly 0.
     result.specimens = (result.specimens ?? []).map((sp) => ({
       moistureAt: s.elapsed ?? 0,
+      plantedAt: s.elapsed ?? 0,
       readyToProduce: false,
       ...sp,
     }));

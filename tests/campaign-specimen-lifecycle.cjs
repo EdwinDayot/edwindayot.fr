@@ -73,18 +73,21 @@ test("isMature is true only at the last growth stage", () => {
   const cv = makeCultivar(g);
   assert.equal(
     Cultivars.isMature(
+      g.s,
       Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 0, z: 0, stage: 0 }),
     ),
     false,
   );
   assert.equal(
     Cultivars.isMature(
+      g.s,
       Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 0, z: 0, stage: 1 }),
     ),
     false,
   );
   assert.equal(
     Cultivars.isMature(
+      g.s,
       Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 0, z: 0, stage: 2 }),
     ),
     true,
@@ -101,7 +104,7 @@ test("setReadyToProduce refuses an immature specimen and never mutates it on ref
     stage: 1,
   });
   assert.throws(
-    () => Cultivars.setReadyToProduce(young, true),
+    () => Cultivars.setReadyToProduce(g.s, young, true),
     /immature/,
   );
   assert.equal(young.readyToProduce, false);
@@ -116,9 +119,9 @@ test("setReadyToProduce marks a mature specimen ready, and can also unmark it re
     z: 0,
     stage: 2,
   });
-  Cultivars.setReadyToProduce(mature, true);
+  Cultivars.setReadyToProduce(g.s, mature, true);
   assert.equal(mature.readyToProduce, true);
-  Cultivars.setReadyToProduce(mature, false);
+  Cultivars.setReadyToProduce(g.s, mature, false);
   assert.equal(mature.readyToProduce, false);
   const young = Cultivars.createSpecimen(g.s, {
     cultivarId: cv.id,
@@ -126,7 +129,7 @@ test("setReadyToProduce marks a mature specimen ready, and can also unmark it re
     z: 0,
     stage: 0,
   });
-  assert.doesNotThrow(() => Cultivars.setReadyToProduce(young, false));
+  assert.doesNotThrow(() => Cultivars.setReadyToProduce(g.s, young, false));
 });
 
 test("A specimen with readyToProduce true but an immature stage is rejected at load", () => {
@@ -192,7 +195,7 @@ test("A specimen's moistureAt/readyToProduce survive a real JSON save/reload rou
     stage: 2,
   });
   Cultivars.waterSpecimen(sp, 123);
-  Cultivars.setReadyToProduce(sp, true);
+  Cultivars.setReadyToProduce(g.s, sp, true);
   const reloaded = new GardenState(JSON.parse(JSON.stringify(g.serialize())));
   assert.deepEqual(reloaded.s.specimens[0], sp);
 });

@@ -121,7 +121,7 @@ test("recolter: a ready specimen in range with room in the panier is au-travail"
     z: 0,
     stage: Cultivars.MATURE_STAGE,
   });
-  Cultivars.setReadyToProduce(specimen, true);
+  Cultivars.setReadyToProduce(g.s, specimen, true);
   teach(rainelle, {
     verbe: "recolter",
     poste: zone.id,
@@ -144,7 +144,7 @@ test("recolter: a ready specimen but a full destination panier is sortie-pleine"
     z: 0,
     stage: Cultivars.MATURE_STAGE,
   });
-  Cultivars.setReadyToProduce(specimen, true);
+  Cultivars.setReadyToProduce(g.s, specimen, true);
   teach(rainelle, {
     verbe: "recolter",
     poste: zone.id,

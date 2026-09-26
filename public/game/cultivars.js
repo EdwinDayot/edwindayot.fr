@@ -14,8 +14,18 @@
    specimen stores `moistureAt` — the elapsed instant its moisture was last refreshed — and
    `specimenMoisture` computes the current value on demand from `elapsed - moistureAt`, the same
    "store a timestamp, compare it to the current s.elapsed" principle already used by the free
-   garden's `plant.boostUntil` (never the wall clock). Maturity is even simpler: derived straight
-   from `stage`, never stored redundantly. */
+   garden's `plant.boostUntil` (never the wall clock).
+
+   Epic C7.2 gives growth stage the same "store a timestamp, derive on demand" treatment moisture
+   already has, since nothing before this epic ever advanced a specimen's stage over time
+   (campaign-automation.js's own header comment named this gap explicitly). `plantedAt` — the
+   elapsed instant a specimen was planted — is stored once, at creation, and `specimenStage`
+   derives the current stage from `s.elapsed - plantedAt` and a fixed duration per stage, never
+   from the raw `stage` field. `stage` itself stays on the object (a specimen created with an
+   explicit non-zero `stage`, the convention this file's own tests and several others use to get
+   an instantly mature specimen for setup, still gets one via a backdated `plantedAt` — see
+   `createSpecimen`) but is no longer the source of truth `isMature`/consumers read: a future
+   rendu epic that gives specimens a persistent world model is what would actually read it. */
 (function (root) {
   // Traits are frozen at creation: two calls with the same input never re-derive different
   // values, and nothing here recomputes them later from parentIds.
@@ -40,10 +50,23 @@
   // guess, easy to revisit once C2.6c's watering gesture gives it something to be calibrated
   // against.
   const MOISTURE_DECAY_PER_ELAPSED_SECOND = 100 / (3 * 3600);
+  // Epic C7.2: how long a specimen spends at each stage before advancing, in simulated elapsed
+  // seconds — a first, easily revisable guess (no growth timer existed anywhere before this epic
+  // to calibrate against), named rather than left as a magic number, on the same discipline as
+  // MOISTURE_DECAY_PER_ELAPSED_SECOND just above. Two transitions (0 -> 1 -> MATURE_STAGE) at
+  // this duration mean six hours of simulated elapsed time from planting to maturity.
+  const STAGE_DURATION_ELAPSED_SECONDS = 3 * 3600;
   // stage 0 is a freshly planted cutting/seedling; later epics (C1.7/C1.8) attach a rendered
   // form per stage. No trait ever lands on the specimen itself — see specimenTraits below.
   // moistureAt is the elapsed instant the specimen was last "fully moist" (creation counts as a
   // watering); readyToProduce starts false and can only ever be set once mature (setReadyToProduce).
+  // plantedAt is the elapsed instant specimenStage derives from (Epic C7.2). A specimen created
+  // with the default stage (0) simply gets plantedAt = s.elapsed, the ordinary/real case (no real
+  // command ever passes `stage` — garden-state-cmd-h.js's plantSpecimen/multiplySpecimen never
+  // do). `stage` itself is still stored on the object, and an explicit non-zero `stage` backdates
+  // plantedAt so specimenStage(s, specimen) derives that exact same stage right away, with zero
+  // drift between the two — this is what keeps every existing "createSpecimen(..., { stage:
+  // Cultivars.MATURE_STAGE })" test-setup convenience working unchanged after this epic.
   function createSpecimen(s, { cultivarId, x, z, stage = 0 }) {
     const specimen = {
       id: `sp${s.specimenNextId++}`,
@@ -51,6 +74,7 @@
       x,
       z,
       stage,
+      plantedAt: s.elapsed - stage * STAGE_DURATION_ELAPSED_SECONDS,
       moistureAt: s.elapsed,
       readyToProduce: false,
     };
@@ -75,14 +99,27 @@
   function waterSpecimen(specimen, elapsed) {
     specimen.moistureAt = elapsed;
   }
-  function isMature(specimen) {
-    return specimen.stage === MATURE_STAGE;
+  // Epic C7.2: pure/lazy, mirrors specimenMoisture's own shape exactly — never mutates
+  // `specimen`, always recomputes from `s.elapsed - specimen.plantedAt`, so the same pair of
+  // arguments always yields the same result, before or after a save/reload, and two calls
+  // without advancing s.elapsed in between agree. Floors at 0 (never a negative stage, even if
+  // plantedAt were ever ahead of s.elapsed) and caps at MATURE_STAGE (never advances past the
+  // last stage no matter how long a specimen is left alone).
+  function specimenStage(s, specimen) {
+    const since = Math.max(0, s.elapsed - specimen.plantedAt);
+    return Math.min(
+      MATURE_STAGE,
+      Math.floor(since / STAGE_DURATION_ELAPSED_SECONDS),
+    );
+  }
+  function isMature(s, specimen) {
+    return specimenStage(s, specimen) === MATURE_STAGE;
   }
   // The one guard this epic's exit criterion requires: an immature specimen can never be marked
   // ready to produce. Throws rather than returning a fail() shape because this is a schema-layer
   // invariant (like garden-state-validate.js's own throws), not yet reachable from any command.
-  function setReadyToProduce(specimen, ready) {
-    if (ready && !isMature(specimen))
+  function setReadyToProduce(s, specimen, ready) {
+    if (ready && !isMature(s, specimen))
       throw new Error(
         "Spécimen immature : ne peut pas être marqué prêt à produire.",
       );
@@ -94,9 +131,11 @@
     specimenTraits,
     specimenMoisture,
     waterSpecimen,
+    specimenStage,
     isMature,
     setReadyToProduce,
     MATURE_STAGE,
+    STAGE_DURATION_ELAPSED_SECONDS,
   };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenCultivars = api;
