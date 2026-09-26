@@ -28,7 +28,23 @@
    properties — bounded geometry memory regardless of scale, and a per-specimen draw/triangle cost
    that stays stable (not accelerating) across tiers — rather than an assertion that would either
    be false or would have to be silently weakened to pass. Consigné aussi dans docs/campagne.md,
-   pas seulement ici. */
+   pas seulement ici.
+
+   Epic C7.9 update, MEASURED against this exact updated page before writing the new assertion
+   below (raw numbers: baseline calls=116 at n=0; deltas 224/680/1360 at n=40/120/240 — see the
+   commit message): per-specimen draw calls dropped from the ~6 recorded above to ~5.6–5.67 once
+   stems are pooled into a shared InstancedMesh (render-instances.js) instead of one Mesh per
+   specimen — only one of this test's two cultivars (`charge-b`, tige-dressee) has a stem at all
+   (`charge-a` is oreille-de-pluie, port "rosette", no stem — botany-hybrids.js's buildSkeleton
+   never builds one for it), so the population-wide average drop is roughly half a call per
+   specimen, not a full one, exactly as expected for a 50/50 mix of the two cultivars. Triangle
+   count is unaffected (removing a Mesh from the scene graph and adding its exact same geometry to
+   an InstancedMesh changes draw-call count, never triangle count). `renderer.info.memory.geometries`
+   stays exactly as flat as before (the pooled stem geometry is the SAME cached object, never a new
+   one). The number of distinct stem pools (`v.specimenStemPools`) must also stay flat regardless of
+   tier size — bounded by the number of distinct (geometry, material) pairs actually present among
+   the fixed set of cultivars this test creates (one, here: only `charge-b` has a stem), never by
+   specimen count. */
 const { chromium } = require("playwright"),
   assert = require("node:assert/strict"),
   fs = require("node:fs");
@@ -116,6 +132,16 @@ const TIERS = [40, 120, 240];
         // content that must always contribute regardless of view direction) — never a claim about
         // real gameplay camera framing, only about what this registry submits to the renderer.
         for (const sm of v.specimenModels.values()) sm.group.traverse((o) => (o.frustumCulled = false));
+        // Epic C7.9: pooled stem InstancedMesh objects are added directly to the scene, never as
+        // children of a specimen Group any more (see render-specimens.js) — the loop above never
+        // reaches them, so they need the same frustumCulled override to be measured correctly
+        // regardless of camera framing, same reasoning as that loop's own comment.
+        let poolCount = 0;
+        for (const byMaterial of v.specimenStemPools.values())
+          for (const pool of byMaterial.values()) {
+            pool.mesh.frustumCulled = false;
+            poolCount++;
+          }
         v.frame(0.016, {}, true);
         return {
           n,
@@ -123,12 +149,17 @@ const TIERS = [40, 120, 240];
           calls: v.renderer.info.render.calls,
           triangles: v.renderer.info.render.triangles,
           geometries: v.renderer.info.memory.geometries,
+          stemPoolCount: poolCount,
         };
       }
 
       const baseline = buildTier(0);
       const results = tiers.map(buildTier);
       for (const sm of v.specimenModels.values()) checkFinite(sm.group);
+      // Epic C7.9: the pooled stem InstancedMesh objects live outside any specimen Group now, so
+      // the loop above never reaches their (shared, unchanged) geometry — checked explicitly here.
+      for (const byMaterial of v.specimenStemPools.values())
+        for (const pool of byMaterial.values()) checkFinite(pool.mesh);
 
       // Resync with no state change at the largest tier already built: nothing should move.
       v.sync();
@@ -190,6 +221,34 @@ const TIERS = [40, 120, 240];
       `per-specimen triangle cost is not stable across tiers (smallest=${smallest.triangles}, largest=${largest.triangles}, ratio=${trianglesRatio})`,
     );
 
+    // Epic C7.9: per-specimen draw-call cost must have genuinely dropped from the ~6 recorded by
+    // C7.5 (header comment above) now that one of the two cultivars' stems is pooled — measured at
+    // ~5.6-5.67 for this exact 50/50 two-cultivar mix (see header comment for the raw numbers).
+    // The bound below is deliberately real-measurement-shaped (not a round "5" or "6"): tight
+    // enough to catch a regression that silently stopped pooling (which would push this back up
+    // towards 6), loose enough to tolerate the small amortization drift already visible between
+    // the n=40 and n=120/240 tiers above.
+    for (const r of perSpecimen) {
+      assert.ok(
+        r.calls < 5.9,
+        `tier ${r.n}: per-specimen draw calls (${r.calls}) did not drop below the pre-C7.9 ~6/specimen baseline — stem pooling regression?`,
+      );
+      assert.ok(
+        r.calls > 5.0,
+        `tier ${r.n}: per-specimen draw calls (${r.calls}) dropped further than stem pooling alone explains (only one of the two cultivars has a stem) — unexpected extra draw-call reduction`,
+      );
+    }
+
+    // Bounded stem-pool count regardless of scale — same "distinct object identity, not specimen
+    // count" guarantee as the geometry check above, for the pools themselves this time.
+    const poolCounts = measured.results.map((r) => r.stemPoolCount);
+    assert.equal(
+      poolCounts[0],
+      poolCounts[poolCounts.length - 1],
+      "stem pool count grew with specimen count (" + JSON.stringify(poolCounts) + ") — pooling by (geometry, material) identity broke at scale",
+    );
+    assert.ok(poolCounts[0] > 0 && poolCounts[0] < 5, "unexpected stem pool count: " + poolCounts[0]);
+
     // Resyncing with no state change must never rebuild anything (no phantom Group churn, no
     // renderer counter drift) — same "reused without change" guarantee as
     // tests/campaign-specimen-render.cjs's own Node test, here exercised at the largest tier.
@@ -205,6 +264,7 @@ const TIERS = [40, 120, 240];
       JSON.stringify({
         tiers: TIERS,
         geometryDeltaConstant: geomDeltas[0],
+        stemPoolCountConstant: poolCounts[0],
         perSpecimen,
       }),
     );

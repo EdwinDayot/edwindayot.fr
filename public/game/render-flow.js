@@ -159,7 +159,8 @@
       // enough to this one case (a rebuild, never a mutation, on stage change) to warrant its own
       // Node-tested module, see that file's header.
       const RenderSpecimens = window.GardenRenderSpecimens;
-      if (RenderSpecimens) RenderSpecimens.syncSpecimenModels(this.specimenModels, this.scene, s);
+      if (RenderSpecimens)
+        RenderSpecimens.syncSpecimenModels(this.specimenModels, this.scene, s, this.specimenStemPools);
       // Epic C5.13: every borne/zone/panier/habitat in the registry (campaign-stations.js) gets a
       // Group built once per station id and cached in `this.stationModels` — the exact
       // "build once, reposition/update on real change, never rebuild every frame" pattern

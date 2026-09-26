@@ -52,6 +52,10 @@
       // `this.stationModels` just above (a specimen's Group is rebuilt, never mutated, when its
       // derived growth stage changes; see render-specimens.js).
       this.specimenModels = new Map();
+      // Epic C7.9: id -> pool identity Map<geometry, Map<material, pool>> for specimen stems
+      // pooled into shared THREE.InstancedMesh instances (render-instances.js, C7.8) instead of
+      // one Mesh per specimen — see render-specimens.js's own header for the full rationale.
+      this.specimenStemPools = new Map();
       // Epic C2.5v-b: a single overlay Group for the "reviewing" teaching draft's resolved
       // trajectory (never one per station like rainelleModels/stationModels above — there is at
       // most one lesson in review at a time, garden-state-cmd-k.js's own "une leçon est déjà en

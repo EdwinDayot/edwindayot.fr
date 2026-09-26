@@ -193,9 +193,10 @@
       () => new T.CatmullRomCurve3(profile.points.map((p) => new T.Vector3(...p))),
     );
     const structure = new T.Group();
+    let stemMesh = null;
     if (port !== "rosette") {
       const geo = sharedGeometry("stem:" + port, () => new T.TubeGeometry(curve, 24, 0.022, 6, false));
-      mesh(geo, stemMaterial, structure);
+      stemMesh = mesh(geo, stemMaterial, structure);
     }
     const [t0, t1] = profile.spread;
     const attachPoints = [];
@@ -203,7 +204,7 @@
       const t = profile.attachCount === 1 ? t0 : t0 + (i / (profile.attachCount - 1)) * (t1 - t0);
       attachPoints.push({ point: curve.getPoint(t), t, index: i });
     }
-    return { structure, attachPoints };
+    return { structure, attachPoints, stemMesh };
   }
 
   const GOLDEN_ANGLE = 2.39996; // even angular spread around the stem, as garden-models-plant.js
@@ -330,7 +331,7 @@
 
     const leafMat = organMaterial(traits.palette.dominante1, 0.46);
     const stemMat = organMaterial(traits.palette.dominante2, 0.4);
-    const { structure, attachPoints } = buildSkeleton(traits.port, stemMat);
+    const { structure, attachPoints, stemMesh } = buildSkeleton(traits.port, stemMat);
 
     const group = new T.Group();
     group.add(structure);
@@ -372,7 +373,13 @@
     }
 
     group.scale.setScalar(scaleFactor);
-    group.userData = { cultivarId: id, organs, attachPoints, stage };
+    // Epic C7.9: exposes the exact stem Mesh (null for "rosette", which never has one) so a
+    // caller (render-specimens.js) can pool it into a shared InstancedMesh without guessing its
+    // position among the group's children (previously an implicit structure.children[0], fragile
+    // to any future reordering of the calls above). Purely additive: the stem stays a normal
+    // child of `structure`/`group` here, byte-for-byte the same as before this field existed,
+    // unless a caller explicitly detaches it.
+    group.userData = { cultivarId: id, organs, attachPoints, stage, stemMesh };
     return group;
   }
 

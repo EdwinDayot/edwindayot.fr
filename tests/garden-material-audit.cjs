@@ -286,6 +286,34 @@ const TRANSPARENT_ALLOWLIST = [
         window.__auditSpecimenIds = { young: young.id, mature: mature.id };
       }
 
+      // Epic C7.9 (docs/campagne-backlog.md): the real stem-pooling path (render-specimens.js's
+      // stemPool branch, wired through render.js's real `this.specimenStemPools` and exercised by
+      // the exact same v.sync() call every frame uses) — several REAL specimens, varied ports and
+      // stem colours, never an isolated buildSpecimenGroup() call. Founders chosen to cover: a
+      // tige-dressee cultivar (aster-des-vents — NOT founders[1]/clochette-du-soir, already used by
+      // the C7.4 block above with the exact same traits, hence the exact same stem geometry+colour
+      // pool: reusing it here would silently inflate that shared pool's count instead of proving a
+      // second, independent one), a touffe cultivar (menthe-de-velours — different port, so a
+      // different pool even though it happens to share aster's "gris-vert" dominante2), and a
+      // rosette cultivar (oreille-de-pluie, port has no stem at all — the negative case: it must
+      // never create a pool). Positioned far off the playable area, same convention as every block
+      // above.
+      let stemAuditIds = null;
+      if (window.GardenGenetics && window.GardenCultivars && window.GardenApp.game) {
+        const s = window.GardenApp.game.s;
+        const Cultivars = window.GardenCultivars;
+        const founders = window.GardenGenetics.founders;
+        const cvAster = Cultivars.createCultivar(s, { name: "Test C7.9 aster", traits: founders[7].traits });
+        const cvMenthe = Cultivars.createCultivar(s, { name: "Test C7.9 menthe", traits: founders[2].traits });
+        const cvOreille = Cultivars.createCultivar(s, { name: "Test C7.9 oreille", traits: founders[0].traits });
+        const stemA = Cultivars.createSpecimen(s, { cultivarId: cvAster.id, x: 250, z: 200, stage: Cultivars.MATURE_STAGE });
+        const stemB = Cultivars.createSpecimen(s, { cultivarId: cvAster.id, x: 251.5, z: 200, stage: Cultivars.MATURE_STAGE });
+        const stemC = Cultivars.createSpecimen(s, { cultivarId: cvMenthe.id, x: 253, z: 200, stage: Cultivars.MATURE_STAGE });
+        const rosette = Cultivars.createSpecimen(s, { cultivarId: cvOreille.id, x: 254.5, z: 200, stage: Cultivars.MATURE_STAGE });
+        v.sync();
+        stemAuditIds = { stemA: stemA.id, stemB: stemB.id, stemC: stemC.id, rosette: rosette.id };
+      }
+
       // Sample a few times of day: a defect that only shows under one lighting angle (the
       // terrain-normal bug was exactly this — it read fine at some sun angles) must not hide.
       const times = [50, 300, 600, 900, 1150];
@@ -415,6 +443,39 @@ const TRANSPARENT_ALLOWLIST = [
         };
       }
 
+      // Epic C7.9: confirms the real stem-pooling wiring — each stemmed specimen's Group no
+      // longer carries its stem Mesh as a child (detached into the pool), the pool it landed in is
+      // a real InstancedMesh added to the real scene (already covered by the generic
+      // isMesh/geometry traversal above, since InstancedMesh#isMesh is true), two specimens of the
+      // SAME cultivar share the identical pool object (one InstancedMesh, count 2), a different
+      // cultivar's stem colour lands in a DIFFERENT pool, and the rosette specimen (no stem at
+      // all) is never present in `v.specimenStemPools`.
+      let stemWiring = { found: false };
+      if (stemAuditIds) {
+        const smA = v.specimenModels.get(stemAuditIds.stemA);
+        const smB = v.specimenModels.get(stemAuditIds.stemB);
+        const smC = v.specimenModels.get(stemAuditIds.stemC);
+        const smRosette = v.specimenModels.get(stemAuditIds.rosette);
+        const stemDetached = [smA, smB, smC].every((sm) => {
+          let stillChild = false;
+          sm.group.traverse((o) => {
+            if (o === sm.group.userData.stemMesh) stillChild = true;
+          });
+          return !stillChild;
+        });
+        let poolCount = 0;
+        for (const byMaterial of v.specimenStemPools.values()) poolCount += byMaterial.size;
+        stemWiring = {
+          found: !!(smA && smB && smC && smRosette),
+          stemDetached,
+          sameCultivarSharedPool: smA.stemPool === smB.stemPool,
+          sharedPoolInstanceCount: smA.stemPool && smA.stemPool.mesh.count,
+          differentCultivarDifferentPool: smA.stemPool !== smC.stemPool,
+          rosetteHasNoPool: smRosette.stemPool === null,
+          distinctPoolCount: poolCount,
+        };
+      }
+
       return {
         suspiciousTransparent,
         badNormals,
@@ -426,6 +487,7 @@ const TRANSPARENT_ALLOWLIST = [
         passageWiring,
         giftWiring,
         specimenWiring,
+        stemWiring,
       };
     });
 
@@ -466,6 +528,14 @@ const TRANSPARENT_ALLOWLIST = [
     assert.equal(audit.specimenWiring.youngStage, 0, "C7.4: the stage-0 specimen's Group does not record stage 0 on userData");
     assert.equal(audit.specimenWiring.matureStage, 2, "C7.4: the mature specimen's Group does not record MATURE_STAGE on userData");
     assert.ok(audit.specimenWiring.youngScale < audit.specimenWiring.matureScale, "C7.4: a young specimen's Group must be visibly smaller than a mature one's");
+
+    assert.equal(audit.stemWiring.found, true, "C7.9: sync() never built a Group for one of the stem-pooling audit specimens");
+    assert.equal(audit.stemWiring.stemDetached, true, "C7.9: a stemmed specimen's Group must no longer carry its stem Mesh as a child");
+    assert.equal(audit.stemWiring.sameCultivarSharedPool, true, "C7.9: two specimens of the same cultivar must share the identical stem pool");
+    assert.equal(audit.stemWiring.sharedPoolInstanceCount, 2, "C7.9: the shared pool must hold exactly two active instances");
+    assert.equal(audit.stemWiring.differentCultivarDifferentPool, true, "C7.9: a different cultivar's stem colour must land in a different pool");
+    assert.equal(audit.stemWiring.rosetteHasNoPool, true, "C7.9: a rosette specimen (no stem) must never get a stemPool");
+    assert.ok(audit.stemWiring.distinctPoolCount >= 2, "C7.9: expected at least two distinct stem pools (clochette + menthe)");
 
     assert.deepEqual(audit.nanMeshes, [], "Meshes with non-finite vertex positions: " + audit.nanMeshes.join(", "));
     assert.deepEqual(
