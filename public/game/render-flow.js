@@ -127,31 +127,22 @@
       // here). The Group itself (render-rainelles.js, C5.9) is built once per Rainelle id and
       // cached in `this.rainelleModels`, exactly the "refreshed on position change, never rebuilt
       // every frame" pattern buildCampaignHouse just above already uses for its own one field;
-      // only `.position`/`.rotation` are touched on every sync call below, never the geometry.
+      // only `.position`/`.rotation` are touched on every sync call, never the geometry. Epic
+      // C7.13: this loop itself now lives in render-rainelles.js's own syncRainelleModels (Node-
+      // testable, same reasoning as render-specimens.js's syncSpecimenModels just below) so it can
+      // also detach/pool the shared body meshes into `this.rainelleBodyPools`
+      // (render-instances.js, C7.8) — byte-for-byte the prior behaviour when
+      // `this.rainelleBodyPools` is left unset, per that function's own header.
       const RenderRainelles = window.GardenRenderRainelles;
-      if (RenderRainelles)
-        for (const r of s.rainelles) {
-          if (!Number.isFinite(r.x) || !Number.isFinite(r.z)) continue;
-          let rm = this.rainelleModels.get(r.id);
-          if (!rm) {
-            const cultivar = s.cultivars.find((c) => c.id === r.cultivarId);
-            if (!cultivar) continue; // no cultivar to draw foliage from yet — nothing to add
-            const group = RenderRainelles.buildRainelleGroup(r, cultivar);
-            this.scene.add(group);
-            rm = { group, x: r.x, z: r.z };
-            this.rainelleModels.set(r.id, rm);
-            this.batchDirty = true;
-          }
-          const y = Terrain.terrainHeight(r.x, r.z);
-          if (r.x !== rm.x || r.z !== rm.z) {
-            // Face the direction actually walked this step — a Rainelle standing still (already
-            // on its target cell) keeps whatever heading it last had, never snaps to a default.
-            rm.group.rotation.y = Math.atan2(r.x - rm.x, r.z - rm.z);
-            rm.x = r.x;
-            rm.z = r.z;
-          }
-          rm.group.position.set(r.x, y, r.z);
-        }
+      if (RenderRainelles) {
+        const rainelleSync = RenderRainelles.syncRainelleModels(
+          this.rainelleModels,
+          this.scene,
+          s,
+          this.rainelleBodyPools,
+        );
+        if (rainelleSync.batchDirty) this.batchDirty = true;
+      }
       // Epic C7.4: every specimen in the real save (s.specimens, C1.6) gets a persistent Group in
       // the real scene, entirely delegated to render-specimens.js's own syncSpecimenModels (create
       // new/remove disappeared/rebuild on a real stage change) rather than duplicated inline like

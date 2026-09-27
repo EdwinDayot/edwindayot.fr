@@ -43,6 +43,12 @@
       // kept separate since a Rainelle is never one of `s.entities` (see rainelles.js's own header
       // comment on why the campaign layer's arrays stay disjoint from the free garden's).
       this.rainelleModels = new Map();
+      // Epic C7.13: id -> pool identity Map<geometry, Map<material, pool>> for the shared Rainelle
+      // body/mark meshes pooled into shared THREE.InstancedMesh instances (render-instances.js,
+      // C7.8) instead of one Mesh per Rainelle per body part — see render-rainelles.js's own
+      // header for the full rationale, and this.specimenStemPools/specimenOrganPools below for the
+      // exact same pattern already established for specimens (C7.9/C7.10).
+      this.rainelleBodyPools = new Map();
       // Epic C5.13: one entry per station id (borne/zone/panier/habitat, campaign-stations.js),
       // id -> { kind, group } — same "build once, cache, reposition/update every sync" pattern as
       // `this.rainelleModels` just above.

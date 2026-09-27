@@ -148,6 +148,42 @@ const TRANSPARENT_ALLOWLIST = [
           x: 205,
           z: 216,
         });
+        // Epic C7.13: two more real Rainelles through the exact same live-state/sync() path —
+        // never an isolated buildRainelleGroup() call like the C5.9 block above, which never
+        // exercises v.rainelleBodyPools at all. "audit-c7.13-rainelle-b" shares the SAME synthetic
+        // cultivar as the Rainelle just above (to exercise the shared-body-pool guarantee against
+        // the real scene graph, not just tests/campaign-rainelle-render.cjs's Node-only unit
+        // tests); "audit-c7.13-rainelle-c" uses a different founder's traits (a different mark
+        // colour distribution, still landing in the same shared body pools).
+        s.rainelles.push({
+          id: "audit-c7.13-rainelle-b",
+          cultivarId: "audit-c5.11-cultivar",
+          name: "",
+          geste: null,
+          job: null,
+          bourgeon: null,
+          founder: false,
+          x: 207,
+          z: 216,
+        });
+        const f2 = window.GardenGenetics.founders[1];
+        s.cultivars.push({
+          id: "audit-c7.13-cultivar-c",
+          name: "Test C7.13",
+          parentIds: [],
+          traits: f2.traits,
+        });
+        s.rainelles.push({
+          id: "audit-c7.13-rainelle-c",
+          cultivarId: "audit-c7.13-cultivar-c",
+          name: "",
+          geste: null,
+          job: null,
+          bourgeon: null,
+          founder: false,
+          x: 209,
+          z: 216,
+        });
         v.sync();
       }
 
@@ -559,6 +595,44 @@ const TRANSPARENT_ALLOWLIST = [
         };
       }
 
+      // Epic C7.13: confirms the real body-pooling wiring for Rainelles, symmetric to stemWiring
+      // above (C7.9) — every body/mark Mesh of a synced Rainelle is detached from its Group (never
+      // present in the real scene graph as an ordinary child any more, only as an InstancedMesh
+      // instance, already covered by the generic isMesh/geometry traversal above since
+      // InstancedMesh#isMesh is true), two Rainelles of the SAME synthetic cultivar share their
+      // torso pool, a third Rainelle of a DIFFERENT cultivar still lands in that identical shared
+      // torso pool (the body is common to every Rainelle regardless of cultivar, unlike a
+      // specimen's stem/organs), and the whole population never exceeds the documented 4 body + 5
+      // mark pool ceiling.
+      let rainelleBodyWiring = { found: false };
+      const rmA = v.rainelleModels.get("audit-c5.11-rainelle");
+      const rmB = v.rainelleModels.get("audit-c7.13-rainelle-b");
+      const rmC = v.rainelleModels.get("audit-c7.13-rainelle-c");
+      if (rmA && rmB && rmC) {
+        const allDetached = [rmA, rmB, rmC].every((rm) =>
+          rm.group.userData.bodyMeshes.every((bm) => {
+            let stillDescendant = false;
+            rm.group.traverse((o) => {
+              if (o === bm.mesh) stillDescendant = true;
+            });
+            return !stillDescendant;
+          }),
+        );
+        const torsoA = rmA.bodyPoolEntries.find((e) => e.key === "torso");
+        const torsoB = rmB.bodyPoolEntries.find((e) => e.key === "torso");
+        const torsoC = rmC.bodyPoolEntries.find((e) => e.key === "torso");
+        let distinctPoolCount = 0;
+        for (const byMaterial of v.rainelleBodyPools.values()) distinctPoolCount += byMaterial.size;
+        rainelleBodyWiring = {
+          found: true,
+          allDetached,
+          sameCultivarSharedTorsoPool: torsoA.pool === torsoB.pool,
+          differentCultivarSameTorsoPool: torsoA.pool === torsoC.pool,
+          sharedTorsoPoolInstanceCount: torsoA.pool.mesh.count,
+          distinctPoolCount,
+        };
+      }
+
       return {
         suspiciousTransparent,
         badNormals,
@@ -572,6 +646,7 @@ const TRANSPARENT_ALLOWLIST = [
         specimenWiring,
         stemWiring,
         organWiring,
+        rainelleBodyWiring,
       };
     });
 
@@ -629,6 +704,13 @@ const TRANSPARENT_ALLOWLIST = [
     assert.equal(audit.organWiring.groupedFlowerMeshCount, 24, "C7.10: expected 24 flower meshes for menthe-de-velours (2 grouped épi flowers * 12 each)");
     assert.equal(audit.organWiring.differentOrganDifferentPool, true, "C7.10: a specimen's leaf organs and flower organs must never share the same pool");
     assert.ok(audit.organWiring.distinctPoolCount >= 2, "C7.10: expected at least two distinct organ pools (palmate leaf + menthe leaf/flower)");
+
+    assert.equal(audit.rainelleBodyWiring.found, true, "C7.13: sync() never built a Group for one of the body-pooling audit rainelles");
+    assert.equal(audit.rainelleBodyWiring.allDetached, true, "C7.13: a pooled rainelle's Group must no longer carry any of its body/mark meshes as a descendant");
+    assert.equal(audit.rainelleBodyWiring.sameCultivarSharedTorsoPool, true, "C7.13: two rainelles of the same cultivar must share the identical torso pool");
+    assert.equal(audit.rainelleBodyWiring.differentCultivarSameTorsoPool, true, "C7.13: the body is common to every rainelle regardless of cultivar — a different cultivar must still share the same torso pool");
+    assert.equal(audit.rainelleBodyWiring.sharedTorsoPoolInstanceCount, 3, "C7.13: the shared torso pool must hold exactly three active instances (all three audit rainelles)");
+    assert.ok(audit.rainelleBodyWiring.distinctPoolCount <= 9, "C7.13: expected at most 9 distinct body/mark pools (4 body pieces + up to 5 mark hues)");
 
     assert.deepEqual(audit.nanMeshes, [], "Meshes with non-finite vertex positions: " + audit.nanMeshes.join(", "));
     assert.deepEqual(

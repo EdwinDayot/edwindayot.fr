@@ -216,7 +216,13 @@
       const rm = this.rainelleModels.get(scene.rainelleId);
       if (!rm) return false;
       this.previousGestureCamera = this.snapshotCamera();
-      const bounds = new T.Box3().setFromObject(rm.group),
+      // Epic C7.13: plain setFromObject(rm.group) would miss a pooled body/mark instance (no
+      // longer a descendant of rm.group — see render-rainelles.js's own groupBounds header), so
+      // this uses that corrected helper rather than the raw THREE call directly.
+      const RenderRainelles = window.GardenRenderRainelles;
+      const bounds = RenderRainelles
+        ? RenderRainelles.groupBounds(rm.group)
+        : new T.Box3().setFromObject(rm.group),
         center = bounds.getCenter(new T.Vector3()),
         size = bounds.getSize(new T.Vector3());
       this.gestureScene = {
@@ -319,7 +325,12 @@
       // C5.11/C5.13) — never fabricated, never forced onto screen if none exists.
       const firstRainelle = this.rainelleModels.values().next().value;
       if (firstRainelle) {
-        const b = new T.Box3().setFromObject(firstRainelle.group),
+        // Epic C7.13: same corrected helper as beginGestureScene above — a pooled body/mark
+        // instance is no longer a descendant of firstRainelle.group.
+        const RenderRainelles = window.GardenRenderRainelles;
+        const b = RenderRainelles
+          ? RenderRainelles.groupBounds(firstRainelle.group)
+          : new T.Box3().setFromObject(firstRainelle.group),
           size = b.getSize(new T.Vector3());
         shots.push({
           center: b.getCenter(new T.Vector3()),

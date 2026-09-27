@@ -276,11 +276,18 @@
          dependency at load time beyond THREE, so its only ordering requirement is loading after
          /vendor/three.min.js (line 28), same as botany-hybrids.js above. -->
     <script src="/game/render-campaign-house.js" defer></script>
-    <!-- Epic C5.9: Rainelle body rendering, kept apart from render-campaign-house.js/botany-
+    <!-- Epic C7.8: generic dynamic Three.js instance pool, self-contained beyond THREE. Moved
+         ahead of render-rainelles.js (below) by epic C7.13, which made it a load-time dependency
+         of that module (root.GardenRenderInstances, read at IIFE-execution time) rather than only
+         a lazily-read one as it was for render-specimens.js below at C7.9. -->
+    <script src="/game/render-instances.js" defer></script>
+    <!-- Epic C5.9/C7.13: Rainelle body rendering, kept apart from render-campaign-house.js/botany-
          hybrids.js (a creature body, not a plant skeleton or a building) but depending on
-         botany-hybrids.js at script-execution time (root.GardenBotanyHybrids, reused for its
-         leaf-organ library) — loads after it, same ordering requirement as every module here that
-         reads another root.Garden* object at its own execution time. -->
+         botany-hybrids.js AND, since epic C7.13, render-instances.js/terrain.js at
+         script-execution time (root.GardenBotanyHybrids/root.GardenRenderInstances/
+         root.GardenTerrain, the last already loaded much earlier at line 269) — loads after all
+         three, same ordering requirement as every module here that reads another root.Garden*
+         object at its own execution time. -->
     <script src="/game/render-rainelles.js" defer></script>
     <!-- Epic C5.13: campaign stations rendering (bornes/zones/paniers/habitats), self-contained
          beyond THREE like render-campaign-house.js/render-rainelles.js above — read lazily as
@@ -298,13 +305,10 @@
          itself only called later at world()-build time (render.js), so its only load-time
          requirement is loading after /vendor/three.min.js, same as those two sibling modules. -->
     <script src="/game/render-campaign-passage.js" defer></script>
-    <!-- Epic C7.8: generic dynamic Three.js instance pool, self-contained beyond THREE — no
-         consumer read this at load time until C7.9 below, so it only needs to load after
-         /vendor/three.min.js, same as every sibling module above. -->
-    <script src="/game/render-instances.js" defer></script>
     <!-- Epic C7.4/C7.9: persistent specimen rendering, self-contained beyond THREE and its own
          sibling modules (botany-hybrids.js/cultivars.js/terrain.js/render-instances.js, all
-         already loaded above) — read lazily as `window.GardenRenderSpecimens` inside
+         already loaded above — render-instances.js itself moved earlier, before
+         render-rainelles.js, by epic C7.13) — read lazily as `window.GardenRenderSpecimens` inside
          render-flow.js's sync(), so its only load-time requirement is loading after those four and
          /vendor/three.min.js, same posture as render-rainelles.js/render-campaign-stations.js
          above. -->

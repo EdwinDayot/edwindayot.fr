@@ -171,3 +171,285 @@ test("a real hybrid trait set (not just a founder) also builds and stays determi
   assert.deepEqual(serialize(a), serialize(b));
   assert.ok(allFinite(a));
 });
+
+// Epic C7.13 — body/mark instance pooling (syncRainelleModels), on the model of
+// tests/campaign-specimen-render.cjs's own pooling section (C7.9/C7.10).
+
+function cultivarEntry(id) {
+  return cultivarFor(id); // {id, traits} is the only shape syncRainelleModels/buildRainelleGroup need
+}
+
+test("omitting bodyPools (3-argument call) leaves every body/mark mesh a normal child of the Group, unchanged from before this epic", () => {
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const s = {
+    rainelles: [{ id: "r1", cultivarId: "oreille-de-pluie", x: 0, z: 0 }],
+    cultivars: [cultivarEntry("oreille-de-pluie")],
+  };
+
+  Rainelles.syncRainelleModels(registry, scene, s);
+
+  const rm = registry.get("r1");
+  assert.equal(rm.bodyPoolEntries, null);
+  for (const bm of rm.group.userData.bodyMeshes)
+    assert.equal(bm.mesh.parent, rm.group.children[0], "body/mark mesh must stay a child of the structure");
+  let instancedMeshCount = 0;
+  scene.traverse((o) => {
+    if (o.isInstancedMesh) instancedMeshCount++;
+  });
+  assert.equal(instancedMeshCount, 0, "no InstancedMesh must exist when bodyPools is omitted");
+});
+
+test("with bodyPools provided, a rainelle's body+mark meshes are detached from its Group and pooled into shared InstancedMeshes", () => {
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const bodyPools = new Map();
+  const s = {
+    rainelles: [{ id: "r1", cultivarId: "oreille-de-pluie", x: 3, z: -2 }],
+    cultivars: [cultivarEntry("oreille-de-pluie")],
+  };
+
+  Rainelles.syncRainelleModels(registry, scene, s, bodyPools);
+
+  const rm = registry.get("r1");
+  assert.ok(rm.bodyPoolEntries, "expected pooled entries recorded on the registry entry");
+  assert.equal(rm.bodyPoolEntries.length, 9, "torso+head+2 eyes+4 legs+mark = 9 pooled pieces");
+  for (const entry of rm.bodyPoolEntries) {
+    assert.equal(entry.pool.mesh.isInstancedMesh, true);
+    assert.equal(entry.pool.mesh.parent, scene, "each pool's InstancedMesh must be added to the real scene");
+  }
+  let stillChild = false;
+  rm.group.traverse((o) => {
+    if (rm.group.userData.bodyMeshes.some((bm) => bm.mesh === o)) stillChild = true;
+  });
+  assert.equal(stillChild, false, "every body/mark mesh must be detached from the rainelle Group");
+});
+
+test("the whole body population never creates more than 4 body pools + 5 mark pools, regardless of population size or cultivar mix", () => {
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const bodyPools = new Map();
+  const founders = Genetics.founders.slice(0, 4);
+  const s = {
+    rainelles: Array.from({ length: 20 }, (_, i) => ({
+      id: "r" + i,
+      cultivarId: founders[i % founders.length].id,
+      x: i,
+      z: 0,
+    })),
+    cultivars: founders.map((f) => cultivarEntry(f.id)),
+  };
+
+  Rainelles.syncRainelleModels(registry, scene, s, bodyPools);
+
+  const distinctPools = new Set();
+  for (const byMaterial of bodyPools.values())
+    for (const pool of byMaterial.values()) distinctPools.add(pool);
+  assert.ok(distinctPools.size <= 9, `expected at most 9 distinct pools, found ${distinctPools.size}`);
+
+  let instancedMeshCount = 0;
+  scene.traverse((o) => {
+    if (o.isInstancedMesh) instancedMeshCount++;
+  });
+  assert.equal(instancedMeshCount, distinctPools.size, "one InstancedMesh per distinct pool, no more");
+
+  // torso/head pool: exactly one instance per rainelle; eye pool: two per rainelle; leg pool: four.
+  const first = registry.get("r0");
+  const torsoEntry = first.bodyPoolEntries.find((e) => e.key === "torso");
+  const eyeEntry = first.bodyPoolEntries.find((e) => e.key === "eye0");
+  const legEntry = first.bodyPoolEntries.find((e) => e.key === "leg0");
+  assert.equal(torsoEntry.pool.mesh.count, 20, "one torso instance per rainelle");
+  assert.equal(eyeEntry.pool.mesh.count, 40, "two eye instances per rainelle");
+  assert.equal(legEntry.pool.mesh.count, 80, "four leg instances per rainelle");
+});
+
+test("removing a rainelle releases every one of its pooled ids without leaving a hole", () => {
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const bodyPools = new Map();
+  const s = {
+    rainelles: [
+      { id: "r1", cultivarId: "oreille-de-pluie", x: 0, z: 0 },
+      { id: "r2", cultivarId: "oreille-de-pluie", x: 1, z: 0 },
+      { id: "r3", cultivarId: "oreille-de-pluie", x: 2, z: 0 },
+    ],
+    cultivars: [cultivarEntry("oreille-de-pluie")],
+  };
+
+  Rainelles.syncRainelleModels(registry, scene, s, bodyPools);
+  const torsoPool = registry.get("r3").bodyPoolEntries.find((e) => e.key === "torso").pool;
+  assert.equal(torsoPool.mesh.count, 3);
+
+  // "r2" disappears from the real save (no in-game command does this today — see the module's own
+  // header — but the code must stay correct if a future one ever does).
+  s.rainelles = s.rainelles.filter((r) => r.id !== "r2");
+  Rainelles.syncRainelleModels(registry, scene, s, bodyPools);
+
+  assert.equal(registry.has("r2"), false, "the removed rainelle's Group must leave the registry");
+  assert.equal(torsoPool.mesh.count, 2, "exactly two active torso instances must remain");
+  assert.equal(torsoPool.indexOf.has("r2:torso"), false);
+  // swap-and-pop: the remaining ids must occupy a dense [0, size) range, no holes.
+  const remainingIndices = ["r1:torso", "r3:torso"].map((id) => torsoPool.indexOf.get(id)).sort();
+  assert.deepEqual(remainingIndices, [0, 1]);
+});
+
+test("a resynchronisation with no position/heading change never rewrites an already-correct instance matrix", () => {
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const bodyPools = new Map();
+  const s = {
+    rainelles: [
+      { id: "r1", cultivarId: "oreille-de-pluie", x: 4, z: 6 },
+      { id: "r2", cultivarId: "oreille-de-pluie", x: -2, z: 1 },
+    ],
+    cultivars: [cultivarEntry("oreille-de-pluie")],
+  };
+
+  Rainelles.syncRainelleModels(registry, scene, s, bodyPools);
+  // THREE's BufferAttribute#needsUpdate is a write-only setter (bumps .version, no getter) — read
+  // .version itself as the actual signal that the GPU buffer was touched again.
+  const versionsBefore = new Map();
+  for (const byMaterial of bodyPools.values())
+    for (const pool of byMaterial.values()) versionsBefore.set(pool, pool.mesh.instanceMatrix.version);
+
+  Rainelles.syncRainelleModels(registry, scene, s, bodyPools); // identical positions, replayed
+
+  for (const byMaterial of bodyPools.values())
+    for (const pool of byMaterial.values())
+      assert.equal(
+        pool.mesh.instanceMatrix.version,
+        versionsBefore.get(pool),
+        "an unchanged resync must never touch an instance matrix already correct",
+      );
+});
+
+test("a rainelle that actually moves DOES get its pooled instance matrices rewritten on the next sync", () => {
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const bodyPools = new Map();
+  const s = {
+    rainelles: [{ id: "r1", cultivarId: "oreille-de-pluie", x: 0, z: 0 }],
+    cultivars: [cultivarEntry("oreille-de-pluie")],
+  };
+
+  Rainelles.syncRainelleModels(registry, scene, s, bodyPools);
+  const versionsBefore = new Map();
+  for (const byMaterial of bodyPools.values())
+    for (const pool of byMaterial.values()) versionsBefore.set(pool, pool.mesh.instanceMatrix.version);
+
+  s.rainelles[0].x = 5; // a real move
+  Rainelles.syncRainelleModels(registry, scene, s, bodyPools);
+
+  let anyBumped = false;
+  for (const byMaterial of bodyPools.values())
+    for (const pool of byMaterial.values())
+      if (pool.mesh.instanceMatrix.version !== versionsBefore.get(pool)) anyBumped = true;
+  assert.ok(anyBumped, "a real move must rewrite at least one pooled instance matrix");
+});
+
+test("the pooled torso instance matrix encodes the rainelle's real world position and heading", () => {
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const bodyPools = new Map();
+  const s = {
+    rainelles: [{ id: "r1", cultivarId: "oreille-de-pluie", x: 0, z: 0 }],
+    cultivars: [cultivarEntry("oreille-de-pluie")],
+  };
+  Rainelles.syncRainelleModels(registry, scene, s, bodyPools);
+
+  // A real move fixes a known heading (atan2(dx, dz)) so the composition below is exact, not
+  // merely "unchanged from an arbitrary default rotation".
+  s.rainelles[0].x = 5;
+  s.rainelles[0].z = 0;
+  Rainelles.syncRainelleModels(registry, scene, s, bodyPools);
+
+  const rm = registry.get("r1");
+  const torsoEntry = rm.bodyPoolEntries.find((e) => e.key === "torso");
+  const m = new THREE.Matrix4();
+  torsoEntry.pool.mesh.getMatrixAt(torsoEntry.pool.indexOf.get("r1:torso"), m);
+
+  const expectedWorld = new THREE.Matrix4().compose(
+    rm.group.position,
+    new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rm.group.rotation.y),
+    new THREE.Vector3(1, 1, 1),
+  );
+  const expected = new THREE.Matrix4().multiplyMatrices(expectedWorld, torsoEntry.localMatrix);
+
+  const EPS = 1e-6; // Float32Array instance buffer, same tolerance rationale as the specimen test above
+  for (let i = 0; i < 16; i++) assert.ok(Math.abs(m.elements[i] - expected.elements[i]) < EPS, `element ${i} mismatch`);
+});
+
+test("a rainelle whose cultivar cannot be resolved yet is skipped, never throws, even with bodyPools provided", () => {
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const bodyPools = new Map();
+  const s = {
+    rainelles: [{ id: "r1", cultivarId: "does-not-exist", x: 0, z: 0 }],
+    cultivars: [],
+  };
+  assert.doesNotThrow(() => Rainelles.syncRainelleModels(registry, scene, s, bodyPools));
+  assert.equal(registry.size, 0);
+});
+
+// Epic C7.13 — groupBounds: render-items.js's beginGestureScene/opening-shots code used to frame
+// its camera with a plain `new THREE.Box3().setFromObject(rm.group)`, which silently stops seeing
+// the body/mark once they are pooled out of `rm.group`'s own descendants (a bald cultivar with no
+// foliage would otherwise yield an EMPTY box — NaN center/size once decomposed). groupBounds is
+// the drop-in replacement, correct whether or not bodyPools was used.
+
+test("groupBounds is never empty even for a cultivar with no foliage and pooled body meshes", () => {
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const bodyPools = new Map();
+  const traits = { ...Genetics.founders[0].traits, feuilles: undefined };
+  const s = {
+    rainelles: [{ id: "r1", cultivarId: "bald", x: 0, z: 0 }],
+    cultivars: [{ id: "bald", traits }],
+  };
+  Rainelles.syncRainelleModels(registry, scene, s, bodyPools);
+  const rm = registry.get("r1");
+
+  // Confirm the setup actually exercises the risk: no foliage AND the body meshes are really gone
+  // from rm.group's own descendants (pooled), so a plain setFromObject(rm.group) would be empty.
+  assert.equal(rm.group.userData.organs.length, 0, "expected no foliage for this bald cultivar");
+  const naiveBox = new THREE.Box3().setFromObject(rm.group);
+  assert.ok(naiveBox.isEmpty(), "sanity check: the naive box must be empty once the body is pooled out");
+
+  const box = Rainelles.groupBounds(rm.group);
+  assert.equal(box.isEmpty(), false, "groupBounds must never be empty even with no foliage and a pooled body");
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  assert.ok(Number.isFinite(center.x) && Number.isFinite(center.y) && Number.isFinite(center.z));
+  assert.ok(size.x > 0 && size.y > 0 && size.z > 0, "expected a real, non-degenerate body extent");
+});
+
+test("groupBounds matches the plain setFromObject box when bodyPools is not used (no behaviour change in that case)", () => {
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const s = {
+    rainelles: [{ id: "r1", cultivarId: "oreille-de-pluie", x: 1, z: 2 }],
+    cultivars: [cultivarEntry("oreille-de-pluie")],
+  };
+  Rainelles.syncRainelleModels(registry, scene, s); // no bodyPools: body stays a normal child
+  const rm = registry.get("r1");
+
+  const naiveBox = new THREE.Box3().setFromObject(rm.group);
+  const box = Rainelles.groupBounds(rm.group);
+  const EPS = 1e-6;
+  assert.ok(naiveBox.min.distanceTo(box.min) < EPS && naiveBox.max.distanceTo(box.max) < EPS);
+});
+
+test("groupBounds follows the rainelle's real world position (translated, not stuck at the origin)", () => {
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const bodyPools = new Map();
+  const s = {
+    rainelles: [{ id: "r1", cultivarId: "oreille-de-pluie", x: 50, z: -30 }],
+    cultivars: [cultivarEntry("oreille-de-pluie")],
+  };
+  Rainelles.syncRainelleModels(registry, scene, s, bodyPools);
+  const rm = registry.get("r1");
+  const center = Rainelles.groupBounds(rm.group).getCenter(new THREE.Vector3());
+  assert.ok(Math.abs(center.x - 50) < 1, "expected the bounds center near the real world x");
+  assert.ok(Math.abs(center.z - -30) < 1, "expected the bounds center near the real world z");
+});
