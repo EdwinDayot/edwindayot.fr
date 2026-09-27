@@ -35,12 +35,23 @@
    "jeune plant") is shortened when `plantedSeason === "printemps"`; stage 1 -> MATURE_STAGE always
    takes the same STAGE_DURATION_ELAPSED_SECONDS regardless of season, and every other season keeps
    the ordinary duration for both transitions (a bonus, never a penalty — the design explicitly
-   rules out killing or slowing plants outside their favored season). */
+   rules out killing or slowing plants outside their favored season).
+
+   Epic C7.20 (a prerequisite of the Replanter gesture, itself still out of scope — see this
+   epic's own campagne-backlog.md entry) adds `zoneId` (null until a specimen is explicitly
+   relocated) and three pure functions — zoneOccupancy/canRelocateSpecimen/relocateSpecimen — that
+   move a specimen into a registered, capacity-bound zone (campaign-stations.js). No tick loop or
+   command calls relocateSpecimen yet, same "pure factory/function, not yet wired" posture
+   registerStation itself started at in C2.6a. */
 (function (root) {
   const Seasons =
     typeof module !== "undefined"
       ? require("./campaign-seasons.js")
       : root.GardenCampaignSeasons;
+  const Stations =
+    typeof module !== "undefined"
+      ? require("./campaign-stations.js")
+      : root.GardenCampaignStations;
   // Traits are frozen at creation: two calls with the same input never re-derive different
   // values, and nothing here recomputes them later from parentIds.
   function createCultivar(s, { name, parentIds = [], traits = {} }) {
@@ -94,6 +105,10 @@
   // plantedSeason (Epic C7.3) is derived once, here, from the campaign day this specimen is
   // actually planted on — never recomputed later, so a specimen already growing never reacts to
   // the season the calendar has since moved on to.
+  // Epic C7.20: zoneId starts null — a specimen is never assigned to a zone at creation (no
+  // caller of createSpecimen names one; plantSpecimen/multiplySpecimen in garden-state-cmd-h.js
+  // never do either), only ever set later by relocateSpecimen below. Same "the factory sets its
+  // own new field" posture as moistureAt/readyToProduce (C2.6b) and plantedAt (C7.2).
   function createSpecimen(s, { cultivarId, x, z, stage = 0 }) {
     const specimen = {
       id: `sp${s.specimenNextId++}`,
@@ -105,6 +120,7 @@
       plantedSeason: Seasons.seasonForDay(s.campaignDay),
       moistureAt: s.elapsed,
       readyToProduce: false,
+      zoneId: null,
     };
     s.specimens.push(specimen);
     return specimen;
@@ -165,6 +181,52 @@
       );
     specimen.readyToProduce = !!ready;
   }
+  // Epic C7.20 (design §5, "Replanter... jeunes plants à portée -> emplacements vides d'une zone
+  // définie", a prerequisite this epic proves in isolation, see its own campagne-backlog.md
+  // entry): the real occupation of a zone, counted from the specimens that actually claim it —
+  // never a number cached on the zone itself, so it can never drift out of sync with s.specimens.
+  // Pure: never mutates s.specimens.
+  function zoneOccupancy(s, zoneId) {
+    return s.specimens.filter((sp) => sp.zoneId === zoneId).length;
+  }
+  // Refuses, without mutating anything: an unknown specimen, an id that doesn't resolve to a real
+  // registered zone (a borne/panier/habitat id is refused the same way an unknown id is — this
+  // geste only ever targets a zone), a zone with no capacity set (see campaign-stations.js's own
+  // MIN_ZONE_CAPACITY comment for why this is a real, distinct, refusable state rather than
+  // treated as unlimited), and a zone already at capacity (occupation >= capacity). Deliberately
+  // allows relocating a specimen that is already in the target zone (occupation counts it once
+  // either way, so a redundant relocate is a harmless no-op, not a special case to detect).
+  function canRelocateSpecimen(s, specimenId, zoneId) {
+    const specimen = s.specimens.find((sp) => sp.id === specimenId);
+    if (!specimen)
+      return { ok: false, error: `Identifiant de spécimen inconnu : "${specimenId}".` };
+    const resolved = Stations.resolveStation(s.campaignStations, zoneId);
+    if (!resolved.ok || resolved.kind !== "zone")
+      return { ok: false, error: `Identifiant de zone inconnu : "${zoneId}".` };
+    const zone = resolved.station;
+    if (zone.capacity === undefined)
+      return {
+        ok: false,
+        error: `La zone "${zoneId}" n'a pas de capacité définie, aucune relocalisation n'y est possible.`,
+      };
+    const alreadyThere = specimen.zoneId === zoneId;
+    if (!alreadyThere && zoneOccupancy(s, zoneId) >= zone.capacity)
+      return { ok: false, error: `La zone "${zoneId}" est pleine (capacité ${zone.capacity}).` };
+    return { ok: true };
+  }
+  // Rejoue canRelocateSpecimen (jamais une seconde copie du même calcul) puis retourne un
+  // s.specimens neuf, tous les autres spécimens strictement inchangés — même discipline
+  // d'immutabilité que Stations/Decor.
+  function relocateSpecimen(s, specimenId, zoneId) {
+    const check = canRelocateSpecimen(s, specimenId, zoneId);
+    if (!check.ok) return check;
+    return {
+      ok: true,
+      specimens: s.specimens.map((sp) =>
+        sp.id === specimenId ? { ...sp, zoneId } : sp,
+      ),
+    };
+  }
   const api = {
     createCultivar,
     createSpecimen,
@@ -174,6 +236,9 @@
     specimenStage,
     isMature,
     setReadyToProduce,
+    zoneOccupancy,
+    canRelocateSpecimen,
+    relocateSpecimen,
     MATURE_STAGE,
     STAGE_DURATION_ELAPSED_SECONDS,
     SPRING_YOUNG_STAGE_DURATION_ELAPSED_SECONDS,

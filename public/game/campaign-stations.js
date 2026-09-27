@@ -56,6 +56,23 @@
   // bounded below by what "plusieurs" (more than one) literally means.
   const MIN_HABITAT_CAPACITY = 2;
 
+  // Epic C7.20 (design §5, "Replanter... respecte l'étiquette de cultivar ou la famille
+  // autorisée" presupposes a zone that can actually fill up): unlike a habitat, a zone's capacity
+  // is optional at registration — most of the 45+ existing zone fixtures across the test suite
+  // register one with no notion of capacity at all (verified by grep before writing this epic),
+  // and none of them are wired to any live command (registerStation("zone", ...) still has no
+  // command caller today, exactly as C2.6a's own header comment already noted — only habitat
+  // gained one, at C3.3/C6.26). Making capacity a hard requirement for every zone, the way
+  // MIN_HABITAT_CAPACITY does for a habitat, would therefore not be additive: it would force an
+  // unrelated edit onto dozens of files that register a zone for reasons that have nothing to do
+  // with this epic — exactly what orchestration.md's "epics petits et additifs" rules out. A zone
+  // *can* be registered with a capacity (design: "nombre maximal de spécimens qu'elle peut porter
+  // simultanément"), and when it is, the number must be real and explicit — never a default
+  // invented here the way DEFAULT_PANIER_CAPACITY is for a panier, since nothing in the design
+  // names a number for a zone. A zone with no capacity simply has none: canRelocateSpecimen
+  // (cultivars.js) refuses it explicitly rather than treating it as unlimited or crashing.
+  const MIN_ZONE_CAPACITY = 1;
+
   // Epic C2.6c: a panier additionally carries a `buffer` (item id -> qty), the same shape as
   // automation.js's `e.buffer` (design §5's "récolter... dépose dans un panier"). Only paniers
   // get it — a borne/zone never holds produce — set at creation here rather than defaulted
@@ -76,6 +93,18 @@
     // posture as a panier's capacity/min above — a zone never works overnight until a command
     // (setVeilleuse, garden-state-cmd-p.js) explicitly turns it on.
     if (kind === "zone") station.veilleuse = false;
+    // Epic C7.20: capacity is optional (see MIN_ZONE_CAPACITY's own comment above for why it is
+    // never required the way a habitat's is) — set only when the caller actually supplies one, so
+    // a zone registered without it stays exactly as bare as before this epic (no invented field).
+    // When supplied it must be a real, finite number of at least MIN_ZONE_CAPACITY, same shape of
+    // guard as the habitat branch below.
+    if (kind === "zone" && capacity !== undefined) {
+      if (!Number.isFinite(capacity) || capacity < MIN_ZONE_CAPACITY)
+        throw Error(
+          `Capacité de zone invalide (minimum ${MIN_ZONE_CAPACITY}) : ${capacity}.`,
+        );
+      station.capacity = capacity;
+    }
     // Epic C6.26 (design §11, third intensification lever, "extension standardisée sur un espace
     // vivant") : only a zone can carry this flag — a borne/panier is never itself the thing
     // extended over a habitat. Off by default, same "no free capability" posture as veilleuse just
@@ -287,6 +316,7 @@
     DEFAULT_PANIER_CAPACITY,
     DEFAULT_PANIER_MIN,
     MIN_HABITAT_CAPACITY,
+    MIN_ZONE_CAPACITY,
     registerStation,
     resolveStation,
     panierTotal,

@@ -598,3 +598,42 @@ test("relocateStation refuses an unknown id", () => {
   assert.equal(result.ok, false);
   assert.equal(JSON.stringify(g.s.campaignStations), before);
 });
+
+// Epic C7.20 (design §5, prerequisite of the Replanter gesture — see this epic's own
+// campagne-backlog.md entry for the full reasoning): a zone's capacity is optional at
+// registration (unlike a habitat's), and when supplied must be a real, explicit number. See
+// tests/campaign-cultivars.cjs for zoneOccupancy/canRelocateSpecimen/relocateSpecimen, which live
+// in cultivars.js since they read s.specimens, not just the stations registry.
+
+test("registerStation('zone', ...) with no capacity stays exactly as bare as before this epic", () => {
+  const g = new GardenState(null, 1000);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", { x: 0, z: 0 });
+  assert.equal(zone.capacity, undefined);
+});
+
+test("registerStation('zone', ...) accepts an explicit capacity, refuses below MIN_ZONE_CAPACITY", () => {
+  const g = new GardenState(null, 1000);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 3,
+  });
+  assert.equal(zone.capacity, 3);
+  for (const bad of [0, -1, NaN, Infinity]) {
+    assert.throws(() =>
+      Stations.registerStation(g.s.campaignStations, "zone", { x: 1, z: 1, capacity: bad }),
+    );
+  }
+});
+
+test("A zone's capacity below MIN_ZONE_CAPACITY, or non-finite, is rejected by validate()", () => {
+  const g = new GardenState(null, 1000);
+  Stations.registerStation(g.s.campaignStations, "zone", { x: 0, z: 0 });
+  const saved = g.serialize();
+  for (const bad of [0, -1, NaN, Infinity]) {
+    saved.campaignStations.zones[0].capacity = bad;
+    assert.throws(() => validate(saved), /Registre de stations invalide/);
+  }
+  saved.campaignStations.zones[0].capacity = 1;
+  assert.doesNotThrow(() => validate(saved));
+});

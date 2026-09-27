@@ -489,7 +489,15 @@
               !Seasons.SEASONS.includes(sp.plantedSeason)) ||
             (sp.readyToProduce !== undefined &&
               typeof sp.readyToProduce !== "boolean") ||
-            (sp.readyToProduce === true && !Cultivars.isMature(s, sp)),
+            (sp.readyToProduce === true && !Cultivars.isMature(s, sp)) ||
+            // Epic C7.20: zoneId is optional and, when present, either null (unassigned) or a
+            // real, currently registered zone id — never a borne/panier/habitat id, and never a
+            // zone that has since been removed (removeStation has no notion of "reassign the
+            // specimens that pointed at it", so a stale zoneId is a real invalid state to reject
+            // rather than silently reinterpret).
+            (sp.zoneId !== undefined &&
+              sp.zoneId !== null &&
+              !(s.campaignStations?.zones || []).some((z) => z?.id === sp.zoneId)),
         ))
     )
       throw Error("Spécimen invalide.");
@@ -773,6 +781,20 @@
           )
         )
           throw Error("Registre de stations invalide.");
+        // Epic C7.20: a zone's capacity is optional (unlike a habitat's — see
+        // campaign-stations.js's own MIN_ZONE_CAPACITY comment for why most zones never carry one
+        // at all); when present it must be finite and at least MIN_ZONE_CAPACITY, same bound
+        // registerStation itself enforces at creation. No default is migrated below: an absent
+        // capacity stays absent (a zone with no capacity, never guessed at zero or unlimited).
+        if (
+          kind === "zone" &&
+          list.some(
+            (st) =>
+              st.capacity !== undefined &&
+              !finite(st.capacity, Stations.MIN_ZONE_CAPACITY, Infinity),
+          )
+        )
+          throw Error("Registre de stations invalide.");
         // Epic C5.4: priseFortDebit is optional so a pre-epic borne still loads (defaulted to
         // false below, same posture as a zone's veilleuse at C5.2); when present, it must be a
         // real boolean, never a truthy stand-in.
@@ -1019,11 +1041,15 @@
     // shortens the stage 0 -> 1 transition (cultivars.js), so any of the other three seasons keeps
     // a specimen already growing on an old save exactly as slow as before this epic. "ete" is an
     // arbitrary pick among those three equally-safe options, named rather than left implicit.
+    // Epic C7.20: zoneId migrates to null (never affected to a zone), same "field simply absent
+    // before this epic" reasoning as the other specimen fields defaulted just above — never
+    // guessed from a zone's own contents (no zone ever tracked its occupants before this epic).
     result.specimens = (result.specimens ?? []).map((sp) => ({
       moistureAt: s.elapsed ?? 0,
       plantedAt: s.elapsed ?? 0,
       plantedSeason: "ete",
       readyToProduce: false,
+      zoneId: null,
       ...sp,
     }));
     result.specimenNextId ??= 1;
