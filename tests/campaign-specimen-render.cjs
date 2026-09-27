@@ -13,6 +13,7 @@ const RenderSpecimens = require("../public/game/render-specimens.js");
 const Cultivars = require("../public/game/cultivars.js");
 const Terrain = require("../public/game/terrain.js");
 const Genetics = require("../public/game/botany-genetics.js");
+const Hybrids = require("../public/game/botany-hybrids.js");
 
 // A real founder's trait shape (port/feuilles/fleurs/palette/humidite/fonction) — buildSpecimenGroup
 // (botany-hybrids.js) reads traits.palette.dominante1/2 and traits.feuilles.forme/taille directly,
@@ -320,4 +321,247 @@ test("the pooled stem instance matrix encodes the specimen's world position and 
   assert.ok(Math.abs(scale.x - sm.group.scale.x) < EPS);
   assert.ok(Math.abs(scale.y - sm.group.scale.x) < EPS);
   assert.ok(Math.abs(scale.z - sm.group.scale.x) < EPS);
+});
+
+// Epic C7.10 — organ pooling. "menthe-de-velours" (port "touffe", fleurs "epi"/"groupee") exercises
+// the multi-Mesh-per-organ case on BOTH axes at once (a simple "ronde" leaf is one Mesh per organ,
+// but its flower is a grouped épi — up to 4 spheres per branch * 3 branches = up to 12 Meshes for a
+// single logical flower); "ronce-a-rubans" (port "grimpant", feuilles "palmee") exercises the other
+// multi-Mesh case, a five-fingered leaf (5 Meshes per organ, no flowers at all on this founder) —
+// between the two, every multi-Mesh organ shape named by this epic's criterion is exercised by a
+// real specimen, synced through the real syncSpecimenModels. "oreille-de-pluie" (port "rosette",
+// used by makeCultivar's default) stays the negative/simple case throughout, as it already was for
+// C7.9's stem tests above.
+
+test("omitting organPools (4-argument call, stemPools only) leaves every organ mesh a normal child of the Group, unchanged from before this epic", () => {
+  const g = new GardenState(null, 1000);
+  const cv = makeCultivar(g, "menthe-de-velours");
+  Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 0, z: 0, stage: Cultivars.MATURE_STAGE });
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const stemPools = new Map();
+
+  RenderSpecimens.syncSpecimenModels(registry, scene, g.s, stemPools);
+
+  const [sm] = registry.values();
+  assert.equal(sm.organPools, null, "organPools must stay null on the registry entry when omitted");
+  const organMeshes = sm.group.userData.organMeshes;
+  assert.ok(organMeshes.length > 1, "expected several organ meshes for menthe-de-velours");
+  for (const om of organMeshes) {
+    let stillDescendant = false;
+    sm.group.traverse((o) => {
+      if (o === om.mesh) stillDescendant = true;
+    });
+    assert.ok(stillDescendant, "an organ mesh must still be a descendant of the Group when organPools is omitted");
+  }
+});
+
+test("with organPools provided, a five-fingered palmate leaf's five Meshes are each detached and pooled", () => {
+  const g = new GardenState(null, 1000);
+  const cv = makeCultivar(g, "ronce-a-rubans");
+  const sp = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 3, z: -1, stage: Cultivars.MATURE_STAGE });
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const stemPools = new Map();
+  const organPools = new Map();
+
+  RenderSpecimens.syncSpecimenModels(registry, scene, g.s, stemPools, organPools);
+
+  const sm = registry.get(sp.id);
+  const organMeshes = sm.group.userData.organMeshes;
+  assert.equal(organMeshes.length, sm.organPools.length, "organPools must have exactly one entry per organMeshes entry");
+  // "grimpant" port, 9 attach points, one 5-fingered palmate leaf organ per attach point (no
+  // flowers on this founder) — 45 total organ meshes.
+  assert.equal(organMeshes.length, 45, "unexpected organ mesh count for ronce-a-rubans (palmate leaves, no flowers)");
+  organMeshes.forEach((om) => {
+    let stillDescendant = false;
+    sm.group.traverse((o) => {
+      if (o === om.mesh) stillDescendant = true;
+    });
+    assert.equal(stillDescendant, false, "every organ mesh must be detached from the specimen Group");
+  });
+  assert.equal(sm.organPools.every((p) => p != null), true, "every organ mesh must have landed in a real pool");
+  // A single (geometry, material) pair — one leaf shape, one leaf colour — so every organ mesh
+  // shares the exact same pool object.
+  assert.ok(sm.organPools.every((p) => p === sm.organPools[0]), "all 45 palmate-leaf meshes must share the identical pool");
+  assert.equal(sm.organPools[0].mesh.count, 45, "the shared pool must hold exactly 45 active instances");
+});
+
+test("a grouped épi flower's up to twelve Meshes are pooled separately from its leaves, and two specimens of the same cultivar share both pools", () => {
+  const g = new GardenState(null, 1000);
+  const cv = makeCultivar(g, "menthe-de-velours");
+  const spA = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 0, z: 0, stage: Cultivars.MATURE_STAGE });
+  const spB = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 8, z: 8, stage: Cultivars.MATURE_STAGE });
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const stemPools = new Map();
+  const organPools = new Map();
+
+  RenderSpecimens.syncSpecimenModels(registry, scene, g.s, stemPools, organPools);
+
+  const smA = registry.get(spA.id);
+  const smB = registry.get(spB.id);
+  // A separate, throwaway build (never passed to syncSpecimenModels, so its meshes are never
+  // detached) to map each flat organMeshes index back to its logical organ kind — smA/smB's own
+  // organ meshes were already detached from their branches by the real sync() above, so their own
+  // branches can no longer be traversed for this. Same cultivar/stage/deterministic seed, so this
+  // reference build's organMeshes order is identical to smA/smB's own.
+  const reference = Hybrids.buildSpecimenGroup(cv, Cultivars.MATURE_STAGE);
+  const leafIndices = [];
+  const flowerIndices = [];
+  let flatIndex = 0;
+  reference.userData.organs.forEach((o) => {
+    let meshCount = 0;
+    o.branch.traverse((node) => {
+      if (node.isMesh) meshCount++;
+    });
+    for (let i = 0; i < meshCount; i++) {
+      (o.kind === "leaf" ? leafIndices : flowerIndices).push(flatIndex);
+      flatIndex++;
+    }
+  });
+  // "touffe" port, 8 attach points, all 8 carrying a leaf at maturity (1 mesh each); the épi
+  // flower is "groupée" so attachPoints.slice(-2) gives 2 flower organs, each 4 spheres * 3
+  // (groupée) = 12 meshes — 24 flower meshes total, matching this epic's own "jusqu'à douze pour
+  // une épi groupée" wording per logical flower.
+  assert.equal(leafIndices.length, 8, "expected 8 leaf meshes for menthe-de-velours at maturity");
+  assert.equal(flowerIndices.length, 24, "expected 24 flower meshes (2 grouped épi flowers * 12 each)");
+
+  const leafPool = smA.organPools[leafIndices[0]];
+  const flowerPool = smA.organPools[flowerIndices[0]];
+  assert.notEqual(leafPool, flowerPool, "leaf and flower organs must land in distinct pools (different geometry/material)");
+  assert.ok(leafIndices.every((i) => smA.organPools[i] === leafPool), "every leaf mesh must share the same leaf pool");
+  assert.ok(flowerIndices.every((i) => smA.organPools[i] === flowerPool), "every flower mesh must share the same flower pool");
+
+  // Same cultivar, same stage: specimen B's organs must resolve to the exact same two pools.
+  assert.ok(leafIndices.every((i) => smB.organPools[i] === leafPool), "specimen B's leaves must share specimen A's leaf pool");
+  assert.ok(flowerIndices.every((i) => smB.organPools[i] === flowerPool), "specimen B's flowers must share specimen A's flower pool");
+  assert.equal(leafPool.mesh.count, leafIndices.length * 2, "leaf pool must hold both specimens' leaf instances");
+  assert.equal(flowerPool.mesh.count, flowerIndices.length * 2, "flower pool must hold both specimens' flower instances");
+
+  let poolCount = 0;
+  for (const byMaterial of organPools.values()) poolCount += byMaterial.size;
+  assert.equal(poolCount, 2, "exactly two distinct organ pools expected for this one cultivar (leaf colour, flower/accent colour)");
+});
+
+test("a different cultivar's organ colours land in different pools than an existing cultivar's", () => {
+  const g = new GardenState(null, 1000);
+  const cvMenthe = makeCultivar(g, "menthe-de-velours");
+  const cvOreille = makeCultivar(g, "oreille-de-pluie");
+  const spMenthe = Cultivars.createSpecimen(g.s, { cultivarId: cvMenthe.id, x: 0, z: 0, stage: Cultivars.MATURE_STAGE });
+  const spOreille = Cultivars.createSpecimen(g.s, { cultivarId: cvOreille.id, x: 4, z: 4, stage: Cultivars.MATURE_STAGE });
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const stemPools = new Map();
+  const organPools = new Map();
+
+  RenderSpecimens.syncSpecimenModels(registry, scene, g.s, stemPools, organPools);
+
+  const smMenthe = registry.get(spMenthe.id);
+  const smOreille = registry.get(spOreille.id);
+  assert.ok(smOreille.organPools.length > 0, "oreille-de-pluie (rosette, coupe leaves) must still get organ pools — only the STEM is absent for a rosette");
+  assert.equal(smOreille.stemPool, null, "a rosette specimen must still never get a stemPool");
+  const shared = smMenthe.organPools.some((p) => smOreille.organPools.includes(p));
+  assert.equal(shared, false, "two cultivars with different leaf colours/shapes must never share an organ pool");
+});
+
+// Sums active instance counts across every distinct pool in an organPools registry — used below
+// where a test cares about the total number of pooled organ instances rather than one pool's own
+// count (menthe-de-velours spreads its organs across two pools, leaf and flower/accent).
+function sumOrganPoolInstances(organPools) {
+  let total = 0;
+  for (const byMaterial of organPools.values())
+    for (const pool of byMaterial.values()) total += pool.mesh.count;
+  return total;
+}
+
+test("organ instances are removed from their pools when the specimen is delivered away via the real deliverContract command", () => {
+  const g = new GardenState(null, 1000);
+  const cv = makeCultivar(g, "menthe-de-velours");
+  const sp1 = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 2, z: 2, stage: Cultivars.MATURE_STAGE });
+  const sp2 = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 4, z: 4, stage: Cultivars.MATURE_STAGE });
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const stemPools = new Map();
+  const organPools = new Map();
+
+  RenderSpecimens.syncSpecimenModels(registry, scene, g.s, stemPools, organPools);
+  const organMeshCount = registry.get(sp1.id).group.userData.organMeshes.length;
+  assert.equal(sumOrganPoolInstances(organPools), organMeshCount * 2, "both specimens' organ instances must be pooled");
+
+  const signed = g.command({ type: "signContract", cultivarId: cv.id, quota: 1, pricePerUnit: 10 });
+  assert.ok(!signed.error, signed.error);
+  const contractId = g.s.campaignContracts[0].id;
+  const delivered = g.command({ type: "deliverContract", contractId, quantity: 1 });
+  assert.ok(!delivered.error, delivered.error);
+  assert.equal(g.s.specimens.length, 1, "exactly one specimen must have been delivered away");
+
+  RenderSpecimens.syncSpecimenModels(registry, scene, g.s, stemPools, organPools);
+
+  assert.equal(sumOrganPoolInstances(organPools), organMeshCount, "exactly one specimen's worth of organ instances must remain after delivery");
+  const remainingId = g.s.specimens[0].id;
+  assert.ok(registry.get(remainingId).organPools, "the remaining specimen must keep its pooled organ instances");
+});
+
+test("a specimen's rebuilt Group on stage change re-registers organs into the same pools, with the new stage's organ count exactly (no leak)", () => {
+  const g = new GardenState(null, 1000);
+  g.s.campaignDay = 15; // past printemps (C7.3), ordinary STAGE_DURATION applies
+  const cv = makeCultivar(g, "menthe-de-velours");
+  const sp = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 1, z: 1 });
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const stemPools = new Map();
+  const organPools = new Map();
+
+  RenderSpecimens.syncSpecimenModels(registry, scene, g.s, stemPools, organPools);
+  const before = registry.get(sp.id);
+  const leafPoolBefore = before.organPools[0];
+  // Stage 0 thins the canopy (only every other attach point), so every organ mesh here is a leaf
+  // sharing the one pool (no flowers before MATURE_STAGE) — exactly the count this specimen's own
+  // organMeshes list holds right now, never more (a leak) or less.
+  assert.equal(leafPoolBefore.mesh.count, before.group.userData.organMeshes.length);
+
+  g.s.elapsed = sp.plantedAt + Cultivars.STAGE_DURATION_ELAPSED_SECONDS;
+  RenderSpecimens.syncSpecimenModels(registry, scene, g.s, stemPools, organPools);
+  const after = registry.get(sp.id);
+  const leafPoolAfter = after.organPools[0];
+
+  assert.equal(leafPoolAfter, leafPoolBefore, "the same (geometry, material) pair must resolve to the same pool object across a rebuild");
+  assert.ok(after.group.userData.organMeshes.length > before.group.userData.organMeshes.length, "the later stage must have a fuller (untinned) canopy than stage 0");
+  assert.equal(
+    leafPoolAfter.mesh.count,
+    after.group.userData.organMeshes.length,
+    "the pool must hold exactly the new stage's organ count after rebuild — the old stage's instance must have been released first, never left as a phantom alongside the new one",
+  );
+});
+
+test("a pooled organ instance matrix combines the specimen's real world transform with its precomputed localMatrix", () => {
+  const g = new GardenState(null, 1000);
+  const cv = makeCultivar(g, "menthe-de-velours");
+  const sp = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 6, z: -9, stage: Cultivars.MATURE_STAGE });
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const stemPools = new Map();
+  const organPools = new Map();
+
+  RenderSpecimens.syncSpecimenModels(registry, scene, g.s, stemPools, organPools);
+  const sm = registry.get(sp.id);
+  const om = sm.group.userData.organMeshes[0];
+  const pool = sm.organPools[0];
+
+  const m = new THREE.Matrix4();
+  pool.mesh.getMatrixAt(pool.indexOf.get(`${sp.id}:0`), m);
+
+  const expected = new THREE.Matrix4()
+    .compose(sm.group.position, new THREE.Quaternion(), sm.group.scale)
+    .multiply(om.localMatrix);
+
+  // Same float32 instance-buffer tolerance already used by the stem's own matrix test above.
+  const EPS = 1e-5;
+  for (let i = 0; i < 16; i++) {
+    assert.ok(
+      Math.abs(m.elements[i] - expected.elements[i]) < EPS,
+      `instance matrix element ${i} mismatch: got ${m.elements[i]}, expected ${expected.elements[i]}`,
+    );
+  }
 });

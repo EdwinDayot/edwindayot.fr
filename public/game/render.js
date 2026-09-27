@@ -56,6 +56,12 @@
       // pooled into shared THREE.InstancedMesh instances (render-instances.js, C7.8) instead of
       // one Mesh per specimen — see render-specimens.js's own header for the full rationale.
       this.specimenStemPools = new Map();
+      // Epic C7.10: the exact same nested pool identity Map, generalised to specimen organ Meshes
+      // (leaves/flowers) — see render-specimens.js's own header for the full rationale. Kept as a
+      // separate Map from specimenStemPools (never merged) since a stem and an organ never share
+      // the same geometry, so keying them into one Map would only mean an extra branch, never a
+      // shared pool.
+      this.specimenOrganPools = new Map();
       // Epic C2.5v-b: a single overlay Group for the "reviewing" teaching draft's resolved
       // trajectory (never one per station like rainelleModels/stationModels above — there is at
       // most one lesson in review at a time, garden-state-cmd-k.js's own "une leçon est déjà en

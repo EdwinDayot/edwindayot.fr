@@ -30,7 +30,22 @@
    stem exactly where it always was, as a normal child of the Group, byte-for-byte the prior
    behaviour. A specimen never moves once planted and a cultivar's traits are fixed for life, so in
    practice `set()` below always finds the same pool for a given specimen id again — but the code
-   stays correct even if that stopped being true. */
+   stays correct even if that stopped being true.
+
+   Epic C7.10: the exact same treatment, generalised to organ Meshes (leaves/flowers). Where C7.9
+   pools at most one Mesh per specimen (the stem, whose local transform relative to the Group is
+   the trivial identity), botany-hybrids.js now also exposes `group.userData.organMeshes`, a flat
+   `[{mesh, localMatrix}]` list — one entry per real organ Mesh, `localMatrix` a NON-trivial
+   `THREE.Matrix4` captured once at construction (see that file's header). `organPools` is a 5th
+   optional argument, the exact same `Map<geometry, Map<material, pool>>` shape as `stemPools` —
+   never a second cache structure — keyed the same way (by the organ Mesh's own `(geometry,
+   material)` object identity). Each pooled organ instance's key is `` `${specimen.id}:${index in
+   organMeshes}` `` so two organs of the same specimen sharing a pool never collide. Its instance
+   matrix is `specimen's real world transform (position + stage scale) composed with the organ's
+   own localMatrix` — never a fresh read of `mesh.matrixWorld` after detachment, which would be
+   stale/wrong once the mesh is pulled out of the real scene graph. Omitting `organPools` (every
+   existing call site, stemPools-only tests included) leaves every organ Mesh exactly where it
+   always was, byte-for-byte — the same guarantee `stemPools` already offers. */
 (function (root) {
   const T = root.THREE;
   if (!T) return;
@@ -45,62 +60,104 @@
   if (!Hybrids || !Cultivars || !Terrain || !RenderInstances) return;
 
   // First estimate, named and revisable (same posture as botany-hybrids.js's own STAGE_SCALE
-  // etc.) — render-instances.js grows a pool automatically past this, never a hard cap.
+  // etc.) — render-instances.js grows a pool automatically past this, never a hard cap. Organs
+  // start at the same estimate as the stem: real counts observed on the C7.5/C7.9 load scene are
+  // measured and documented in the commit message per this epic's own criterion, not guessed here.
   const STEM_POOL_INITIAL_CAPACITY = 8;
+  const ORGAN_POOL_INITIAL_CAPACITY = 8;
 
-  // stemPools: Map<geometry, Map<material, pool>> -> the one pool for this exact (geometry,
-  // material) object pair, creating both the pool and any missing map level on first use.
-  function stemPoolFor(stemPools, scene, geometry, material) {
-    let byMaterial = stemPools.get(geometry);
+  // pools: Map<geometry, Map<material, pool>> -> the one pool for this exact (geometry, material)
+  // object pair, creating both the pool and any missing map level on first use. Shared by both
+  // stemPoolFor and organPoolFor below (each called with its own, separate Map instance owned by
+  // the caller) — one generic lookup, never two divergent implementations of the same nested-Map
+  // pattern.
+  function poolFor(pools, scene, geometry, material, initialCapacity) {
+    let byMaterial = pools.get(geometry);
     if (!byMaterial) {
       byMaterial = new Map();
-      stemPools.set(geometry, byMaterial);
+      pools.set(geometry, byMaterial);
     }
     let pool = byMaterial.get(material);
     if (!pool) {
-      pool = RenderInstances.createInstancePool(scene, geometry, material, STEM_POOL_INITIAL_CAPACITY);
+      pool = RenderInstances.createInstancePool(scene, geometry, material, initialCapacity);
       byMaterial.set(material, pool);
     }
     return pool;
+  }
+  function stemPoolFor(stemPools, scene, geometry, material) {
+    return poolFor(stemPools, scene, geometry, material, STEM_POOL_INITIAL_CAPACITY);
+  }
+  function organPoolFor(organPools, scene, geometry, material) {
+    return poolFor(organPools, scene, geometry, material, ORGAN_POOL_INITIAL_CAPACITY);
   }
 
   // Scratch objects reused across calls (render-instances.js's own `set()` copies the matrix
   // elements into the InstancedMesh's instance buffer immediately, so nothing here is retained
   // by reference beyond a single call) — no per-call allocation for what runs every sync().
-  const _stemQuat = new T.Quaternion(); // identity, never rotated: a specimen never turns in place.
-  const _stemScale = new T.Vector3();
-  const _stemMatrix = new T.Matrix4();
-  function stemInstanceMatrix(position, scaleScalar) {
-    _stemScale.set(scaleScalar, scaleScalar, scaleScalar);
-    return _stemMatrix.compose(position, _stemQuat, _stemScale);
+  const _quat = new T.Quaternion(); // identity, never rotated: a specimen never turns in place.
+  const _scale = new T.Vector3();
+  const _worldMatrix = new T.Matrix4(); // the specimen's own world transform (position + stage scale)
+  const _organMatrix = new T.Matrix4(); // one organ's final instance matrix (world * localMatrix)
+
+  // The specimen's real world transform: position (terrain-placed) composed with its stage scale,
+  // identity rotation (a specimen never turns in place). This IS the stem's own final instance
+  // matrix too (the stem's localMatrix relative to the Group is the trivial identity — see
+  // botany-hybrids.js's C7.10 header comment) — kept as one shared scratch (`_worldMatrix`) so
+  // `organInstanceMatrix` below can reuse it as the left-hand operand for every organ of the same
+  // specimen without recomputing it once per organ.
+  function specimenWorldMatrix(position, scaleScalar) {
+    _scale.set(scaleScalar, scaleScalar, scaleScalar);
+    return _worldMatrix.compose(position, _quat, _scale);
+  }
+  // Must be called only after specimenWorldMatrix() for the SAME specimen (it reads the shared
+  // `_worldMatrix` scratch that call just filled) — combines the specimen's real world transform
+  // with an organ's own `localMatrix` (botany-hybrids.js, captured once at construction, never
+  // re-read from `mesh.matrixWorld` here: the mesh is detached from any real scene hierarchy once
+  // pooled, so its own matrixWorld would be stale/meaningless).
+  function organInstanceMatrix(localMatrix) {
+    return _organMatrix.multiplyMatrices(_worldMatrix, localMatrix);
   }
 
-  // registry: a Map id -> { group, stemPool }, owned by the caller (render.js's
+  // Removes every pooled instance (stem + organs) this registry entry currently holds — the one
+  // piece of pool-teardown logic shared by both the "specimen gone" and "stage changed, Group
+  // being rebuilt" branches below, so the two paths can never drift apart on what gets released.
+  function releasePools(sm, id) {
+    if (sm.stemPool) RenderInstances.remove(sm.stemPool, id);
+    if (sm.organPools) {
+      sm.organPools.forEach((pool, i) => {
+        if (pool) RenderInstances.remove(pool, `${id}:${i}`);
+      });
+    }
+  }
+
+  // registry: a Map id -> { group, stemPool, organPools }, owned by the caller (render.js's
   // this.specimenModels, one entry per s.specimens element) — same convention as
   // this.rainelleModels/this.stationModels. `stemPool` is the pool (if any) this specimen's stem
   // instance currently lives in, `null` when stemPools is omitted or the port has no stem
-  // (rosette).
+  // (rosette). `organPools` (epic C7.10) is an array parallel to `group.userData.organMeshes`,
+  // `organPools[i]` the pool (or `null`) that organ Mesh's instance lives in — `null`/absent
+  // entirely when `organPools` is omitted.
   // scene: the THREE.Scene (or any object exposing add/remove) Groups/pools are added to/removed
   // from.
   // s: the live GardenState save (s.specimens/s.cultivars).
-  // stemPools: optional, see the header comment above.
+  // stemPools, organPools: optional, see the header comment above.
   //
-  // Each call: removes the Group (and any pooled stem instance) of any specimen no longer in
-  // s.specimens (delivered via a contract, garden-state-cmd-r.js's deliverContract — the only site
-  // that ever shortens s.specimens, verified before writing this module); builds the Group of any
-  // new specimen id; rebuilds ENTIRELY (never mutates in place — buildSpecimenGroup cannot change
-  // its own stage after construction) the Group of any specimen whose derived stage
+  // Each call: removes the Group (and any pooled stem/organ instances) of any specimen no longer
+  // in s.specimens (delivered via a contract, garden-state-cmd-r.js's deliverContract — the only
+  // site that ever shortens s.specimens, verified before writing this module); builds the Group of
+  // any new specimen id; rebuilds ENTIRELY (never mutates in place — buildSpecimenGroup cannot
+  // change its own stage after construction) the Group of any specimen whose derived stage
   // (Cultivars.specimenStage(s, specimen), never the raw specimen.stage field, stale since C7.2)
   // no longer matches the stage already recorded on group.userData by buildSpecimenGroup itself —
   // never a second, duplicated tracking field. A specimen whose cultivar cannot be resolved yet
   // is skipped, same defensive posture render-flow.js's own Rainelle sync already uses for the
   // same situation.
-  function syncSpecimenModels(registry, scene, s, stemPools) {
+  function syncSpecimenModels(registry, scene, s, stemPools, organPools) {
     const liveIds = new Set(s.specimens.map((sp) => sp.id));
     for (const [id, sm] of registry) {
       if (!liveIds.has(id)) {
         scene.remove(sm.group);
-        if (sm.stemPool) RenderInstances.remove(sm.stemPool, id);
+        releasePools(sm, id);
         registry.delete(id);
       }
     }
@@ -111,7 +168,7 @@
       let sm = registry.get(specimen.id);
       if (sm && sm.group.userData.stage !== stage) {
         scene.remove(sm.group);
-        if (sm.stemPool) RenderInstances.remove(sm.stemPool, specimen.id);
+        releasePools(sm, specimen.id);
         registry.delete(specimen.id);
         sm = null;
       }
@@ -125,8 +182,15 @@
             stemPool = stemPoolFor(stemPools, scene, stemMesh.geometry, stemMesh.material);
           }
         }
+        let organPoolsList = null;
+        if (organPools) {
+          organPoolsList = group.userData.organMeshes.map((om) => {
+            om.mesh.parent.remove(om.mesh);
+            return organPoolFor(organPools, scene, om.mesh.geometry, om.mesh.material);
+          });
+        }
         scene.add(group);
-        sm = { group, stemPool };
+        sm = { group, stemPool, organPools: organPoolsList };
         registry.set(specimen.id, sm);
       }
       sm.group.position.set(
@@ -134,12 +198,20 @@
         Terrain.terrainHeight(specimen.x, specimen.z),
         specimen.z,
       );
-      if (sm.stemPool) {
-        RenderInstances.set(
-          sm.stemPool,
-          specimen.id,
-          stemInstanceMatrix(sm.group.position, sm.group.scale.x),
-        );
+      if (sm.stemPool || sm.organPools) {
+        specimenWorldMatrix(sm.group.position, sm.group.scale.x);
+        if (sm.stemPool) RenderInstances.set(sm.stemPool, specimen.id, _worldMatrix);
+        if (sm.organPools) {
+          const organMeshes = sm.group.userData.organMeshes;
+          sm.organPools.forEach((pool, i) => {
+            if (!pool) return;
+            RenderInstances.set(
+              pool,
+              `${specimen.id}:${i}`,
+              organInstanceMatrix(organMeshes[i].localMatrix),
+            );
+          });
+        }
       }
     }
   }

@@ -44,7 +44,31 @@
    one). The number of distinct stem pools (`v.specimenStemPools`) must also stay flat regardless of
    tier size — bounded by the number of distinct (geometry, material) pairs actually present among
    the fixed set of cultivars this test creates (one, here: only `charge-b` has a stem), never by
-   specimen count. */
+   specimen count.
+
+   Epic C7.10 update — organs (leaves/flowers) pooled too, MEASURED against this exact updated page
+   before writing the new assertion below (tests/_probe.cjs, discarded after use, same discipline as
+   above; raw numbers in the commit message): once every organ Mesh is ALSO detached into a shared
+   InstancedMesh (render-specimens.js's `organPools`), a specimen's own Group is left holding no
+   Mesh at all any more (stem AND every leaf/flower already pooled) — draw calls therefore stop
+   scaling with specimen count altogether. Measured: calls delta above baseline is the EXACT SAME
+   120 - 116 = 4 at n=40, n=120 AND n=240 (never growing), the 4 being exactly `v.specimenStemPools`'s
+   1 pool plus `v.specimenOrganPools`'s 3 distinct (geometry, material) pairs actually used by this
+   test's two cultivars (charge-a/oreille-de-pluie: one leaf shape/colour, no flowers; charge-b/
+   clochette-du-soir: one leaf shape/colour, one flower shape/colour — 1 + 1 + 1 = 3, verified by
+   this file's own `organPoolCount` measurement below, never assumed). This is the further "chute"
+   this epic's own criterion asks to measure and document against the C7.9 figure above: per-specimen
+   draw calls at the largest tier (240) fall from ~5.62 (C7.9) to 4/240 ≈ 0.017 — over two orders of
+   magnitude lower, because virtually the entire population now renders through a small, FIXED number
+   of InstancedMesh draw calls instead of one Mesh per specimen part. Triangle count is unaffected,
+   same reasoning as the C7.9 note above (pooling moves WHERE a Mesh's geometry is submitted from,
+   never how many triangles it contributes once submitted) — still ~472-476 triangles/specimen,
+   stable across tiers. `renderer.info.memory.geometries` stays exactly as flat as before (every
+   pooled organ geometry is one of botany-hybrids.js's own already-cached objects, never a new one).
+   The number of distinct organ pools (`v.specimenOrganPools`) must also stay flat regardless of tier
+   size, same "bounded by the number of distinct (geometry, material) pairs actually present, never
+   by specimen count" guarantee already established for stem pools — measured at exactly 3 for this
+   test's fixed two-cultivar population. */
 const { chromium } = require("playwright"),
   assert = require("node:assert/strict"),
   fs = require("node:fs");
@@ -136,11 +160,20 @@ const TIERS = [40, 120, 240];
         // children of a specimen Group any more (see render-specimens.js) — the loop above never
         // reaches them, so they need the same frustumCulled override to be measured correctly
         // regardless of camera framing, same reasoning as that loop's own comment.
-        let poolCount = 0;
+        let stemPoolCount = 0;
         for (const byMaterial of v.specimenStemPools.values())
           for (const pool of byMaterial.values()) {
             pool.mesh.frustumCulled = false;
-            poolCount++;
+            stemPoolCount++;
+          }
+        // Epic C7.10: same treatment, generalised to the pooled organ (leaf/flower) InstancedMesh
+        // objects — also added directly to the scene, never reached by the specimen-Group loop
+        // above, and never by the stem loop just above either (a distinct Map, `v.specimenOrganPools`).
+        let organPoolCount = 0;
+        for (const byMaterial of v.specimenOrganPools.values())
+          for (const pool of byMaterial.values()) {
+            pool.mesh.frustumCulled = false;
+            organPoolCount++;
           }
         v.frame(0.016, {}, true);
         return {
@@ -149,7 +182,8 @@ const TIERS = [40, 120, 240];
           calls: v.renderer.info.render.calls,
           triangles: v.renderer.info.render.triangles,
           geometries: v.renderer.info.memory.geometries,
-          stemPoolCount: poolCount,
+          stemPoolCount,
+          organPoolCount,
         };
       }
 
@@ -159,6 +193,9 @@ const TIERS = [40, 120, 240];
       // Epic C7.9: the pooled stem InstancedMesh objects live outside any specimen Group now, so
       // the loop above never reaches their (shared, unchanged) geometry — checked explicitly here.
       for (const byMaterial of v.specimenStemPools.values())
+        for (const pool of byMaterial.values()) checkFinite(pool.mesh);
+      // Epic C7.10: same check, generalised to the pooled organ InstancedMesh objects.
+      for (const byMaterial of v.specimenOrganPools.values())
         for (const pool of byMaterial.values()) checkFinite(pool.mesh);
 
       // Resync with no state change at the largest tier already built: nothing should move.
@@ -200,9 +237,10 @@ const TIERS = [40, 120, 240];
     );
     assert.ok(geomDeltas[0] > 0 && geomDeltas[0] < 20, "unexpected geometry delta: " + geomDeltas[0]);
 
-    // Per-specimen draw-call/triangle cost stays stable across tiers (linear growth is expected
-    // and correct — see header comment — but it must never accelerate, which would signal an
-    // accidental quadratic cost somewhere in the sync loop).
+    // Per-specimen triangle cost stays stable across tiers (linear growth is expected and correct
+    // — see header comment — but it must never accelerate, which would signal an accidental
+    // quadratic cost somewhere in the sync loop). Pooling never changes triangle count (only WHERE
+    // a Mesh's geometry gets submitted from), so this check is unaffected by C7.10.
     const perSpecimen = measured.results.map((r) => ({
       n: r.n,
       calls: (r.calls - measured.baseline.calls) / r.n,
@@ -210,44 +248,65 @@ const TIERS = [40, 120, 240];
     }));
     const smallest = perSpecimen[0],
       largest = perSpecimen[perSpecimen.length - 1];
-    const callsRatio = largest.calls / smallest.calls;
     const trianglesRatio = largest.triangles / smallest.triangles;
-    assert.ok(
-      callsRatio > 0.9 && callsRatio < 1.1,
-      `per-specimen draw-call cost is not stable across tiers (smallest=${smallest.calls}, largest=${largest.calls}, ratio=${callsRatio})`,
-    );
     assert.ok(
       trianglesRatio > 0.9 && trianglesRatio < 1.1,
       `per-specimen triangle cost is not stable across tiers (smallest=${smallest.triangles}, largest=${largest.triangles}, ratio=${trianglesRatio})`,
     );
 
-    // Epic C7.9: per-specimen draw-call cost must have genuinely dropped from the ~6 recorded by
-    // C7.5 (header comment above) now that one of the two cultivars' stems is pooled — measured at
-    // ~5.6-5.67 for this exact 50/50 two-cultivar mix (see header comment for the raw numbers).
-    // The bound below is deliberately real-measurement-shaped (not a round "5" or "6"): tight
-    // enough to catch a regression that silently stopped pooling (which would push this back up
-    // towards 6), loose enough to tolerate the small amortization drift already visible between
-    // the n=40 and n=120/240 tiers above.
-    for (const r of perSpecimen) {
-      assert.ok(
-        r.calls < 5.9,
-        `tier ${r.n}: per-specimen draw calls (${r.calls}) did not drop below the pre-C7.9 ~6/specimen baseline — stem pooling regression?`,
-      );
-      assert.ok(
-        r.calls > 5.0,
-        `tier ${r.n}: per-specimen draw calls (${r.calls}) dropped further than stem pooling alone explains (only one of the two cultivars has a stem) — unexpected extra draw-call reduction`,
-      );
-    }
+    // Epic C7.10: draw calls no longer scale with specimen count AT ALL once organs are pooled
+    // alongside the stem (header comment above) — every specimen part that used to submit its own
+    // Mesh now goes through one of a small, fixed number of InstancedMesh draw calls instead. The
+    // delta above baseline must therefore be the EXACT SAME value at every tier, never merely
+    // "stable within a ratio" as the pre-C7.10 per-specimen check used to assert (that check no
+    // longer makes sense once the per-specimen cost trends toward zero, rather than toward a
+    // stable positive constant).
+    const callDeltas = measured.results.map((r) => r.calls - measured.baseline.calls);
+    assert.equal(
+      callDeltas[0],
+      callDeltas[callDeltas.length - 1],
+      "draw-call delta above baseline grew with specimen count (" +
+        JSON.stringify(callDeltas) +
+        ") — organ/stem pooling regression: some organ Mesh is being submitted per-specimen again instead of through a shared pool",
+    );
+    // Bounded above by the C7.9 measurement (that epic alone already got draw calls down near
+    // n * ~5.6) and by a generous margin over the 4 actually observed (1 stem pool + 3 organ
+    // pools for this test's fixed two-cultivar population) — loose enough to tolerate a future
+    // cultivar/founder added to this same test needing one or two more pools, tight enough to
+    // catch a regression that silently stopped pooling organs (which would push this back up
+    // towards linear growth with n).
+    assert.ok(callDeltas[0] > 0 && callDeltas[0] < 20, "unexpected constant draw-call delta: " + callDeltas[0]);
+
+    // Epic C7.10: per-specimen draw-call cost at the largest tier must have genuinely dropped far
+    // below the ~5.6-5.67 recorded by C7.9 (header comment above) now that organs are pooled too —
+    // measured at 4/240 ≈ 0.017 for this exact fixture. The bound is loose (still an order of
+    // magnitude of margin) but strictly below the C7.9 figure, so a regression that silently kept
+    // organs unpooled (leaving per-specimen cost near 5.6 again) fails loudly here.
+    const largestTierCalls = perSpecimen[perSpecimen.length - 1].calls;
+    assert.ok(
+      largestTierCalls < 1,
+      `tier ${TIERS[TIERS.length - 1]}: per-specimen draw calls (${largestTierCalls}) did not drop far below the pre-C7.10 ~5.6/specimen baseline (C7.9) — organ pooling regression?`,
+    );
 
     // Bounded stem-pool count regardless of scale — same "distinct object identity, not specimen
     // count" guarantee as the geometry check above, for the pools themselves this time.
-    const poolCounts = measured.results.map((r) => r.stemPoolCount);
+    const stemPoolCounts = measured.results.map((r) => r.stemPoolCount);
     assert.equal(
-      poolCounts[0],
-      poolCounts[poolCounts.length - 1],
-      "stem pool count grew with specimen count (" + JSON.stringify(poolCounts) + ") — pooling by (geometry, material) identity broke at scale",
+      stemPoolCounts[0],
+      stemPoolCounts[stemPoolCounts.length - 1],
+      "stem pool count grew with specimen count (" + JSON.stringify(stemPoolCounts) + ") — pooling by (geometry, material) identity broke at scale",
     );
-    assert.ok(poolCounts[0] > 0 && poolCounts[0] < 5, "unexpected stem pool count: " + poolCounts[0]);
+    assert.ok(stemPoolCounts[0] > 0 && stemPoolCounts[0] < 5, "unexpected stem pool count: " + stemPoolCounts[0]);
+
+    // Epic C7.10: same "bounded, never proportional to specimen count" guarantee, for organ pools
+    // — measured at exactly 3 for this test's fixed two-cultivar population (see header comment).
+    const organPoolCounts = measured.results.map((r) => r.organPoolCount);
+    assert.equal(
+      organPoolCounts[0],
+      organPoolCounts[organPoolCounts.length - 1],
+      "organ pool count grew with specimen count (" + JSON.stringify(organPoolCounts) + ") — pooling by (geometry, material) identity broke at scale",
+    );
+    assert.ok(organPoolCounts[0] > 0 && organPoolCounts[0] < 20, "unexpected organ pool count: " + organPoolCounts[0]);
 
     // Resyncing with no state change must never rebuild anything (no phantom Group churn, no
     // renderer counter drift) — same "reused without change" guarantee as
@@ -264,7 +323,10 @@ const TIERS = [40, 120, 240];
       JSON.stringify({
         tiers: TIERS,
         geometryDeltaConstant: geomDeltas[0],
-        stemPoolCountConstant: poolCounts[0],
+        stemPoolCountConstant: stemPoolCounts[0],
+        organPoolCountConstant: organPoolCounts[0],
+        callDeltaConstant: callDeltas[0],
+        perSpecimenCallsAtLargestTier: largestTierCalls,
         perSpecimen,
       }),
     );

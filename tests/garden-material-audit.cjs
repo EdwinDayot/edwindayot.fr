@@ -314,6 +314,35 @@ const TRANSPARENT_ALLOWLIST = [
         stemAuditIds = { stemA: stemA.id, stemB: stemB.id, stemC: stemC.id, rosette: rosette.id };
       }
 
+      // Epic C7.10 (docs/campagne-backlog.md): the real organ-pooling path (render-specimens.js's
+      // organPools branch, wired through render.js's real `this.specimenOrganPools`, exercised by
+      // the exact same v.sync() call every frame uses) — real specimens exercising the two
+      // multi-Mesh-per-organ shapes this epic's own criterion names: ronce-a-rubans (a palmate
+      // leaf, five Meshes per leaf organ — founders[3], never used by the C7.9 block above) and
+      // menthe-de-velours (a grouped épi flower, up to twelve Meshes per flower organ —
+      // founders[2], the SAME founder as C7.9's stemC above on purpose: menthe-de-velours has a
+      // real stem too, so this deliberately exercises a specimen whose stem AND organs are BOTH
+      // pooled at once, never checked together until this epic). Positioned far off the playable
+      // area, same convention as every block above.
+      let organAuditIds = null;
+      if (window.GardenGenetics && window.GardenCultivars && window.GardenApp.game) {
+        const s = window.GardenApp.game.s;
+        const Cultivars = window.GardenCultivars;
+        const founders = window.GardenGenetics.founders;
+        const cvPalmate = Cultivars.createCultivar(s, { name: "Test C7.10 palmate", traits: founders[3].traits });
+        const cvGrouped = Cultivars.createCultivar(s, { name: "Test C7.10 grouped", traits: founders[2].traits });
+        const palmateA = Cultivars.createSpecimen(s, { cultivarId: cvPalmate.id, x: 256, z: 200, stage: Cultivars.MATURE_STAGE });
+        const palmateB = Cultivars.createSpecimen(s, { cultivarId: cvPalmate.id, x: 257.5, z: 200, stage: Cultivars.MATURE_STAGE });
+        const grouped = Cultivars.createSpecimen(s, { cultivarId: cvGrouped.id, x: 259, z: 200, stage: Cultivars.MATURE_STAGE });
+        v.sync();
+        organAuditIds = {
+          palmateA: palmateA.id,
+          palmateB: palmateB.id,
+          grouped: grouped.id,
+          cvGroupedId: cvGrouped.id,
+        };
+      }
+
       // Sample a few times of day: a defect that only shows under one lighting angle (the
       // terrain-normal bug was exactly this — it read fine at some sun angles) must not hide.
       const times = [50, 300, 600, 900, 1150];
@@ -476,6 +505,60 @@ const TRANSPARENT_ALLOWLIST = [
         };
       }
 
+      // Epic C7.10: confirms the real organ-pooling wiring, symmetric to stemWiring above — every
+      // organ Mesh of a pooled specimen is detached from its Group, two specimens of the SAME
+      // cultivar share the identical pool per (geometry, material) pair, and the palmate leaf /
+      // grouped flower multi-Mesh cases this epic's own criterion names are both actually present
+      // and pooled (never silently skipped because botany-hybrids.js only exposed a single organ
+      // Mesh for them by mistake).
+      let organWiring = { found: false };
+      if (organAuditIds) {
+        const smA = v.specimenModels.get(organAuditIds.palmateA);
+        const smB = v.specimenModels.get(organAuditIds.palmateB);
+        const smGrouped = v.specimenModels.get(organAuditIds.grouped);
+        const allDetached = [smA, smB, smGrouped].every((sm) =>
+          sm.group.userData.organMeshes.every((om) => {
+            let stillDescendant = false;
+            sm.group.traverse((o) => {
+              if (o === om.mesh) stillDescendant = true;
+            });
+            return !stillDescendant;
+          }),
+        );
+        // Classify smGrouped's flat organMeshes indices back to leaf/flower via a throwaway
+        // reference build (never synced/pooled, so its meshes are never detached) — the real
+        // group's own branches can no longer be traversed for this after v.sync() above already
+        // detached every organ mesh, same reasoning as the Node-only test's own reference build.
+        const cvGrouped = window.GardenApp.game.s.cultivars.find((c) => c.id === organAuditIds.cvGroupedId);
+        const reference = window.GardenBotanyHybrids.buildSpecimenGroup(cvGrouped, window.GardenCultivars.MATURE_STAGE);
+        let firstFlowerIndex = -1;
+        let flowerMeshCount = 0;
+        let idx = 0;
+        reference.userData.organs.forEach((o) => {
+          let meshCount = 0;
+          o.branch.traverse((node) => {
+            if (node.isMesh) meshCount++;
+          });
+          if (o.kind === "flower") {
+            flowerMeshCount += meshCount;
+            if (firstFlowerIndex === -1) firstFlowerIndex = idx;
+          }
+          idx += meshCount;
+        });
+        let poolCount = 0;
+        for (const byMaterial of v.specimenOrganPools.values()) poolCount += byMaterial.size;
+        organWiring = {
+          found: !!(smA && smB && smGrouped),
+          allDetached,
+          palmateMeshCount: smA.group.userData.organMeshes.length,
+          sameCultivarSharedPool: smA.organPools[0] === smB.organPools[0],
+          sharedPoolInstanceCount: smA.organPools[0] && smA.organPools[0].mesh.count,
+          groupedFlowerMeshCount: flowerMeshCount,
+          differentOrganDifferentPool: firstFlowerIndex >= 0 && smGrouped.organPools[0] !== smGrouped.organPools[firstFlowerIndex],
+          distinctPoolCount: poolCount,
+        };
+      }
+
       return {
         suspiciousTransparent,
         badNormals,
@@ -488,6 +571,7 @@ const TRANSPARENT_ALLOWLIST = [
         giftWiring,
         specimenWiring,
         stemWiring,
+        organWiring,
       };
     });
 
@@ -536,6 +620,15 @@ const TRANSPARENT_ALLOWLIST = [
     assert.equal(audit.stemWiring.differentCultivarDifferentPool, true, "C7.9: a different cultivar's stem colour must land in a different pool");
     assert.equal(audit.stemWiring.rosetteHasNoPool, true, "C7.9: a rosette specimen (no stem) must never get a stemPool");
     assert.ok(audit.stemWiring.distinctPoolCount >= 2, "C7.9: expected at least two distinct stem pools (clochette + menthe)");
+
+    assert.equal(audit.organWiring.found, true, "C7.10: sync() never built a Group for one of the organ-pooling audit specimens");
+    assert.equal(audit.organWiring.allDetached, true, "C7.10: a pooled specimen's Group must no longer carry any of its organMeshes as a descendant");
+    assert.equal(audit.organWiring.palmateMeshCount, 45, "C7.10: expected 45 organ meshes for ronce-a-rubans (9 attach points * 5 palmate fingers, no flowers)");
+    assert.equal(audit.organWiring.sameCultivarSharedPool, true, "C7.10: two specimens of the same cultivar must share the identical organ pool for a given (geometry, material) pair");
+    assert.equal(audit.organWiring.sharedPoolInstanceCount, 90, "C7.10: the shared palmate-leaf pool must hold exactly two specimens' worth of finger instances (2 * 45)");
+    assert.equal(audit.organWiring.groupedFlowerMeshCount, 24, "C7.10: expected 24 flower meshes for menthe-de-velours (2 grouped épi flowers * 12 each)");
+    assert.equal(audit.organWiring.differentOrganDifferentPool, true, "C7.10: a specimen's leaf organs and flower organs must never share the same pool");
+    assert.ok(audit.organWiring.distinctPoolCount >= 2, "C7.10: expected at least two distinct organ pools (palmate leaf + menthe leaf/flower)");
 
     assert.deepEqual(audit.nanMeshes, [], "Meshes with non-finite vertex positions: " + audit.nanMeshes.join(", "));
     assert.deepEqual(

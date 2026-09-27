@@ -26,7 +26,23 @@
    (mature) so every existing call site/test written against C1.7 -- none of which pass a stage
    -- is byte-for-byte unaffected: same organs, same attach points, group.scale left at 1.
    Younger stages scale the whole group down (STAGE_SCALE) and thin the canopy (sparser leaves,
-   no flowers before maturity) rather than inventing a second geometry set per stage. */
+   no flowers before maturity) rather than inventing a second geometry set per stage.
+
+   Epic C7.10 (docs/campagne-backlog.md): buildSpecimenGroup also exposes
+   group.userData.organMeshes, a flat [{mesh, localMatrix}] list — one entry per real organ Mesh,
+   never per logical organ branch (a palmate leaf's five fingers are five entries, a grouped "epi"
+   flower's up to twelve spheres are twelve entries), so render-specimens.js can pool each one into
+   a shared THREE.InstancedMesh exactly like the stem (C7.9). `localMatrix` is captured ONCE here,
+   right after `structure.updateMatrixWorld(true)` and before `group.scale.setScalar(scaleFactor)`
+   runs below — at that point `group` is still at its default (1,1,1) scale, so `mesh.matrixWorld`
+   at that instant already IS the organ's transform relative to the group's own frame, stage-scale-
+   independent, the same frame the stem's (trivial, identity) local matrix has always implicitly
+   used. THIS IS ONLY VALID because no organ Mesh moves or rotates independently of the whole
+   specimen after construction today — verified by reading buildLeafOrgan/buildFlowerOrgan above,
+   neither of which is ever touched again post-construction. A future epic that animates a leaf or
+   flower on its own (wind sway, bloom opening, etc.) MUST re-examine this precomputation before
+   reusing organMeshes — a stale localMatrix would silently desync a pooled organ's rendered pose
+   from its real one. */
 (function (root) {
   const T = root.THREE;
   if (!T) return;
@@ -372,6 +388,25 @@
       });
     }
 
+    // Epic C7.10: capture each organ Mesh's transform relative to `group`'s OWN frame, once, right
+    // here — before the stage scale below is ever applied. `group` was just created above and
+    // never had updateMatrixWorld called on it (nor was it added to any scene yet), so its own
+    // matrixWorld is still THREE's default identity; `structure.updateMatrixWorld(true)` forces a
+    // fresh computation for `structure` and every descendant using that identity as the parent
+    // matrix, which is exactly why the result already equals each Mesh's transform in `group`'s
+    // frame, stage-scale-independent — see this file's header comment for the full reasoning and
+    // the animation caveat it depends on. One flat entry per real Mesh, never per organ branch (a
+    // palmate leaf's five fingers / a grouped epi flower's up to twelve spheres each produce that
+    // many entries), gathered via traverse() so a leaf's direct mesh children and a flower's
+    // cloned sub-branches (buildFlowerOrgan's own `extra = branch.clone()`) are both covered.
+    structure.updateMatrixWorld(true);
+    const organMeshes = [];
+    for (const o of organs) {
+      o.branch.traverse((node) => {
+        if (node.isMesh) organMeshes.push({ mesh: node, localMatrix: node.matrixWorld.clone() });
+      });
+    }
+
     group.scale.setScalar(scaleFactor);
     // Epic C7.9: exposes the exact stem Mesh (null for "rosette", which never has one) so a
     // caller (render-specimens.js) can pool it into a shared InstancedMesh without guessing its
@@ -379,7 +414,7 @@
     // to any future reordering of the calls above). Purely additive: the stem stays a normal
     // child of `structure`/`group` here, byte-for-byte the same as before this field existed,
     // unless a caller explicitly detaches it.
-    group.userData = { cultivarId: id, organs, attachPoints, stage, stemMesh };
+    group.userData = { cultivarId: id, organs, attachPoints, stage, stemMesh, organMeshes };
     return group;
   }
 
