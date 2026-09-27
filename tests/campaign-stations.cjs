@@ -2,6 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { GardenState, validate } = require("./garden-rules-helpers.cjs");
 const Stations = require("../public/game/campaign-stations.js");
+const Cultivars = require("../public/game/cultivars.js");
 
 // Epic C2.6a (first tier of C2.6's reformulation, see campagne-backlog.md's journal des
 // décisions, 2026-09-18) : un registre de bornes d'eau/zones de culture/paniers de campagne,
@@ -284,6 +285,45 @@ test("a pre-C2.8 panier without capacity/min migrates to the same defaults regis
     migrated.campaignStations.paniers[0].min,
     Stations.DEFAULT_PANIER_MIN,
   );
+});
+
+// Epic C7.21: a panier's declared capacity must never be exceeded by its real buffer total once
+// reloaded (the trou left open by C7.20's own commit — see garden-state-validate.js's own
+// comment). An occupation exactly at capacity is the normal "full" state and must stay valid.
+test("validate rejects a panier whose buffer total exceeds its declared capacity, accepts it exactly at capacity", () => {
+  // A buffer key must resolve to a real cultivar (validated independently, see the buffer content
+  // check just above this one in garden-state-validate.js) — two real cultivars stand in for two
+  // resource kinds, same as tests/campaign-rainelles-chain.cjs's own fixtures.
+  const base = () => {
+    const g = new GardenState(null, 1000);
+    const cv1 = Cultivars.createCultivar(g.s, { name: "A", traits: {} });
+    const cv2 = Cultivars.createCultivar(g.s, { name: "B", traits: {} });
+    Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+    return { saved: g.serialize(), cv1, cv2 };
+  };
+
+  const overflowing = base();
+  overflowing.saved.campaignStations.paniers[0].capacity = 5;
+  overflowing.saved.campaignStations.paniers[0].buffer = {
+    [overflowing.cv1.id]: 3,
+    [overflowing.cv2.id]: 3,
+  };
+  assert.throws(() => validate(overflowing.saved), /Registre de stations invalide/);
+
+  const exactlyFull = base();
+  exactlyFull.saved.campaignStations.paniers[0].capacity = 5;
+  exactlyFull.saved.campaignStations.paniers[0].buffer = {
+    [exactlyFull.cv1.id]: 3,
+    [exactlyFull.cv2.id]: 2,
+  };
+  assert.doesNotThrow(() => validate(exactlyFull.saved));
+
+  // A panier with no declared capacity is never concerned by this control, however large its
+  // buffer — behaviour unchanged from before this epic.
+  const noCapacity = base();
+  delete noCapacity.saved.campaignStations.paniers[0].capacity;
+  noCapacity.saved.campaignStations.paniers[0].buffer = { [noCapacity.cv1.id]: 999 };
+  assert.doesNotThrow(() => validate(noCapacity.saved));
 });
 
 test("panierTotal sums every resource key in a panier's buffer", () => {

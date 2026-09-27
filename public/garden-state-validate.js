@@ -753,6 +753,21 @@
           )
         )
           throw Error("Registre de stations invalide.");
+        // Epic C7.21: a panier's declared capacity, when present, must never be exceeded by its
+        // real content (Stations.panierTotal — a pre-epic panier without a buffer field yet is
+        // normalised to {} here, never crashed on, same posture as the buffer check above). Equal
+        // to capacity is the normal "full" state (already exercised by existing tests) and stays
+        // valid; only strictly above is rejected, since only relocateSpecimen-equivalent commands
+        // ever write past that ceiling and none of them do.
+        if (
+          kind === "panier" &&
+          list.some(
+            (st) =>
+              st.capacity !== undefined &&
+              Stations.panierTotal({ buffer: st.buffer || {} }) > st.capacity,
+          )
+        )
+          throw Error("Registre de stations invalide.");
         // Epic C3.3: a habitat's capacity is required (no optional/default path — unlike a
         // panier's capacity/min, no pre-epic habitat can exist to migrate), and bounded below by
         // Stations.MIN_HABITAT_CAPACITY (design §6's "plusieurs places de vie", more than one).
@@ -792,6 +807,23 @@
             (st) =>
               st.capacity !== undefined &&
               !finite(st.capacity, Stations.MIN_ZONE_CAPACITY, Infinity),
+          )
+        )
+          throw Error("Registre de stations invalide.");
+        // Epic C7.21: same discipline for a zone — its declared capacity, when present, must
+        // never be exceeded by its real occupation (Cultivars.zoneOccupancy, counted on
+        // s.specimens, already validated above this point in the file). A pre-epic/absent
+        // s.specimens is normalised to [] here, never crashed on. Equal to capacity is the normal
+        // "full" state (already exercised by existing tests) and stays valid; only strictly above
+        // is rejected, since relocateSpecimen is the only path that ever writes zoneId and it
+        // already refuses a full zone.
+        if (
+          kind === "zone" &&
+          list.some(
+            (st) =>
+              st.capacity !== undefined &&
+              Cultivars.zoneOccupancy({ specimens: s.specimens || [] }, st.id) >
+                st.capacity,
           )
         )
           throw Error("Registre de stations invalide.");

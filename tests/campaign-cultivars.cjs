@@ -243,3 +243,56 @@ test("A specimen with a zoneId that resolves to a non-zone station or an unknown
   assert.doesNotThrow(() => validate(saved));
 });
 
+// Epic C7.21: the trou left open by C7.20's own commit ("validate() ne vérifie pas que
+// l'occupation totale d'une zone rechargée ne dépasse pas sa capacité") — a zone's declared
+// capacity must never be exceeded by the real occupation counted on s.specimens once reloaded.
+// Equal to capacity is the normal "full" state (already exercised by the round-trip test above)
+// and must stay valid.
+test("validate rejects a zone whose real occupation exceeds its declared capacity, accepts it exactly at capacity", () => {
+  const overflowing = new GardenState(null, 1000);
+  const cvOverflow = makeCultivar(overflowing);
+  const overflowZone = Stations.registerStation(overflowing.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 1,
+  });
+  const spOverflow1 = Cultivars.createSpecimen(overflowing.s, {
+    cultivarId: cvOverflow.id,
+    x: 0,
+    z: 0,
+  });
+  const spOverflow2 = Cultivars.createSpecimen(overflowing.s, {
+    cultivarId: cvOverflow.id,
+    x: 1,
+    z: 1,
+  });
+  spOverflow1.zoneId = overflowZone.id;
+  spOverflow2.zoneId = overflowZone.id;
+  assert.throws(
+    () => validate(overflowing.serialize()),
+    /Registre de stations invalide/,
+  );
+
+  const exactlyFull = new GardenState(null, 1000);
+  const cvFull = makeCultivar(exactlyFull);
+  const fullZone = Stations.registerStation(exactlyFull.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 1,
+  });
+  const spFull = Cultivars.createSpecimen(exactlyFull.s, { cultivarId: cvFull.id, x: 0, z: 0 });
+  spFull.zoneId = fullZone.id;
+  assert.doesNotThrow(() => validate(exactlyFull.serialize()));
+
+  // A zone with no declared capacity is never concerned by this control, however many specimens
+  // point at it — behaviour unchanged from before this epic.
+  const bare = new GardenState(null, 1000);
+  const cvBare = makeCultivar(bare);
+  const bareZone = Stations.registerStation(bare.s.campaignStations, "zone", { x: 0, z: 0 });
+  const spBare1 = Cultivars.createSpecimen(bare.s, { cultivarId: cvBare.id, x: 0, z: 0 });
+  const spBare2 = Cultivars.createSpecimen(bare.s, { cultivarId: cvBare.id, x: 1, z: 1 });
+  spBare1.zoneId = bareZone.id;
+  spBare2.zoneId = bareZone.id;
+  assert.doesNotThrow(() => validate(bare.serialize()));
+});
+
