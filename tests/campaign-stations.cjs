@@ -495,3 +495,106 @@ test("labelStation on a panier preserves its buffer/capacity/min untouched", () 
   assert.equal(labelled.min, 3);
   assert.equal(labelled.label, "Panier du fond");
 });
+
+// Epic C7.18 (design §16, "déplacer un poste... conserve les ressources et libère correctement
+// les réservations"). Stations.relocateStation is a pure function proven here; the command wiring
+// (relocateStation({id, x, z}) via the real GardenState.command() vector) and the "cycle survives
+// a small move, stops cleanly once out of range" scenario are proven separately in
+// tests/campaign-remove-station.cjs, alongside removeStation/labelStation.
+
+test("relocateStation moves a zone/borne/panier: only x/z change, every other field is untouched", () => {
+  const g = new GardenState(null, 1000);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", { x: 0, z: 0 });
+  const borne = Stations.registerStation(g.s.campaignStations, "borne", { x: 1, z: 1 });
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", { x: 2, z: 2 });
+  let registry = Stations.labelStation(g.s.campaignStations, zone.id, "Le carré du matin").registry;
+  registry = Stations.relocateStation(registry, zone.id, 10, 20).registry;
+  assert.deepEqual(registry.zones.find((z) => z.id === zone.id), {
+    id: zone.id,
+    x: 10,
+    z: 20,
+    veilleuse: false,
+    extensionCommerciale: false,
+    label: "Le carré du matin",
+  });
+
+  registry = Stations.relocateStation(registry, borne.id, -5, 5).registry;
+  assert.deepEqual(registry.bornes.find((b) => b.id === borne.id), {
+    id: borne.id,
+    x: -5,
+    z: 5,
+    priseFortDebit: false,
+  });
+
+  registry = Stations.relocateStation(registry, panier.id, 30, -30).registry;
+  const moved = registry.paniers.find((p) => p.id === panier.id);
+  assert.equal(moved.x, 30);
+  assert.equal(moved.z, -30);
+  assert.deepEqual(moved.buffer, {});
+  assert.equal(moved.capacity, Stations.DEFAULT_PANIER_CAPACITY);
+  assert.equal(moved.min, Stations.DEFAULT_PANIER_MIN);
+});
+
+test("relocateStation on a panier that already holds produce is never refused, unlike removeStation", () => {
+  const g = new GardenState(null, 1000);
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+  panier.buffer.fraise = 5;
+  const result = Stations.relocateStation(g.s.campaignStations, panier.id, 12, 12);
+  assert.equal(result.ok, true, result.error);
+  const moved = result.registry.paniers.find((p) => p.id === panier.id);
+  assert.equal(moved.x, 12);
+  assert.equal(moved.z, 12);
+  assert.deepEqual(moved.buffer, { fraise: 5 });
+});
+
+test("relocateStation refuses non-finite or out-of-bound x/z, registry unchanged", () => {
+  const g = new GardenState(null, 1000);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", { x: 0, z: 0 });
+  const before = JSON.stringify(g.s.campaignStations);
+  for (const [x, z] of [
+    [NaN, 0],
+    [0, NaN],
+    [Infinity, 0],
+    [0, -Infinity],
+    [65, 0],
+    [-65, 0],
+    [0, 65],
+    [0, -65],
+  ]) {
+    const result = Stations.relocateStation(g.s.campaignStations, zone.id, x, z);
+    assert.equal(result.ok, false, `x=${x} z=${z} should be refused`);
+    assert.equal(JSON.stringify(g.s.campaignStations), before);
+  }
+});
+
+test("relocateStation accepts the exact -64/64 boundary", () => {
+  const g = new GardenState(null, 1000);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", { x: 0, z: 0 });
+  const result = Stations.relocateStation(g.s.campaignStations, zone.id, -64, 64);
+  assert.equal(result.ok, true, result.error);
+  const moved = result.registry.zones.find((z) => z.id === zone.id);
+  assert.equal(moved.x, -64);
+  assert.equal(moved.z, 64);
+});
+
+test("relocateStation refuses a habitat id, registry unchanged", () => {
+  const g = new GardenState(null, 1000);
+  const habitat = Stations.registerStation(g.s.campaignStations, "habitat", {
+    x: 0,
+    z: 0,
+    capacity: 2,
+  });
+  const before = JSON.stringify(g.s.campaignStations);
+  const result = Stations.relocateStation(g.s.campaignStations, habitat.id, 1, 1);
+  assert.equal(result.ok, false);
+  assert.match(result.error, /habitat/);
+  assert.equal(JSON.stringify(g.s.campaignStations), before);
+});
+
+test("relocateStation refuses an unknown id", () => {
+  const g = new GardenState(null, 1000);
+  const before = JSON.stringify(g.s.campaignStations);
+  const result = Stations.relocateStation(g.s.campaignStations, "z999", 1, 1);
+  assert.equal(result.ok, false);
+  assert.equal(JSON.stringify(g.s.campaignStations), before);
+});

@@ -20,7 +20,10 @@
    Epic C7.17 adds labelStation({id, label}) alongside it, on the same reuse: reused, not a new
    lettered segment, because both commands share this file's exact "thin wrapper over a pure
    Stations.* function, replace s.campaignStations with the returned registry on success" shape —
-   see campaign-stations.js's own labelStation for the validation/clearing rules. */
+   see campaign-stations.js's own labelStation for the validation/clearing rules.
+
+   Epic C7.18 adds relocateStation({id, x, z}) alongside them, same reuse and same shape again —
+   see campaign-stations.js's own relocateStation for the validation/preservation rules. */
 (function (root) {
   const Stations =
     typeof module !== "undefined"
@@ -41,6 +44,12 @@
         if (!result.ok) return fail(result.error);
         s.campaignStations = result.registry;
         st.message = "Station étiquetée.";
+      } else if (c.type === "relocateStation") {
+        st.taken = true;
+        const result = Stations.relocateStation(s.campaignStations, c.id, c.x, c.z);
+        if (!result.ok) return fail(result.error);
+        s.campaignStations = result.registry;
+        st.message = "Station déplacée.";
       }
       return null;
     },

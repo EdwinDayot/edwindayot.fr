@@ -232,6 +232,46 @@
     };
   }
 
+  // Epic C7.18 (design §16, "déplacer un poste... conserve les ressources et libère correctement
+  // les réservations"): moves a borne/zone/panier to a new x/z without touching anything else it
+  // carries (buffer, capacity, min, veilleuse, priseFortDebit, extensionCommerciale, label) —
+  // unlike removeStation, a move never inspects panierTotal: nothing is discarded, so a non-empty
+  // panier moves exactly like an empty one. A habitat is refused, same posture as removeStation/
+  // labelStation (no command relocates a habitat today, out of scope for this epic).
+  //
+  // x/z bounds reuse garden-state-validate.js's own ~line 702 bound for a station position
+  // (-64..64), already imposed at load time on every station and already enforced at write time
+  // by C6.27's convertZoneToLivingSpace for a new habitat — never a bound invented for this epic.
+  function relocateStation(registry, id, x, z) {
+    const resolved = resolveStation(registry, id);
+    if (!resolved.ok) return resolved;
+    const { kind, station } = resolved;
+    if (kind === "habitat")
+      return {
+        ok: false,
+        error: `"${id}" est un habitat : aucune commande ne déplace un habitat aujourd'hui.`,
+      };
+    // Lazily resolved, not required at module load time: campaign-stations.js loads before
+    // garden-state-util.js in public/index.html (same load-order constraint automation.js's own
+    // tickSow already works around the same way, see its own comment).
+    const finite =
+      typeof module !== "undefined"
+        ? require("../garden-state-util.js").finite
+        : root.GardenStateParts.util.finite;
+    if (!finite(x, -64, 64) || !finite(z, -64, 64))
+      return { ok: false, error: "Position invalide (x/z doivent être des nombres entre -64 et 64)." };
+    const collection = KINDS[kind].collection;
+    return {
+      ok: true,
+      registry: {
+        ...registry,
+        [collection]: registry[collection].map((st) =>
+          st.id !== station.id ? st : { ...st, x, z },
+        ),
+      },
+    };
+  }
+
   // Pure lookup, never a silent `undefined`: an unknown id always comes back as an explicit
   // { ok: false, error } rather than a falsy value a caller might forward unchecked.
   function resolveStation(registry, id) {
@@ -255,6 +295,7 @@
     removeHabitat,
     removeStation,
     labelStation,
+    relocateStation,
   };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenCampaignStations = api;
