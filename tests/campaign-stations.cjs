@@ -292,6 +292,84 @@ test("panierTotal sums every resource key in a panier's buffer", () => {
   assert.equal(Stations.panierTotal({ buffer: {} }), 0);
 });
 
+// Epic C7.11: Stations.removeStation generalises removeHabitat's pattern to the three other
+// station kinds (borne/zone/panier) — see campaign-stations.js's own header comment for the
+// reasoning. Pure-function tests here, alongside removeHabitat/resolveStation's own; the command
+// wiring (removeStation({id}), a Rainelle's geste falling back to poste-manquant) is tested in
+// tests/campaign-remove-station.cjs instead.
+
+test("removeStation refuses an unknown id, exactly resolveStation's own refusal", () => {
+  const g = new GardenState(null, 1000);
+  const before = JSON.stringify(g.s.campaignStations);
+  const result = Stations.removeStation(g.s.campaignStations, "b999");
+  assert.equal(result.ok, false);
+  assert.match(result.error, /inconnu/);
+  assert.equal(JSON.stringify(g.s.campaignStations), before, "refusal never mutates");
+});
+
+test("removeStation refuses a habitat id, pointing at removeHabitat instead", () => {
+  const g = new GardenState(null, 1000);
+  const habitat = Stations.registerStation(g.s.campaignStations, "habitat", {
+    x: 0,
+    z: 0,
+    capacity: 2,
+  });
+  const before = JSON.stringify(g.s.campaignStations);
+  const result = Stations.removeStation(g.s.campaignStations, habitat.id);
+  assert.equal(result.ok, false);
+  assert.match(result.error, /removeHabitat/);
+  assert.equal(JSON.stringify(g.s.campaignStations), before, "refusal never mutates");
+});
+
+test("removeStation removes a zone unconditionally", () => {
+  const g = new GardenState(null, 1000);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", { x: 1, z: 2 });
+  const result = Stations.removeStation(g.s.campaignStations, zone.id);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.registry.zones, []);
+  // Every other collection is untouched (same registry, only its own kind's collection changes).
+  assert.deepEqual(result.registry.bornes, g.s.campaignStations.bornes);
+});
+
+test("removeStation removes a borne unconditionally", () => {
+  const g = new GardenState(null, 1000);
+  const borne = Stations.registerStation(g.s.campaignStations, "borne", { x: 1, z: 2 });
+  const result = Stations.removeStation(g.s.campaignStations, borne.id);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.registry.bornes, []);
+});
+
+test("removeStation refuses a panier that still holds produce, registry unchanged", () => {
+  const g = new GardenState(null, 1000);
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+  panier.buffer.fraise = 3;
+  const before = JSON.stringify(g.s.campaignStations);
+  const result = Stations.removeStation(g.s.campaignStations, panier.id);
+  assert.equal(result.ok, false);
+  assert.match(result.error, /vider/);
+  assert.equal(JSON.stringify(g.s.campaignStations), before, "refusal never mutates");
+});
+
+test("removeStation removes an empty panier", () => {
+  const g = new GardenState(null, 1000);
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+  assert.equal(Stations.panierTotal(panier), 0);
+  const result = Stations.removeStation(g.s.campaignStations, panier.id);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.registry.paniers, []);
+});
+
+test("removeStation, once a panier's produce is fully withdrawn, then succeeds", () => {
+  const g = new GardenState(null, 1000);
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+  panier.buffer.fraise = 2;
+  assert.equal(Stations.removeStation(g.s.campaignStations, panier.id).ok, false);
+  panier.buffer.fraise = 0;
+  const result = Stations.removeStation(g.s.campaignStations, panier.id);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.registry.paniers, []);
+});
+
 test("teachGesture/demonstrateGesture behave identically whether campaignStations is empty or populated — unchanged by this epic", () => {
   const run = (populate) => {
     const g = new GardenState(null, 1000);

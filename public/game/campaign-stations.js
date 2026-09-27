@@ -149,6 +149,45 @@
     return Object.values(panier.buffer).reduce((n, qty) => n + qty, 0);
   }
 
+  // Epic C7.11 (generalises removeHabitat's pattern to the three other station kinds — the
+  // Cartographe's eleventh-lot note in campagne-backlog.md found removeHabitat already wired to a
+  // command since C6.10, but no equivalent existed for a borne/zone/panier). Resolves the id's
+  // kind through resolveStation itself — never a second, duplicated lookup. A habitat is refused
+  // here and pointed at the dedicated removeHabitat command instead: fusing the two would mix
+  // removeHabitat's own occupancy invariant (design §6, "un habitat occupé ne peut pas être
+  // supprimé sans destination de relogement") into a function that has no such invariant for the
+  // other three kinds, and would duplicate that logic rather than reuse it.
+  //
+  // A zone/borne carries no stock and no population invariant comparable to a habitat's (only
+  // flags — veilleuse/extensionCommerciale/priseFortDebit — and a position, verified by reading
+  // registerStation above), so removal is unconditional. A panier can hold real produce
+  // (buffer), so it refuses while panierTotal(panier) > 0 — design §16's "Saturer puis libérer un
+  // bac... conserve les ressources" : removing a station must never make a stock vanish silently.
+  // An empty panier removes unconditionally, same as a zone/borne.
+  function removeStation(registry, id) {
+    const resolved = resolveStation(registry, id);
+    if (!resolved.ok) return resolved;
+    const { kind, station } = resolved;
+    if (kind === "habitat")
+      return {
+        ok: false,
+        error: `"${id}" est un habitat : utiliser la commande removeHabitat, pas removeStation.`,
+      };
+    if (kind === "panier" && panierTotal(station) > 0)
+      return {
+        ok: false,
+        error: "Ce panier contient encore des produits — le vider avant de le retirer.",
+      };
+    const collection = KINDS[kind].collection;
+    return {
+      ok: true,
+      registry: {
+        ...registry,
+        [collection]: registry[collection].filter((s) => s.id !== id),
+      },
+    };
+  }
+
   // Pure lookup, never a silent `undefined`: an unknown id always comes back as an explicit
   // { ok: false, error } rather than a falsy value a caller might forward unchecked.
   function resolveStation(registry, id) {
@@ -170,6 +209,7 @@
     habitatCapacityTotal,
     freeLivingPlaces,
     removeHabitat,
+    removeStation,
   };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenCampaignStations = api;
