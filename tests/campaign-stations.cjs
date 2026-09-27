@@ -399,3 +399,99 @@ test("teachGesture/demonstrateGesture behave identically whether campaignStation
   assert.equal(populated.ok, true);
   assert.equal(empty.message, populated.message);
 });
+
+// Epic C7.17 (design §5, "Développer le réseau" names "étiquettes" as a comfort feature once
+// paniers/bornes/zones multiply). Stations.labelStation is a pure function proven here; the
+// command wiring (labelStation({id, label}) via the real GardenState.command() vector) is proven
+// separately in tests/campaign-remove-station.cjs, alongside removeStation.
+
+test("labelStation labels a zone, a borne and a panier; the label is read back in the returned registry", () => {
+  const g = new GardenState(null, 1000);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", { x: 0, z: 0 });
+  const borne = Stations.registerStation(g.s.campaignStations, "borne", { x: 1, z: 0 });
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", { x: 2, z: 0 });
+  let registry = Stations.labelStation(g.s.campaignStations, zone.id, "Le carré du matin").registry;
+  assert.equal(registry.zones.find((z) => z.id === zone.id).label, "Le carré du matin");
+  registry = Stations.labelStation(registry, borne.id, "La grande borne").registry;
+  assert.equal(registry.bornes.find((b) => b.id === borne.id).label, "La grande borne");
+  registry = Stations.labelStation(registry, panier.id, "Panier du fond").registry;
+  assert.equal(registry.paniers.find((p) => p.id === panier.id).label, "Panier du fond");
+  // Every other collection/station is untouched by each call.
+  assert.equal(registry.zoneNextId, g.s.campaignStations.zoneNextId);
+  assert.equal(registry.borneNextId, g.s.campaignStations.borneNextId);
+});
+
+test("labelStation trims surrounding whitespace before storing the label", () => {
+  const g = new GardenState(null, 1000);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", { x: 0, z: 0 });
+  const result = Stations.labelStation(g.s.campaignStations, zone.id, "  Le carré du matin  ");
+  assert.equal(result.ok, true);
+  assert.equal(result.registry.zones.find((z) => z.id === zone.id).label, "Le carré du matin");
+});
+
+test("labelStation with an empty (or whitespace-only) string clears an existing label, field removed rather than stored empty", () => {
+  const g = new GardenState(null, 1000);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", { x: 0, z: 0 });
+  let registry = Stations.labelStation(g.s.campaignStations, zone.id, "Un nom").registry;
+  assert.equal(registry.zones.find((z) => z.id === zone.id).label, "Un nom");
+  const cleared = Stations.labelStation(registry, zone.id, "   ");
+  assert.equal(cleared.ok, true);
+  const station = cleared.registry.zones.find((z) => z.id === zone.id);
+  assert.equal(station.label, undefined);
+  assert.equal("label" in station, false);
+});
+
+test("labelStation refuses a label longer than 40 characters, registry unchanged", () => {
+  const g = new GardenState(null, 1000);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", { x: 0, z: 0 });
+  const before = JSON.stringify(g.s.campaignStations);
+  const result = Stations.labelStation(g.s.campaignStations, zone.id, "x".repeat(41));
+  assert.equal(result.ok, false);
+  assert.match(result.error, /40 caractères/);
+  assert.equal(JSON.stringify(g.s.campaignStations), before);
+});
+
+test("labelStation accepts exactly 40 characters", () => {
+  const g = new GardenState(null, 1000);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", { x: 0, z: 0 });
+  const result = Stations.labelStation(g.s.campaignStations, zone.id, "x".repeat(40));
+  assert.equal(result.ok, true);
+  assert.equal(result.registry.zones.find((z) => z.id === zone.id).label, "x".repeat(40));
+});
+
+test("labelStation refuses a habitat id, registry unchanged, error orients away from an absent display", () => {
+  const g = new GardenState(null, 1000);
+  const habitat = Stations.registerStation(g.s.campaignStations, "habitat", {
+    x: 0,
+    z: 0,
+    capacity: 2,
+  });
+  const before = JSON.stringify(g.s.campaignStations);
+  const result = Stations.labelStation(g.s.campaignStations, habitat.id, "Un nom");
+  assert.equal(result.ok, false);
+  assert.match(result.error, /habitat/);
+  assert.equal(JSON.stringify(g.s.campaignStations), before);
+});
+
+test("labelStation refuses an unknown id", () => {
+  const g = new GardenState(null, 1000);
+  const before = JSON.stringify(g.s.campaignStations);
+  const result = Stations.labelStation(g.s.campaignStations, "z999", "Un nom");
+  assert.equal(result.ok, false);
+  assert.equal(JSON.stringify(g.s.campaignStations), before);
+});
+
+test("labelStation on a panier preserves its buffer/capacity/min untouched", () => {
+  const g = new GardenState(null, 1000);
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+  panier.buffer.fraise = 5;
+  panier.capacity = 24;
+  panier.min = 3;
+  const result = Stations.labelStation(g.s.campaignStations, panier.id, "Panier du fond");
+  assert.equal(result.ok, true);
+  const labelled = result.registry.paniers.find((p) => p.id === panier.id);
+  assert.deepEqual(labelled.buffer, { fraise: 5 });
+  assert.equal(labelled.capacity, 24);
+  assert.equal(labelled.min, 3);
+  assert.equal(labelled.label, "Panier du fond");
+});

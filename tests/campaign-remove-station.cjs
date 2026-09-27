@@ -97,3 +97,45 @@ test("a Rainelle whose gesture pointed at a now-removed zone reports poste-manqu
   // garden-state-cmd-u.js.
   assert.equal(rainelle.geste.poste, zone.id);
 });
+
+// Epic C7.17: labelStation({id, label}) via the real GardenState.command() vector — the pure
+// function itself (Stations.labelStation) is proven in tests/campaign-stations.cjs; this proves
+// the command wiring and that a label survives a real save round-trip.
+
+test("labelStation command: labels a zone, read back from s.campaignStations", () => {
+  const g = new GardenState(null, 1000);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", { x: 0, z: 0 });
+  const result = g.command({ type: "labelStation", id: zone.id, label: "Le carré du matin" });
+  assert.equal(result.ok, true, result.message);
+  assert.equal(
+    g.s.campaignStations.zones.find((z) => z.id === zone.id).label,
+    "Le carré du matin",
+  );
+});
+
+test("labelStation command: refuses an unknown id, refuses a habitat id", () => {
+  const g = new GardenState(null, 1000);
+  const habitat = Stations.registerStation(g.s.campaignStations, "habitat", {
+    x: 0,
+    z: 0,
+    capacity: 2,
+  });
+  assert.equal(g.command({ type: "labelStation", id: "z999", label: "x" }).ok, false);
+  const habitatResult = g.command({ type: "labelStation", id: habitat.id, label: "x" });
+  assert.equal(habitatResult.ok, false);
+  assert.match(habitatResult.message, /habitat/);
+});
+
+test("labelStation command: a label survives a JSON save/load round-trip exactly", () => {
+  const g = new GardenState(null, 1000);
+  const borne = Stations.registerStation(g.s.campaignStations, "borne", { x: 0, z: 0 });
+  assert.equal(
+    g.command({ type: "labelStation", id: borne.id, label: "La grande borne" }).ok,
+    true,
+  );
+  const reloaded = new GardenState(JSON.parse(JSON.stringify(g.s)), 1000);
+  assert.equal(
+    reloaded.s.campaignStations.bornes.find((b) => b.id === borne.id).label,
+    "La grande borne",
+  );
+});

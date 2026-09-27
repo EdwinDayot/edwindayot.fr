@@ -15,7 +15,12 @@
    falls back, at the next automation tick, to the "poste-manquant" state already exposed and
    tested since C2.8 (campaign-automation.js's resolveKind returns null on an unknown id) —
    nothing here rewrites `rainelle.geste`, exactly the same "the removal itself does not touch the
-   gesture" posture already documented by garden-state-cmd-u.js for removeHabitat. */
+   gesture" posture already documented by garden-state-cmd-u.js for removeHabitat.
+
+   Epic C7.17 adds labelStation({id, label}) alongside it, on the same reuse: reused, not a new
+   lettered segment, because both commands share this file's exact "thin wrapper over a pure
+   Stations.* function, replace s.campaignStations with the returned registry on success" shape —
+   see campaign-stations.js's own labelStation for the validation/clearing rules. */
 (function (root) {
   const Stations =
     typeof module !== "undefined"
@@ -30,6 +35,12 @@
         if (!result.ok) return fail(result.error);
         s.campaignStations = result.registry;
         st.message = "Station retirée.";
+      } else if (c.type === "labelStation") {
+        st.taken = true;
+        const result = Stations.labelStation(s.campaignStations, c.id, c.label);
+        if (!result.ok) return fail(result.error);
+        s.campaignStations = result.registry;
+        st.message = "Station étiquetée.";
       }
       return null;
     },

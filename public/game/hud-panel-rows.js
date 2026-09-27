@@ -57,7 +57,8 @@
                                 ? "Donner"
                                 : r.action === "compost-cultivar"
                                   ? "Composter"
-                                  : r.action === "rename-cultivar"
+                                  : r.action === "rename-cultivar" ||
+                                      r.action === "begin-label-station"
                                     ? "Renommer"
                                     : r.action === "confirm-night"
                                       ? "Dormir"

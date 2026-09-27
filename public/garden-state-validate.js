@@ -777,6 +777,24 @@
           )
         )
           throw Error("Registre de stations invalide.");
+        // Epic C7.17: label is optional (no pre-epic station has ever had this field, so its
+        // absence is always valid — same posture as veilleuse/priseFortDebit above) and only
+        // meaningful for a borne/zone/panier — a habitat is refused by labelStation itself and
+        // never shown anywhere (no display site names one today), so no habitat label is ever
+        // valid here either. When present, it must be a real string, non-empty after trim (an
+        // empty label is never stored — labelStation clears the field instead) and at most 40
+        // characters — exactly the invariant labelStation itself already guarantees in writing.
+        if (
+          kind !== "habitat" &&
+          list.some(
+            (st) =>
+              st.label !== undefined &&
+              (typeof st.label !== "string" ||
+                !st.label.trim() ||
+                st.label.length > 40),
+          )
+        )
+          throw Error("Registre de stations invalide.");
         if (!count(s.campaignStations[counter]))
           throw Error("Registre de stations invalide.");
         if (

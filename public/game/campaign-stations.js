@@ -188,6 +188,50 @@
     };
   }
 
+  // Epic C7.17 (design §5, "Développer le réseau" names "étiquettes" as a comfort feature once
+  // paniers/bornes/zones multiply): a player-facing name for a borne/zone/panier, the same
+  // generalisation renameCultivar (C1.4) already proved for a cultivar and rainelle.name already
+  // proved for a Rainelle — the only station-shaped entity regularly shown to a player that never
+  // got this treatment. A habitat is refused: no display site names one today (unlike the other
+  // three kinds, verified by reading hud-panel.js/campaign-observation.js), so labelling one would
+  // be a feature with nothing to show it — same "refuse what this epic has no destination for"
+  // posture as removeStation's own habitat refusal just above.
+  //
+  // Deliberately asymmetric with renameCultivar on empty input: a cultivar's name is its identity
+  // (renameCultivar refuses an empty string), a station's label is a purely optional comfort
+  // (design calls it "repérer", never "identité") — an empty string after trim *clears* an
+  // existing label instead of being refused, so a player can always undo a label back to the bare
+  // id. The field itself is removed from the station object rather than stored as `""`, so a
+  // cleared label is indistinguishable from a station that was never labelled.
+  function labelStation(registry, id, label) {
+    const resolved = resolveStation(registry, id);
+    if (!resolved.ok) return resolved;
+    const { kind, station } = resolved;
+    if (kind === "habitat")
+      return {
+        ok: false,
+        error: `"${id}" est un habitat : aucun affichage ne montre encore son nom, l'étiquetage ne s'y applique pas.`,
+      };
+    const trimmed = typeof label === "string" ? label.trim() : "";
+    if (trimmed.length > 40)
+      return { ok: false, error: "Le nom est trop long (40 caractères maximum)." };
+    const collection = KINDS[kind].collection;
+    return {
+      ok: true,
+      registry: {
+        ...registry,
+        [collection]: registry[collection].map((st) => {
+          if (st.id !== station.id) return st;
+          if (!trimmed) {
+            const { label: _drop, ...rest } = st;
+            return rest;
+          }
+          return { ...st, label: trimmed };
+        }),
+      },
+    };
+  }
+
   // Pure lookup, never a silent `undefined`: an unknown id always comes back as an explicit
   // { ok: false, error } rather than a falsy value a caller might forward unchecked.
   function resolveStation(registry, id) {
@@ -210,6 +254,7 @@
     freeLivingPlaces,
     removeHabitat,
     removeStation,
+    labelStation,
   };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenCampaignStations = api;

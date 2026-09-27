@@ -441,9 +441,9 @@
         // (garden-state-cmd-p.js/-q.js) never advance s.elapsed themselves (only a real tick
         // does), so a row cached on s.elapsed would keep showing the pre-click label until the
         // next tick landed instead of reflecting the click immediately.
-        for (const zone of m.s.campaignStations.zones)
+        for (const zone of m.s.campaignStations.zones) {
           rows.push({
-            title: `Zone ${zone.id} — veilleuse`,
+            title: `Zone ${zone.label || zone.id} — veilleuse`,
             detail: zone.veilleuse
               ? "Allumée : la zone continue de travailler la nuit."
               : "Éteinte : la zone se repose la nuit.",
@@ -451,15 +451,50 @@
             data: { zoneId: zone.id, active: !zone.veilleuse },
             buttonLabel: zone.veilleuse ? "Éteindre" : "Allumer",
           });
-        for (const borne of m.s.campaignStations.bornes)
+          // Epic C7.17: a station's own row for the confort optionnel design §5 names
+          // ("étiquettes") once paniers/bornes/zones multiply — a separate row rather than a
+          // second button on the toggle row above, same one-row-one-action shape already used for
+          // the four cultivar disposition rows (keep/store/give/compost) at C1.4.
           rows.push({
-            title: `Borne ${borne.id} — prise à fort débit`,
+            title: `Étiqueter la zone ${zone.label || zone.id}`,
+            detail: zone.label
+              ? "Changer ou effacer ce repère (jamais une identité obligatoire)."
+              : "Donner un repère facultatif à cette zone, affiché à la place de son identifiant.",
+            action: "begin-label-station",
+            data: { id: zone.id },
+          });
+        }
+        for (const borne of m.s.campaignStations.bornes) {
+          rows.push({
+            title: `Borne ${borne.label || borne.id} — prise à fort débit`,
             detail: borne.priseFortDebit
               ? "Activée : le débit augmente au prix du bassin commun."
               : "Désactivée : débit normal, le bassin commun ne baisse pas pour cette borne.",
             action: "toggle-prise-fort-debit",
             data: { borneId: borne.id, active: !borne.priseFortDebit },
             buttonLabel: borne.priseFortDebit ? "Éteindre" : "Allumer",
+          });
+          rows.push({
+            title: `Étiqueter la borne ${borne.label || borne.id}`,
+            detail: borne.label
+              ? "Changer ou effacer ce repère (jamais une identité obligatoire)."
+              : "Donner un repère facultatif à cette borne, affiché à la place de son identifiant.",
+            action: "begin-label-station",
+            data: { id: borne.id },
+          });
+        }
+        // Epic C7.17: no panier row existed anywhere in this panel before this epic (verified: no
+        // occurrence of `campaignStations.paniers` in this file before this change) — a minimal
+        // one, the labelling action being the only useful one a panier has here (its
+        // buffer/capacity/min are already shown by the observation panel below).
+        for (const panier of m.s.campaignStations.paniers)
+          rows.push({
+            title: `Panier ${panier.label || panier.id}`,
+            detail: panier.label
+              ? "Changer ou effacer ce repère (jamais une identité obligatoire)."
+              : "Donner un repère facultatif à ce panier, affiché à la place de son identifiant.",
+            action: "begin-label-station",
+            data: { id: panier.id },
           });
         if (!this._observationCache || this._observationCache.elapsed !== m.s.elapsed) {
           const Observation = window.GardenCampaignObservation;
@@ -487,7 +522,7 @@
                   ? `Veilleuse : ${transfer.veilleuse ? "allumée" : "éteinte"}.`
                   : `Prise à fort débit : ${transfer.priseFortDebit ? "activée" : "désactivée"}.`;
             obsRows.push({
-              title: `${KIND_LABELS[transfer.kind]} ${transfer.id}`,
+              title: `${KIND_LABELS[transfer.kind]} ${transfer.label || transfer.id}`,
               detail: `${state} ${who}`,
             });
           }

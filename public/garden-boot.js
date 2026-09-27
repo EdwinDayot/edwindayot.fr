@@ -67,6 +67,13 @@
     campaignInput.hidden = true;
     if (kind === "teaching-field" && A.teachingDraft) A.teachingDraft[field] = value;
     else if (kind === "teaching-phrase") A.execute({ type: "reviseGesturePhrase", phrase: value });
+    // Epic C7.17: the third discriminant of this shared field — commits the real, persisted
+    // labelStation command (never client-only scratch like a teaching field), keyed off the
+    // station id "begin-label-station" (garden-dispatch.js) stashed on the input itself.
+    else if (kind === "station-label") {
+      const stationId = campaignInput.dataset.stationId;
+      if (stationId) A.execute({ type: "labelStation", id: stationId, label: value });
+    }
   };
   campaignInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {

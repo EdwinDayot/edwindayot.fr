@@ -106,6 +106,29 @@
         input.select();
         break;
       }
+      // Epic C7.17: the third reuse of #campaign-text-input's shared field (after
+      // "teaching-edit-field"/"revise-phrase-edit" above), on the same "HTML for what Canvas
+      // doesn't do well" principle as "rename-cultivar" — a station's current label (if any) is
+      // prefilled so clearing the field (never refused here, unlike a cultivar's name) is a
+      // visible action, not a mystery blank box.
+      case "begin-label-station": {
+        const resolved = window.GardenCampaignStations.resolveStation(
+          A.game.s.campaignStations,
+          data.id,
+        );
+        if (!resolved.ok) break;
+        const input = $("campaign-text-input");
+        input.maxLength = 40;
+        input.value = resolved.station.label || "";
+        input.dataset.kind = "station-label";
+        input.dataset.stationId = data.id;
+        delete input.dataset.field;
+        input.setAttribute("aria-label", "Étiquette de la station « " + data.id + " »");
+        input.hidden = false;
+        input.focus();
+        input.select();
+        break;
+      }
       case "go":
         A.go(data.id);
         break;

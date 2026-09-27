@@ -140,6 +140,10 @@
       transfers.push({
         kind: "borne",
         id: borne.id,
+        // Epic C7.17: `undefined` when unlabelled, never a substituted empty string — the same
+        // "absent means never labelled" reading hud-panel.js's `transfer.label || transfer.id`
+        // fallback already relies on.
+        label: borne.label,
         priseFortDebit: borne.priseFortDebit,
         rainelles: workersOf(s, borne.id),
       });
@@ -147,6 +151,7 @@
       transfers.push({
         kind: "zone",
         id: zone.id,
+        label: zone.label,
         veilleuse: zone.veilleuse,
         rainelles: workersOf(s, zone.id),
       });
@@ -154,6 +159,7 @@
       transfers.push({
         kind: "panier",
         id: panier.id,
+        label: panier.label,
         buffer: { ...panier.buffer },
         total: Stations.panierTotal(panier),
         capacity: panier.capacity,
