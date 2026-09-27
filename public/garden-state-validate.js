@@ -38,6 +38,13 @@
     typeof module !== "undefined"
       ? require("./game/campaign-house.js")
       : root.GardenCampaignHouse;
+  // Epic C7.19: read here only for ITEM_IDS, to validate an optional decor list per space
+  // against the real catalogue rather than duplicate its ids as a second literal list — same
+  // posture as Epilogue.ORIENTATIONS/Genetics.founders/Seasons.SEASONS below.
+  const Decor =
+    typeof module !== "undefined"
+      ? require("./game/campaign-decor.js")
+      : root.GardenCampaignDecor;
   const Passage =
     typeof module !== "undefined"
       ? require("./game/campaign-passage.js")
@@ -812,6 +819,10 @@
     // before this epic already has a well-formed campaignHouse but simply lacks this one field
     // (undefined is accepted here, defaulted to null below), same two-level migration already
     // used for campaignStations.habitats further down.
+    // Epic C7.19 adds an optional decor per space: when present, it must be a flat array of
+    // unique strings, each a real id from Decor.ITEMS — exactly the invariant placeDecor itself
+    // already guarantees in writing (never a state the command produces that validation would
+    // itself reject), same posture as campaignStations' per-station label just above.
     if (
       s.campaignHouse !== undefined &&
       (typeof s.campaignHouse !== "object" ||
@@ -823,7 +834,11 @@
           return (
             !space ||
             !["delabre", "repare"].includes(space.status) ||
-            typeof space.locked !== "boolean"
+            typeof space.locked !== "boolean" ||
+            (space.decor !== undefined &&
+              (!Array.isArray(space.decor) ||
+                space.decor.some((item) => !Decor.ITEMS[item]) ||
+                new Set(space.decor).size !== space.decor.length))
           );
         }) ||
         (s.campaignHouse.furnitureMarks !== undefined &&
@@ -1091,6 +1106,12 @@
     // above only fires when campaignHouse itself is entirely missing) — defaulted here too, same
     // two-level migration already used for campaignStations.habitats above.
     result.campaignHouse.furnitureMarks ??= null;
+    // Epic C7.19: a pre-epic save has campaignHouse.spaces but no decor field on any space yet
+    // (the freshHouse() call above only fires when campaignHouse itself is entirely missing) —
+    // defaulted per space here, same "field added to an already-existing object" two-level
+    // migration as furnitureMarks just above and as campaignStations' veilleuse/priseFortDebit.
+    for (const id of House.SPACE_IDS)
+      result.campaignHouse.spaces[id].decor ??= [];
     result.campaignTools ??= [];
     result.campaignFlags ??= [];
     // Epic C1.5: a pre-epic save simply has no pin awaiting its next sowPot.

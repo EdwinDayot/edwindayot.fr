@@ -42,8 +42,12 @@
 
   function freshHouse() {
     const spaces = {};
+    // Epic C7.19: decor starts empty on every space — including the still-locked/delabre ones,
+    // since canPlaceDecor (campaign-decor.js) gates on status/locked itself rather than on the
+    // field's mere presence, the same "no free capability" posture campaign-stations.js already
+    // uses for veilleuse/priseFortDebit/extensionCommerciale.
     for (const id of SPACE_IDS)
-      spaces[id] = { status: "delabre", locked: id !== "accueil" };
+      spaces[id] = { status: "delabre", locked: id !== "accueil", decor: [] };
     // furnitureMarks: null until chooseFurnitureTreatment sets it once (never reset afterwards)
     // — a top-level campaignHouse field, not a seventh "space", since it has no repair cost/lock
     // of its own.

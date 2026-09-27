@@ -71,6 +71,9 @@
     <!-- Epic C3.1: campaign-house.js's SPACES/freshHouse are read by garden-state-lifecycle.js/
          garden-state-validate.js just below, same reason as campaign-stations.js above. -->
     <script src="/game/campaign-house.js" defer></script>
+    <!-- Epic C7.19: campaign-decor.js's ITEMS/ITEM_IDS are read by garden-state-validate.js and
+         garden-state-cmd-l.js just below, same reason campaign-house.js loads before them. -->
+    <script src="/game/campaign-decor.js" defer></script>
     <!-- Epic C4.1: data-narrative.js's TEXTS/pendingReveal are read by garden-state-cmd-n.js and
          hud-panel.js (both much further below); no dependency of its own (pure catalog, like
          campaign-house.js/campaign-stations.js above), loaded here anyway to avoid the exact
