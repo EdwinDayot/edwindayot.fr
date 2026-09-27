@@ -184,6 +184,49 @@ const TRANSPARENT_ALLOWLIST = [
           x: 209,
           z: 216,
         });
+        // Epic C7.14: two more real Rainelles, again through the exact same live-state/sync() path
+        // — never an isolated buildRainelleGroup() call. "audit-c7.14-rainelle-bald" carries a
+        // cultivar with no feuilles trait at all (must register zero foliage pool instances, never
+        // a phantom empty pool). "audit-c7.14-rainelle-twin" carries a cultivar with a DIFFERENT id
+        // but the SAME feuilles.forme + palette.dominante1 as "audit-c5.11-cultivar" (f, founders[0])
+        // — the two properties Hybrids.leafGeometry/organMaterial actually key their shared caches
+        // on (verified by direct reading, see tests/campaign-rainelle-render.cjs's own equivalent
+        // Node test) — to confirm the same "shared regardless of cultivar identity" guarantee
+        // against the real scene graph, not just the Node-only unit tests.
+        s.cultivars.push({
+          id: "audit-c7.14-cultivar-bald",
+          name: "Test C7.14 bald",
+          parentIds: [],
+          traits: { ...f.traits, feuilles: undefined },
+        });
+        s.rainelles.push({
+          id: "audit-c7.14-rainelle-bald",
+          cultivarId: "audit-c7.14-cultivar-bald",
+          name: "",
+          geste: null,
+          job: null,
+          bourgeon: null,
+          founder: false,
+          x: 211,
+          z: 216,
+        });
+        s.cultivars.push({
+          id: "audit-c7.14-cultivar-twin",
+          name: "Test C7.14 twin",
+          parentIds: [],
+          traits: { ...f.traits, port: "grimpant", fleurs: null, fonction: null },
+        });
+        s.rainelles.push({
+          id: "audit-c7.14-rainelle-twin",
+          cultivarId: "audit-c7.14-cultivar-twin",
+          name: "",
+          geste: null,
+          job: null,
+          bourgeon: null,
+          founder: false,
+          x: 213,
+          z: 216,
+        });
         v.sync();
       }
 
@@ -633,6 +676,45 @@ const TRANSPARENT_ALLOWLIST = [
         };
       }
 
+      // Epic C7.14: confirms the real foliage-pooling wiring for Rainelles, symmetric to
+      // rainelleBodyWiring just above — every leaf Mesh of a synced Rainelle with a feuilles trait
+      // is detached from its Group (only ever present as an InstancedMesh instance now, already
+      // covered by the generic isMesh/geometry traversal above since InstancedMesh#isMesh is true),
+      // two Rainelles of the SAME synthetic cultivar share their leaf pool, a Rainelle of a
+      // DIFFERENT cultivar that happens to share the same feuilles.forme + palette.dominante1 also
+      // lands in that identical pool (never a pool keyed by cultivar identity), and a Rainelle whose
+      // cultivar carries no feuilles trait at all registers zero foliage pool entries — never a
+      // phantom empty pool for it.
+      let rainelleFoliageWiring = { found: false };
+      const rmBald = v.rainelleModels.get("audit-c7.14-rainelle-bald");
+      const rmTwin = v.rainelleModels.get("audit-c7.14-rainelle-twin");
+      if (rmA && rmB && rmBald && rmTwin) {
+        const allFoliageDetached = [rmA, rmB, rmTwin].every((rm) =>
+          rm.group.userData.foliageMeshes.every((fm) => {
+            let stillDescendant = false;
+            rm.group.traverse((o) => {
+              if (o === fm.mesh) stillDescendant = true;
+            });
+            return !stillDescendant;
+          }),
+        );
+        const leafA = rmA.foliagePoolEntries[0];
+        const leafB = rmB.foliagePoolEntries[0];
+        const leafTwin = rmTwin.foliagePoolEntries[0];
+        let distinctFoliagePoolCount = 0;
+        for (const byMaterial of v.rainelleFoliagePools.values()) distinctFoliagePoolCount += byMaterial.size;
+        rainelleFoliageWiring = {
+          found: true,
+          allFoliageDetached,
+          baldHasNoFoliageEntries: rmBald.foliagePoolEntries.length === 0,
+          baldHasNoFoliageMeshes: rmBald.group.userData.foliageMeshes.length === 0,
+          sameCultivarSharedLeafPool: leafA.pool === leafB.pool,
+          differentCultivarSameFormeSharedLeafPool: leafA.pool === leafTwin.pool,
+          sharedLeafPoolInstanceCount: leafA.pool.mesh.count,
+          distinctFoliagePoolCount,
+        };
+      }
+
       return {
         suspiciousTransparent,
         badNormals,
@@ -647,6 +729,7 @@ const TRANSPARENT_ALLOWLIST = [
         stemWiring,
         organWiring,
         rainelleBodyWiring,
+        rainelleFoliageWiring,
       };
     });
 
@@ -709,8 +792,19 @@ const TRANSPARENT_ALLOWLIST = [
     assert.equal(audit.rainelleBodyWiring.allDetached, true, "C7.13: a pooled rainelle's Group must no longer carry any of its body/mark meshes as a descendant");
     assert.equal(audit.rainelleBodyWiring.sameCultivarSharedTorsoPool, true, "C7.13: two rainelles of the same cultivar must share the identical torso pool");
     assert.equal(audit.rainelleBodyWiring.differentCultivarSameTorsoPool, true, "C7.13: the body is common to every rainelle regardless of cultivar — a different cultivar must still share the same torso pool");
-    assert.equal(audit.rainelleBodyWiring.sharedTorsoPoolInstanceCount, 3, "C7.13: the shared torso pool must hold exactly three active instances (all three audit rainelles)");
+    // 5, not 3: epic C7.14 added two more audit rainelles below (bald/twin) sharing this same
+    // founders[0]-derived cultivar family — the body is common to every rainelle regardless of
+    // cultivar (design §5), so they land in this identical torso pool too.
+    assert.equal(audit.rainelleBodyWiring.sharedTorsoPoolInstanceCount, 5, "C7.13: the shared torso pool must hold exactly five active instances (all five audit rainelles sharing the body)");
     assert.ok(audit.rainelleBodyWiring.distinctPoolCount <= 9, "C7.13: expected at most 9 distinct body/mark pools (4 body pieces + up to 5 mark hues)");
+
+    assert.equal(audit.rainelleFoliageWiring.found, true, "C7.14: sync() never built a Group for one of the foliage-pooling audit rainelles");
+    assert.equal(audit.rainelleFoliageWiring.allFoliageDetached, true, "C7.14: a pooled rainelle's Group must no longer carry any of its leaf meshes as a descendant");
+    assert.equal(audit.rainelleFoliageWiring.baldHasNoFoliageMeshes, true, "C7.14: a cultivar with no feuilles trait must expose zero foliageMeshes");
+    assert.equal(audit.rainelleFoliageWiring.baldHasNoFoliageEntries, true, "C7.14: a cultivar with no feuilles trait must register zero foliage pool entries, never a phantom empty pool");
+    assert.equal(audit.rainelleFoliageWiring.sameCultivarSharedLeafPool, true, "C7.14: two rainelles of the same cultivar must share the identical leaf pool");
+    assert.equal(audit.rainelleFoliageWiring.differentCultivarSameFormeSharedLeafPool, true, "C7.14: a different cultivar sharing the same feuilles.forme + palette.dominante1 must still share the identical leaf pool");
+    assert.equal(audit.rainelleFoliageWiring.sharedLeafPoolInstanceCount, 9, "C7.14: the shared leaf pool must hold exactly nine active instances (3 leaves x 3 rainelles sharing this forme/teinte)");
 
     assert.deepEqual(audit.nanMeshes, [], "Meshes with non-finite vertex positions: " + audit.nanMeshes.join(", "));
     assert.deepEqual(

@@ -49,6 +49,10 @@
       // header for the full rationale, and this.specimenStemPools/specimenOrganPools below for the
       // exact same pattern already established for specimens (C7.9/C7.10).
       this.rainelleBodyPools = new Map();
+      // Epic C7.14: same pattern, separate identity Map for the foliage leaf meshes attachFoliage
+      // attaches to a Rainelle's back — geometry/material vary by cultivar there (unlike the fixed
+      // body), so this is deliberately its own Map, never shared with this.rainelleBodyPools.
+      this.rainelleFoliagePools = new Map();
       // Epic C5.13: one entry per station id (borne/zone/panier/habitat, campaign-stations.js),
       // id -> { kind, group } — same "build once, cache, reposition/update every sync" pattern as
       // `this.rainelleModels` just above.

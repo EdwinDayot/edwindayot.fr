@@ -78,6 +78,7 @@ const url = process.env.GARDEN_URL || "http://127.0.0.1:4174/";
       const Stations = window.GardenCampaignStations;
       const Construction = window.GardenConstruction;
       const Hybrids = window.GardenBotanyHybrids;
+      const Rainelles = window.GardenRenderRainelles;
 
       // Sample real, currently-walkable half-unit-ish points inside zone 0's own bounds (data-
       // world.js: x:[-16,4], z:[-5,19]), kept a couple of units clear of the rectangle's edges —
@@ -194,8 +195,17 @@ const url = process.env.GARDEN_URL || "http://127.0.0.1:4174/";
         const groups = [...v.rainelleModels.values()].map((rm) => rm.group);
         for (let i = 0; i < groups.length; i++)
           for (let j = i + 1; j < groups.length; j++) {
-            const bi = new T.Box3().setFromObject(groups[i]);
-            const bj = new T.Box3().setFromObject(groups[j]);
+            // Epics C7.13/C7.14: body AND foliage meshes are now detached from a Rainelle's own
+            // Group (pooled into shared InstancedMeshes elsewhere in the scene) — a naive
+            // `Box3().setFromObject(group)` sees nothing left as a real descendant and silently
+            // returns an EMPTY box for every Rainelle, which never intersects anything (an empty
+            // THREE.Box3 has min=+Infinity/max=-Infinity by construction), permanently disabling
+            // this exact overlap check without ever failing it. `Rainelles.groupBounds` is the
+            // drop-in replacement built for exactly this (see render-rainelles.js's own header) —
+            // found and fixed while writing this epic, not assumed still correct from the last time
+            // this file was touched (execution-continue.md: "vérifié veut dire exécuté").
+            const bi = Rainelles.groupBounds(groups[i]);
+            const bj = Rainelles.groupBounds(groups[j]);
             if (bi.intersectsBox(bj)) {
               overlapDetected = true;
               overlapPairs.push([
@@ -229,7 +239,7 @@ const url = process.env.GARDEN_URL || "http://127.0.0.1:4174/";
       // in-place player model (v.player, built once at world-build time, never rebuilt here) and a
       // founder plant built the same way C5.9's own bench did.
       const anyGroup = [...v.rainelleModels.values()][0].group;
-      const rainelleSize = new T.Box3().setFromObject(anyGroup).getSize(new T.Vector3());
+      const rainelleSize = Rainelles.groupBounds(anyGroup).getSize(new T.Vector3());
       const playerSize = new T.Box3().setFromObject(v.player).getSize(new T.Vector3());
       const plantGroup = Hybrids.buildSpecimenGroup({
         id: "val-scale-ref",

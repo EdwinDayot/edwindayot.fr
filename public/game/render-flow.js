@@ -132,7 +132,8 @@
       // testable, same reasoning as render-specimens.js's syncSpecimenModels just below) so it can
       // also detach/pool the shared body meshes into `this.rainelleBodyPools`
       // (render-instances.js, C7.8) — byte-for-byte the prior behaviour when
-      // `this.rainelleBodyPools` is left unset, per that function's own header.
+      // `this.rainelleBodyPools` is left unset, per that function's own header. C7.14: same call
+      // site, one more argument (`this.rainelleFoliagePools`) for the foliage leaf meshes.
       const RenderRainelles = window.GardenRenderRainelles;
       if (RenderRainelles) {
         const rainelleSync = RenderRainelles.syncRainelleModels(
@@ -140,6 +141,7 @@
           this.scene,
           s,
           this.rainelleBodyPools,
+          this.rainelleFoliagePools,
         );
         if (rainelleSync.batchDirty) this.batchDirty = true;
       }

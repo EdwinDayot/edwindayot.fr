@@ -379,6 +379,253 @@ test("the pooled torso instance matrix encodes the rainelle's real world positio
   for (let i = 0; i < 16; i++) assert.ok(Math.abs(m.elements[i] - expected.elements[i]) < EPS, `element ${i} mismatch`);
 });
 
+// Epic C7.14 — foliage instance pooling (syncRainelleModels's 5th argument), same model as the
+// body-pooling section above (C7.13), generalised to group.userData.foliageMeshes.
+
+test("omitting foliagePools leaves every leaf mesh a normal child of its branch, unchanged from before this epic", () => {
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const bodyPools = new Map(); // bodyPools provided, foliagePools omitted: independent of each other
+  const s = {
+    rainelles: [{ id: "r1", cultivarId: "oreille-de-pluie", x: 0, z: 0 }],
+    cultivars: [cultivarEntry("oreille-de-pluie")],
+  };
+
+  Rainelles.syncRainelleModels(registry, scene, s, bodyPools);
+
+  const rm = registry.get("r1");
+  assert.equal(rm.foliagePoolEntries, null);
+  assert.ok(rm.group.userData.foliageMeshes.length > 0, "oreille-de-pluie has a feuilles trait");
+  for (const fm of rm.group.userData.foliageMeshes) {
+    let stillDescendant = false;
+    rm.group.traverse((o) => {
+      if (o === fm.mesh) stillDescendant = true;
+    });
+    assert.ok(stillDescendant, "leaf mesh must remain a real descendant when foliagePools is omitted");
+  }
+});
+
+test("with foliagePools provided, a rainelle's leaf meshes are detached from its Group and pooled into shared InstancedMeshes", () => {
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const foliagePools = new Map();
+  const s = {
+    rainelles: [{ id: "r1", cultivarId: "oreille-de-pluie", x: 3, z: -2 }],
+    cultivars: [cultivarEntry("oreille-de-pluie")],
+  };
+
+  Rainelles.syncRainelleModels(registry, scene, s, undefined, foliagePools);
+
+  const rm = registry.get("r1");
+  assert.ok(rm.foliagePoolEntries, "expected pooled foliage entries recorded on the registry entry");
+  assert.equal(rm.foliagePoolEntries.length, 3, "3 back attach points, each a single 'coupe' leaf mesh");
+  for (const entry of rm.foliagePoolEntries) {
+    assert.equal(entry.pool.mesh.isInstancedMesh, true);
+    assert.equal(entry.pool.mesh.parent, scene, "each pool's InstancedMesh must be added to the real scene");
+  }
+  let stillChild = false;
+  rm.group.traverse((o) => {
+    if (rm.group.userData.foliageMeshes.some((fm) => fm.mesh === o)) stillChild = true;
+  });
+  assert.equal(stillChild, false, "every leaf mesh must be detached from the rainelle Group");
+});
+
+test("a 'palmee' cultivar's leaf branches (5 finger meshes each) are ALL pooled, never one per branch", () => {
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const foliagePools = new Map();
+  const s = {
+    rainelles: [{ id: "r1", cultivarId: "ronce-a-rubans", x: 0, z: 0 }],
+    cultivars: [cultivarEntry("ronce-a-rubans")],
+  };
+
+  Rainelles.syncRainelleModels(registry, scene, s, undefined, foliagePools);
+
+  const rm = registry.get("r1");
+  assert.equal(rm.foliagePoolEntries.length, 15, "3 back attach points x 5 palmate fingers each");
+});
+
+test("a cultivar with no feuilles trait registers no foliage pool entries and creates no phantom empty pool", () => {
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const foliagePools = new Map();
+  const traits = { ...Genetics.founders[0].traits, feuilles: undefined };
+  const s = {
+    rainelles: [{ id: "r1", cultivarId: "bald", x: 0, z: 0 }],
+    cultivars: [{ id: "bald", traits }],
+  };
+
+  Rainelles.syncRainelleModels(registry, scene, s, undefined, foliagePools);
+
+  const rm = registry.get("r1");
+  assert.deepEqual(rm.foliagePoolEntries, []);
+  assert.equal(foliagePools.size, 0, "no pool, empty or otherwise, must be created for a bald cultivar");
+});
+
+test("two rainelles of the SAME cultivar share their leaf pools", () => {
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const foliagePools = new Map();
+  const s = {
+    rainelles: [
+      { id: "r1", cultivarId: "oreille-de-pluie", x: 0, z: 0 },
+      { id: "r2", cultivarId: "oreille-de-pluie", x: 1, z: 0 },
+    ],
+    cultivars: [cultivarEntry("oreille-de-pluie")],
+  };
+
+  Rainelles.syncRainelleModels(registry, scene, s, undefined, foliagePools);
+
+  const a = registry.get("r1").foliagePoolEntries[0];
+  const b = registry.get("r2").foliagePoolEntries[0];
+  assert.equal(a.pool, b.pool, "same cultivar must share the identical leaf pool");
+  // oreille-de-pluie's 3 back-attach leaves ALSO share this exact same (geometry, material) pair
+  // among themselves (leafGeometry/organMaterial cached only by shape/colour, never by attach
+  // point) — so a single rainelle already contributes all 3 of its own leaves to this one pool,
+  // verified directly rather than assumed: 3 leaves x 2 rainelles = 6 instances total.
+  assert.equal(registry.get("r1").foliagePoolEntries.every((e) => e.pool === a.pool), true);
+  assert.equal(a.pool.mesh.count, 6, "3 leaves x 2 rainelles, all sharing the identical pool");
+});
+
+test("two rainelles of DIFFERENT cultivars sharing the same feuilles.forme + palette.dominante1 also share their leaf pool (never a pool per cultivar)", () => {
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const foliagePools = new Map();
+  const base = Genetics.founders.find((f) => f.id === "oreille-de-pluie").traits;
+  // A synthetic second cultivar, deliberately different id/port/other axes, but the SAME
+  // feuilles.forme ("coupe") and the SAME palette.dominante1 ("vert-sauge") — the two properties
+  // Hybrids.leafGeometry/organMaterial actually key their shared caches on (see this test file's
+  // header block and botany-hybrids.js lines 92-134/265-283, already read before writing C7.14's
+  // own backlog entry).
+  const twin = { ...base, port: "grimpant", fleurs: null, fonction: null };
+  const s = {
+    rainelles: [
+      { id: "r1", cultivarId: "oreille-de-pluie", x: 0, z: 0 },
+      { id: "r2", cultivarId: "twin-cultivar", x: 1, z: 0 },
+    ],
+    cultivars: [cultivarEntry("oreille-de-pluie"), { id: "twin-cultivar", traits: twin }],
+  };
+
+  Rainelles.syncRainelleModels(registry, scene, s, undefined, foliagePools);
+
+  const a = registry.get("r1").foliagePoolEntries[0];
+  const b = registry.get("r2").foliagePoolEntries[0];
+  assert.equal(a.pool, b.pool, "same forme+dominante1 across different cultivars must still share the leaf pool");
+});
+
+test("removing a rainelle releases every one of its pooled foliage ids without leaving a hole", () => {
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const foliagePools = new Map();
+  const s = {
+    rainelles: [
+      { id: "r1", cultivarId: "oreille-de-pluie", x: 0, z: 0 },
+      { id: "r2", cultivarId: "oreille-de-pluie", x: 1, z: 0 },
+      { id: "r3", cultivarId: "oreille-de-pluie", x: 2, z: 0 },
+    ],
+    cultivars: [cultivarEntry("oreille-de-pluie")],
+  };
+
+  Rainelles.syncRainelleModels(registry, scene, s, undefined, foliagePools);
+  const leafPool = registry.get("r3").foliagePoolEntries[0].pool;
+  // 3 leaves x 3 rainelles, all sharing this one pool (see the "SAME cultivar" test above for why).
+  assert.equal(leafPool.mesh.count, 9);
+
+  s.rainelles = s.rainelles.filter((r) => r.id !== "r2");
+  Rainelles.syncRainelleModels(registry, scene, s, undefined, foliagePools);
+
+  assert.equal(leafPool.mesh.count, 6, "r2's 3 leaf instances must be released, 6 remain");
+  assert.equal(leafPool.indexOf.has("r2:leaf0"), false);
+  assert.equal(leafPool.indexOf.has("r2:leaf1"), false);
+  assert.equal(leafPool.indexOf.has("r2:leaf2"), false);
+  // swap-and-pop: the remaining 6 ids must occupy a dense [0, 6) range, no holes.
+  const remainingIds = ["r1:leaf0", "r1:leaf1", "r1:leaf2", "r3:leaf0", "r3:leaf1", "r3:leaf2"];
+  const remainingIndices = remainingIds.map((id) => leafPool.indexOf.get(id)).sort((a, b) => a - b);
+  assert.deepEqual(remainingIndices, [0, 1, 2, 3, 4, 5]);
+});
+
+test("a resynchronisation with no position/heading change never rewrites an already-correct foliage instance matrix", () => {
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const foliagePools = new Map();
+  const s = {
+    rainelles: [
+      { id: "r1", cultivarId: "oreille-de-pluie", x: 4, z: 6 },
+      { id: "r2", cultivarId: "oreille-de-pluie", x: -2, z: 1 },
+    ],
+    cultivars: [cultivarEntry("oreille-de-pluie")],
+  };
+
+  Rainelles.syncRainelleModels(registry, scene, s, undefined, foliagePools);
+  const versionsBefore = new Map();
+  for (const byMaterial of foliagePools.values())
+    for (const pool of byMaterial.values()) versionsBefore.set(pool, pool.mesh.instanceMatrix.version);
+
+  Rainelles.syncRainelleModels(registry, scene, s, undefined, foliagePools); // identical positions, replayed
+
+  for (const byMaterial of foliagePools.values())
+    for (const pool of byMaterial.values())
+      assert.equal(
+        pool.mesh.instanceMatrix.version,
+        versionsBefore.get(pool),
+        "an unchanged resync must never touch a foliage instance matrix already correct",
+      );
+});
+
+test("a rainelle that actually moves DOES get its pooled foliage instance matrices rewritten on the next sync", () => {
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const foliagePools = new Map();
+  const s = {
+    rainelles: [{ id: "r1", cultivarId: "oreille-de-pluie", x: 0, z: 0 }],
+    cultivars: [cultivarEntry("oreille-de-pluie")],
+  };
+
+  Rainelles.syncRainelleModels(registry, scene, s, undefined, foliagePools);
+  const versionsBefore = new Map();
+  for (const byMaterial of foliagePools.values())
+    for (const pool of byMaterial.values()) versionsBefore.set(pool, pool.mesh.instanceMatrix.version);
+
+  s.rainelles[0].x = 5; // a real move
+  Rainelles.syncRainelleModels(registry, scene, s, undefined, foliagePools);
+
+  let anyBumped = false;
+  for (const byMaterial of foliagePools.values())
+    for (const pool of byMaterial.values())
+      if (pool.mesh.instanceMatrix.version !== versionsBefore.get(pool)) anyBumped = true;
+  assert.ok(anyBumped, "a real move must rewrite at least one pooled foliage instance matrix");
+});
+
+test("the pooled leaf instance matrix encodes the rainelle's real world position/heading composed with FOLIAGE_SCALE already baked into localMatrix", () => {
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const foliagePools = new Map();
+  const s = {
+    rainelles: [{ id: "r1", cultivarId: "oreille-de-pluie", x: 0, z: 0 }],
+    cultivars: [cultivarEntry("oreille-de-pluie")],
+  };
+  Rainelles.syncRainelleModels(registry, scene, s, undefined, foliagePools);
+
+  s.rainelles[0].x = 5;
+  s.rainelles[0].z = 0;
+  Rainelles.syncRainelleModels(registry, scene, s, undefined, foliagePools);
+
+  const rm = registry.get("r1");
+  const leafEntry = rm.foliagePoolEntries[0];
+  const m = new THREE.Matrix4();
+  leafEntry.pool.mesh.getMatrixAt(leafEntry.pool.indexOf.get("r1:leaf0"), m);
+
+  const expectedWorld = new THREE.Matrix4().compose(
+    rm.group.position,
+    new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rm.group.rotation.y),
+    new THREE.Vector3(1, 1, 1),
+  );
+  const expected = new THREE.Matrix4().multiplyMatrices(expectedWorld, leafEntry.localMatrix);
+
+  const EPS = 1e-6;
+  for (let i = 0; i < 16; i++) assert.ok(Math.abs(m.elements[i] - expected.elements[i]) < EPS, `element ${i} mismatch`);
+});
+
 test("a rainelle whose cultivar cannot be resolved yet is skipped, never throws, even with bodyPools provided", () => {
   const scene = new THREE.Group();
   const registry = new Map();
@@ -437,6 +684,63 @@ test("groupBounds matches the plain setFromObject box when bodyPools is not used
   const box = Rainelles.groupBounds(rm.group);
   const EPS = 1e-6;
   assert.ok(naiveBox.min.distanceTo(box.min) < EPS && naiveBox.max.distanceTo(box.max) < EPS);
+});
+
+// Epic C7.14: real regression found and fixed while writing this epic (see render-rainelles.js's
+// own groupBounds header) — once foliage is ALSO pooled/detached, the same blind spot bodyPools
+// already caused for the body reappears for foliage, unless groupBounds accounts for it too.
+
+test("groupBounds includes the real foliage extent even when foliagePools pools every leaf mesh out of the Group", () => {
+  const scene = new THREE.Group();
+  const registryUnpooled = new Map();
+  const s1 = {
+    rainelles: [{ id: "r1", cultivarId: "oreille-de-pluie", x: 0, z: 0 }],
+    cultivars: [cultivarEntry("oreille-de-pluie")],
+  };
+  Rainelles.syncRainelleModels(registryUnpooled, scene, s1); // no pools at all: real ground truth
+  const unpooledBox = Rainelles.groupBounds(registryUnpooled.get("r1").group);
+
+  const scene2 = new THREE.Group();
+  const registryPooled = new Map();
+  const foliagePools = new Map();
+  const s2 = {
+    rainelles: [{ id: "r1", cultivarId: "oreille-de-pluie", x: 0, z: 0 }],
+    cultivars: [cultivarEntry("oreille-de-pluie")],
+  };
+  Rainelles.syncRainelleModels(registryPooled, scene2, s2, undefined, foliagePools);
+  const rm = registryPooled.get("r1");
+
+  // Confirm the setup actually exercises the risk: with foliage pooled AND no body pools, a naive
+  // setFromObject would only ever see the (unpooled) body here — never the (pooled) foliage.
+  const naiveBox = new THREE.Box3().setFromObject(rm.group);
+  const naiveSize = naiveBox.getSize(new THREE.Vector3());
+  const pooledBox = Rainelles.groupBounds(rm.group);
+  const pooledSize = pooledBox.getSize(new THREE.Vector3());
+  assert.ok(
+    pooledSize.x > naiveSize.x || pooledSize.z > naiveSize.z,
+    "sanity check: groupBounds must see MORE extent than the naive (body-only) box once foliage is pooled out",
+  );
+
+  const EPS = 1e-5;
+  assert.ok(
+    unpooledBox.min.distanceTo(pooledBox.min) < EPS && unpooledBox.max.distanceTo(pooledBox.max) < EPS,
+    "groupBounds with foliage pooled must match the real (unpooled) ground-truth bounds",
+  );
+});
+
+test("a cultivar with no feuilles trait contributes nothing extra to groupBounds beyond the body (empty foliageMeshes list)", () => {
+  const scene = new THREE.Group();
+  const registry = new Map();
+  const foliagePools = new Map();
+  const traits = { ...Genetics.founders[0].traits, feuilles: undefined };
+  const s = {
+    rainelles: [{ id: "r1", cultivarId: "bald", x: 0, z: 0 }],
+    cultivars: [{ id: "bald", traits }],
+  };
+  Rainelles.syncRainelleModels(registry, scene, s, undefined, foliagePools);
+  const rm = registry.get("r1");
+  assert.deepEqual(rm.group.userData.foliageMeshes, []);
+  assert.doesNotThrow(() => Rainelles.groupBounds(rm.group));
 });
 
 test("groupBounds follows the rainelle's real world position (translated, not stuck at the origin)", () => {

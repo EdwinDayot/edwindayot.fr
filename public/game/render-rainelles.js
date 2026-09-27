@@ -41,13 +41,17 @@
    "eye1", "leg0".."leg3", "mark") and `localMatrix` each Mesh's fixed transform relative to
    `group`'s own frame, captured once via `structure.updateMatrixWorld(true)` +
    `mesh.matrixWorld.clone()` — the exact technique botany-hybrids.js's own organMeshes capture
-   (C7.10) already documents and this file reuses rather than reinventing. Foliage organs
-   (attachFoliage) are deliberately NOT included here (a real second difficulty — geometry/material
-   vary by cultivar rather than being fixed for every Rainelle — left to a future epic, same
-   sequencing C7.9 -> C7.10 already used for specimens). buildRainelleGroup itself never detaches or
-   pools anything — same "pure builder" contract as before this epic — that is syncRainelleModels's
-   job, exactly mirroring how botany-hybrids.js exposes stemMesh/organMeshes without pooling them
-   itself.
+   (C7.10) already documents and this file reuses rather than reinventing. buildRainelleGroup itself
+   never detaches or pools anything — same "pure builder" contract as before this epic — that is
+   syncRainelleModels's job, exactly mirroring how botany-hybrids.js exposes stemMesh/organMeshes
+   without pooling them itself.
+
+   Epic C7.14: the same treatment, generalised to the foliage attachFoliage attaches (the real
+   second difficulty C7.13 deliberately left open — geometry/material vary by cultivar rather than
+   being fixed for every Rainelle, same sequencing C7.9 -> C7.10 already used for specimens) — every
+   leaf Mesh is exposed as group.userData.foliageMeshes, the same flat `[{mesh, localMatrix}]` shape
+   already used for a specimen's own organMeshes, captured at the exact same instant as bodyMeshes
+   above (one `structure.updateMatrixWorld(true)` covers both).
 
    Self-contained beyond botany-hybrids.js, render-instances.js (C7.8) and terrain.js: only THREE
    and those three sibling modules are required, so this loads and runs identically in a plain Node
@@ -227,7 +231,30 @@
     // fixed body/mark layout), so a one-time capture is correct forever, not merely at this instant.
     structure.updateMatrixWorld(true);
     for (const bm of bodyMeshes) bm.localMatrix = bm.mesh.matrixWorld.clone();
-    group.userData = { rainelleId: rainelle.id, cultivarId: cultivar.id, organs, mark, bodyMeshes };
+    // Epic C7.14: capture each foliage leaf Mesh's transform relative to `group`'s OWN frame, at
+    // the exact same instant as bodyMeshes just above (one single structure.updateMatrixWorld(true)
+    // already covers both) — never a second traversal at a different time. `branch.scale.setScalar
+    // (FOLIAGE_SCALE)` in attachFoliage runs BEFORE this point, so FOLIAGE_SCALE is already baked
+    // into each captured localMatrix — unlike a specimen's stage scale (botany-hybrids.js's own
+    // organMeshes, captured before ITS scale is applied to the whole group), a Rainelle's Group is
+    // never itself scaled (see `_scale` below), so no further composition is ever needed at sync
+    // time. One flat entry per real leaf Mesh, never per branch (a "palmee" cultivar's branch holds
+    // five finger meshes) — gathered via traverse(), the exact same technique botany-hybrids.js's
+    // own organMeshes capture already uses for a plant's organs.
+    const foliageMeshes = [];
+    for (const o of organs) {
+      o.branch.traverse((node) => {
+        if (node.isMesh) foliageMeshes.push({ mesh: node, localMatrix: node.matrixWorld.clone() });
+      });
+    }
+    group.userData = {
+      rainelleId: rainelle.id,
+      cultivarId: cultivar.id,
+      organs,
+      mark,
+      bodyMeshes,
+      foliageMeshes,
+    };
     return group;
   }
 
@@ -235,14 +262,20 @@
 
   // First estimate, named and revisable (same posture as render-specimens.js's own
   // STEM_POOL_INITIAL_CAPACITY) — render-instances.js grows a pool automatically past this, never
-  // a hard cap.
+  // a hard cap. Epic C7.14 adds FOLIAGE_POOL_INITIAL_CAPACITY, its own separate estimate (a leaf
+  // pool's real population differs from a body-piece pool's), on the same model render-
+  // specimens.js already uses for its own STEM_POOL_INITIAL_CAPACITY/ORGAN_POOL_INITIAL_CAPACITY
+  // pair rather than reusing one constant for two unrelated populations.
   const BODY_POOL_INITIAL_CAPACITY = 8;
+  const FOLIAGE_POOL_INITIAL_CAPACITY = 8;
 
   // pools: Map<geometry, Map<material, pool>> -> the one pool for this exact (geometry, material)
   // object pair, creating both the pool and any missing map level on first use — same generic
   // lookup already established by render-specimens.js's own poolFor, never a second divergent
-  // implementation of the same nested-Map pattern.
-  function poolFor(pools, scene, geometry, material) {
+  // implementation of the same nested-Map pattern. `initialCapacity` is an explicit 5th argument
+  // (epic C7.14: this one function is now shared by bodyPoolFor/foliagePoolFor below, each with its
+  // own estimate) rather than a second hardcoded constant baked into this function itself.
+  function poolFor(pools, scene, geometry, material, initialCapacity) {
     let byMaterial = pools.get(geometry);
     if (!byMaterial) {
       byMaterial = new Map();
@@ -250,16 +283,22 @@
     }
     let pool = byMaterial.get(material);
     if (!pool) {
-      pool = RenderInstances.createInstancePool(scene, geometry, material, BODY_POOL_INITIAL_CAPACITY);
+      pool = RenderInstances.createInstancePool(scene, geometry, material, initialCapacity);
       byMaterial.set(material, pool);
     }
     return pool;
+  }
+  function bodyPoolFor(bodyPools, scene, geometry, material) {
+    return poolFor(bodyPools, scene, geometry, material, BODY_POOL_INITIAL_CAPACITY);
+  }
+  function foliagePoolFor(foliagePools, scene, geometry, material) {
+    return poolFor(foliagePools, scene, geometry, material, FOLIAGE_POOL_INITIAL_CAPACITY);
   }
 
   // Detaches every body/mark Mesh of a freshly built Rainelle Group from its (real, in-scene)
   // structure and registers each into its shared pool. Returns an array parallel to
   // group.userData.bodyMeshes: [{key, localMatrix, pool}] — the per-Rainelle bookkeeping
-  // syncRainelleModels keeps in its registry to later update (syncBodyMeshInstances) or release
+  // syncRainelleModels keeps in its registry to later update (syncPooledMeshInstances) or release
   // (releaseBodyMeshPools) these instances. Two Rainelles of the SAME cultivar share their eight
   // body pools (torso/head/eye0/eye1/leg0..3, keyed by the shared geometry+material objects, never
   // recomputed) exactly as much as two Rainelles of DIFFERENT cultivars do — the body is common to
@@ -269,7 +308,7 @@
   function poolBodyMeshes(bodyPools, scene, group) {
     return group.userData.bodyMeshes.map((bm) => {
       bm.mesh.parent.remove(bm.mesh);
-      const pool = poolFor(bodyPools, scene, bm.mesh.geometry, bm.mesh.material);
+      const pool = bodyPoolFor(bodyPools, scene, bm.mesh.geometry, bm.mesh.material);
       return { key: bm.key, localMatrix: bm.localMatrix, pool };
     });
   }
@@ -283,6 +322,30 @@
   function releaseBodyMeshPools(bodyPoolEntries, rainelleId) {
     if (!bodyPoolEntries) return;
     for (const entry of bodyPoolEntries) RenderInstances.remove(entry.pool, `${rainelleId}:${entry.key}`);
+  }
+
+  // ---- Epic C7.14: same treatment, generalised to the foliage attached to a Rainelle's back ----
+
+  // Detaches every leaf Mesh of a freshly built Rainelle Group's group.userData.foliageMeshes from
+  // its (real, in-scene) branch and registers each into its shared pool, keyed by index within that
+  // flat list (`leaf0`, `leaf1`... — never a key colliding with a body piece's own "torso"/"leg0"
+  // etc., so both lists can be released independently through the exact same `${rainelleId}:${key}`
+  // pooled-instance id convention poolBodyMeshes already established). A cultivar with no feuilles
+  // trait has an empty foliageMeshes list (attachFoliage returns []), so this simply returns an
+  // empty array — no pool, empty or otherwise, is ever created for it, exactly the guarantee this
+  // epic's own backlog entry names.
+  function poolFoliageMeshes(foliagePools, scene, group) {
+    return group.userData.foliageMeshes.map((fm, i) => {
+      fm.mesh.parent.remove(fm.mesh);
+      const pool = foliagePoolFor(foliagePools, scene, fm.mesh.geometry, fm.mesh.material);
+      return { key: "leaf" + i, localMatrix: fm.localMatrix, pool };
+    });
+  }
+
+  // Same swap-and-pop release guarantee as releaseBodyMeshPools, for a Rainelle's foliage instances.
+  function releaseFoliageMeshPools(foliagePoolEntries, rainelleId) {
+    if (!foliagePoolEntries) return;
+    for (const entry of foliagePoolEntries) RenderInstances.remove(entry.pool, `${rainelleId}:${entry.key}`);
   }
 
   // Scratch objects reused across calls (render-instances.js's own set() copies the matrix
@@ -309,27 +372,34 @@
     return _instanceMatrix.multiplyMatrices(_worldMatrix, localMatrix);
   }
 
-  // Writes every pooled instance matrix for one Rainelle — called only when its position/heading
-  // actually changed (or it was just created), never on an unchanged resync: render-instances.js's
-  // own set() would otherwise mark instanceMatrix.needsUpdate on every one of these pools every
-  // ~0.25s tick for every idle Rainelle, for no observable change — exactly the "jamais de travail
-  // fantôme" discipline C7.9/C7.10 already established for specimens (whose position is fixed for
-  // life, so the question never arose there the same way).
-  function syncBodyMeshInstances(bodyPoolEntries, rainelleId, position, rotationY) {
-    if (!bodyPoolEntries) return;
+  // Writes every pooled instance matrix a Rainelle currently holds (body+mark OR foliage — both
+  // share the exact same "world transform composed with a fixed localMatrix" math, epic C7.14
+  // generalises this from body-only to either list rather than duplicating it) — called only when
+  // its position/heading actually changed (or it was just created), never on an unchanged resync:
+  // render-instances.js's own set() would otherwise mark instanceMatrix.needsUpdate on every one of
+  // these pools every ~0.25s tick for every idle Rainelle, for no observable change — exactly the
+  // "jamais de travail fantôme" discipline C7.9/C7.10 already established for specimens (whose
+  // position is fixed for life, so the question never arose there the same way).
+  function syncPooledMeshInstances(poolEntries, rainelleId, position, rotationY) {
+    if (!poolEntries || !poolEntries.length) return;
     rainelleWorldMatrix(position, rotationY);
-    for (const entry of bodyPoolEntries)
+    for (const entry of poolEntries)
       RenderInstances.set(entry.pool, `${rainelleId}:${entry.key}`, bodyInstanceMatrix(entry.localMatrix));
   }
 
-  // registry: a Map id -> { group, x, z, bodyPoolEntries }, owned by the caller (render.js's
-  // this.rainelleModels) — same convention as render-specimens.js's this.specimenModels.
+  // registry: a Map id -> { group, x, z, bodyPoolEntries, foliagePoolEntries }, owned by the caller
+  // (render.js's this.rainelleModels) — same convention as render-specimens.js's
+  // this.specimenModels.
   // scene: the THREE.Scene (or any object exposing add/remove) Groups/pools are added to/removed
   // from.
   // s: the live GardenState save (s.rainelles/s.cultivars).
   // bodyPools: optional Map<geometry, Map<material, pool>> (render.js's this.rainelleBodyPools).
   // Omitting it (every existing call site before this epic) leaves every body/mark Mesh exactly
   // where it always was, a normal child of the Group, byte-for-byte the prior behaviour.
+  // foliagePools (epic C7.14): optional, the exact same Map<geometry, Map<material, pool>> shape
+  // (render.js's this.rainelleFoliagePools) for the leaf Meshes attachFoliage attaches. Omitting it
+  // leaves every leaf Mesh exactly where it always was, byte-for-byte — the same guarantee
+  // bodyPools already offers, entirely independent of whether bodyPools itself is provided.
   //
   // Replaces the sync loop render-flow.js's own sync() carried inline since epic C5.11, moved here
   // so it can be exercised directly in Node (tests/campaign-rainelle-render.cjs) rather than only
@@ -337,13 +407,14 @@
   // why syncSpecimenModels lives there rather than inline in render-flow.js. Returns
   // { batchDirty }, since render-flow.js's `this.batchDirty = true` on a newly built Group (byte-
   // for-byte the pre-C7.13 behaviour) is a caller-owned field this module has no access to.
-  function syncRainelleModels(registry, scene, s, bodyPools) {
+  function syncRainelleModels(registry, scene, s, bodyPools, foliagePools) {
     let batchDirty = false;
     const liveIds = new Set(s.rainelles.map((r) => r.id));
     for (const [id, rm] of registry) {
       if (!liveIds.has(id)) {
         scene.remove(rm.group);
         releaseBodyMeshPools(rm.bodyPoolEntries, id);
+        releaseFoliageMeshPools(rm.foliagePoolEntries, id);
         registry.delete(id);
         batchDirty = true;
       }
@@ -357,8 +428,9 @@
         if (!cultivar) continue; // no cultivar to draw foliage from yet — nothing to add
         const group = buildRainelleGroup(r, cultivar);
         const bodyPoolEntries = bodyPools ? poolBodyMeshes(bodyPools, scene, group) : null;
+        const foliagePoolEntries = foliagePools ? poolFoliageMeshes(foliagePools, scene, group) : null;
         scene.add(group);
-        rm = { group, x: r.x, z: r.z, bodyPoolEntries };
+        rm = { group, x: r.x, z: r.z, bodyPoolEntries, foliagePoolEntries };
         registry.set(r.id, rm);
         batchDirty = true;
         isNew = true;
@@ -374,8 +446,10 @@
         moved = true;
       }
       rm.group.position.set(r.x, y, r.z);
-      if (rm.bodyPoolEntries && (isNew || moved))
-        syncBodyMeshInstances(rm.bodyPoolEntries, r.id, rm.group.position, rm.group.rotation.y);
+      if (isNew || moved) {
+        syncPooledMeshInstances(rm.bodyPoolEntries, r.id, rm.group.position, rm.group.rotation.y);
+        syncPooledMeshInstances(rm.foliagePoolEntries, r.id, rm.group.position, rm.group.rotation.y);
+      }
     }
     return { batchDirty };
   }
@@ -413,10 +487,30 @@
   // `setFromObject(group)` still picks up the body directly when it is NOT pooled (a normal child),
   // and unioning with the transformed body bounds a second time in that case is harmless (union of
   // an already-covered region changes nothing).
+  //
+  // Epic C7.14: real regression found and fixed while writing this epic, not assumed still correct
+  // (execution-continue.md: "vérifié veut dire exécuté") — once foliage is ALSO pooled/detached, the
+  // SAME blind spot reappears for it: `setFromObject(group)` above no longer sees a pooled leaf Mesh
+  // either, and unlike the body (one fixed shape shared by every Rainelle, safe to memoise once),
+  // foliage geometry/position VARIES by cultivar, so there is no single constant to union in here —
+  // each real foliage Mesh's own geometry bounding box, transformed by ITS OWN localMatrix (already
+  // captured in group's own frame at construction, see buildRainelleGroup) then by group's real
+  // world transform, is computed fresh per call from group.userData.foliageMeshes. A Rainelle whose
+  // cultivar grows no foliage simply contributes nothing here (empty list), same as bodyLocalBounds
+  // contributing nothing extra when the body is not pooled.
+  const _foliagePieceBox = new T.Box3();
   function groupBounds(group) {
     group.updateMatrixWorld(true);
     const box = new T.Box3().setFromObject(group);
     box.union(bodyLocalBounds().clone().applyMatrix4(group.matrixWorld));
+    for (const fm of group.userData.foliageMeshes) {
+      fm.mesh.geometry.computeBoundingBox();
+      _foliagePieceBox
+        .copy(fm.mesh.geometry.boundingBox)
+        .applyMatrix4(fm.localMatrix)
+        .applyMatrix4(group.matrixWorld);
+      box.union(_foliagePieceBox);
+    }
     return box;
   }
 
