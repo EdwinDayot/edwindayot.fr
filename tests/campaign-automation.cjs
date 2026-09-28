@@ -1476,6 +1476,285 @@ test("bouturer: a real cycle's new young-plant stock and the poste's remaining b
   assert.equal(savedDestination.buffer[Stations.youngPlantKey(cultivarId)], 1);
 });
 
+// Epic C7.28 (design §5's last row, « Ingrédients au poste » → « Une recette connue en sortie »;
+// §7, « Le compost récupère une fraction des résidus »): a taught Rainelle actually préparer,
+// cycle after cycle, composting RESIDUE_RATIO units of harvested residue from a source panier
+// into one unit of substrate in a destination panier — the last of the design's seven gestures to
+// gain a real tick effect (all six teachable verbs now do something; "multiplier" stays refused).
+
+const RESIDUE_RATIO = CampaignAutomation.RESIDUE_RATIO;
+
+test("preparer: a full cycle with enough residue composts RESIDUE_RATIO units into exactly one unit of substrate", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const source = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  source.buffer[cultivarId] = RESIDUE_RATIO * 2;
+  const destination = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 5,
+    z: 5,
+  });
+  teach(rainelle, {
+    verbe: "preparer",
+    poste: "peu-importe",
+    source: source.id,
+    destination: destination.id,
+    condition: cultivarId,
+  });
+  g.step(CYCLE);
+  assert.equal(source.buffer[cultivarId], RESIDUE_RATIO);
+  assert.equal(destination.buffer[SUBSTRATE_KEY], 1);
+});
+
+test("preparer: an empty condition leaves the Rainelle inactive, never starting a job", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const source = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  source.buffer[cultivarId] = RESIDUE_RATIO * 2;
+  const destination = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  teach(rainelle, {
+    verbe: "preparer",
+    poste: "peu-importe",
+    source: source.id,
+    destination: destination.id,
+    condition: "",
+  });
+  assert.doesNotThrow(() => g.step(CYCLE * 2));
+  assert.equal(rainelle.job, null);
+  assert.equal(source.buffer[cultivarId], RESIDUE_RATIO * 2);
+  assert.equal(destination.buffer[SUBSTRATE_KEY], undefined);
+});
+
+test("preparer: an unknown source/destination id, or one of the wrong kind, leaves the Rainelle inactive without throwing", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const source = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  source.buffer[cultivarId] = RESIDUE_RATIO * 2;
+  const destination = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 3,
+  });
+  teach(rainelle, {
+    verbe: "preparer",
+    poste: "peu-importe",
+    source: "inconnu",
+    destination: destination.id,
+    condition: cultivarId,
+  });
+  assert.doesNotThrow(() => g.step(CYCLE * 2));
+  assert.equal(rainelle.job, null);
+  teach(rainelle, {
+    verbe: "preparer",
+    poste: "peu-importe",
+    source: zone.id,
+    destination: destination.id,
+    condition: cultivarId,
+  });
+  assert.doesNotThrow(() => g.step(CYCLE * 2));
+  assert.equal(rainelle.job, null);
+  teach(rainelle, {
+    verbe: "preparer",
+    poste: "peu-importe",
+    source: source.id,
+    destination: "inconnu",
+    condition: cultivarId,
+  });
+  assert.doesNotThrow(() => g.step(CYCLE * 2));
+  assert.equal(rainelle.job, null);
+});
+
+test("preparer: geste.poste is never read — an unresolved poste never blocks the gesture", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const source = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  source.buffer[cultivarId] = RESIDUE_RATIO;
+  const destination = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  teach(rainelle, {
+    verbe: "preparer",
+    poste: "identifiant-jamais-resolu",
+    source: source.id,
+    destination: destination.id,
+    condition: cultivarId,
+  });
+  g.step(CYCLE);
+  assert.equal(destination.buffer[SUBSTRATE_KEY], 1);
+});
+
+// Same degenerate configuration already guarded for transporter/trier/bouturer: source and
+// destination are both paniers here too, so teaching the same panier as both must never deposit
+// or consume anything.
+test("preparer: a panier taught as both source and destination is a degenerate no-op, never composting anything", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+    capacity: 3,
+  });
+  panier.buffer[cultivarId] = RESIDUE_RATIO * 2;
+  teach(rainelle, {
+    verbe: "preparer",
+    poste: "peu-importe",
+    source: panier.id,
+    destination: panier.id,
+    condition: cultivarId,
+  });
+  assert.doesNotThrow(() => g.step(CYCLE * 2));
+  assert.equal(rainelle.job, null);
+  assert.equal(panier.buffer[cultivarId], RESIDUE_RATIO * 2);
+  assert.equal(panier.buffer[SUBSTRATE_KEY], undefined);
+});
+
+test("preparer: a full destination panier ends the cycle without consuming any residue", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const source = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  source.buffer[cultivarId] = RESIDUE_RATIO * 2;
+  const destination = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  destination.capacity = 0;
+  teach(rainelle, {
+    verbe: "preparer",
+    poste: "peu-importe",
+    source: source.id,
+    destination: destination.id,
+    condition: cultivarId,
+  });
+  g.step(CYCLE);
+  assert.equal(source.buffer[cultivarId], RESIDUE_RATIO * 2);
+  assert.equal(destination.buffer[SUBSTRATE_KEY], undefined);
+});
+
+test("preparer: a source with fewer than RESIDUE_RATIO units of residue (including zero) ends the cycle without any consumption or deposit", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const destination = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+
+  const shortSource = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  shortSource.buffer[cultivarId] = RESIDUE_RATIO - 1;
+  teach(rainelle, {
+    verbe: "preparer",
+    poste: "peu-importe",
+    source: shortSource.id,
+    destination: destination.id,
+    condition: cultivarId,
+  });
+  g.step(CYCLE);
+  assert.equal(shortSource.buffer[cultivarId], RESIDUE_RATIO - 1);
+  assert.equal(destination.buffer[SUBSTRATE_KEY], undefined);
+
+  const emptySource = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  teach(rainelle, {
+    verbe: "preparer",
+    poste: "peu-importe",
+    source: emptySource.id,
+    destination: destination.id,
+    condition: cultivarId,
+  });
+  g.step(CYCLE);
+  assert.equal(emptySource.buffer[cultivarId], undefined);
+  assert.equal(destination.buffer[SUBSTRATE_KEY], undefined);
+});
+
+test("preparer: two consecutive full cycles with at least 2*RESIDUE_RATIO residue compost two cumulative units of substrate", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const source = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  source.buffer[cultivarId] = RESIDUE_RATIO * 2;
+  const destination = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  teach(rainelle, {
+    verbe: "preparer",
+    poste: "peu-importe",
+    source: source.id,
+    destination: destination.id,
+    condition: cultivarId,
+  });
+  g.step(CYCLE * 2);
+  assert.equal(destination.buffer[SUBSTRATE_KEY], 2);
+  assert.equal(source.buffer[cultivarId], undefined);
+});
+
+test("preparer: a real cycle's new substrate stock and the source's remaining residue survive a JSON save/reload round trip", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const source = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  source.buffer[cultivarId] = RESIDUE_RATIO * 2;
+  const destination = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  teach(rainelle, {
+    verbe: "preparer",
+    poste: "peu-importe",
+    source: source.id,
+    destination: destination.id,
+    condition: cultivarId,
+  });
+  g.step(CYCLE);
+  const saved = g.serialize();
+  const reloaded = new GardenState(saved);
+  const savedSource = reloaded.s.campaignStations.paniers.find((p) => p.id === source.id);
+  const savedDestination = reloaded.s.campaignStations.paniers.find(
+    (p) => p.id === destination.id,
+  );
+  assert.equal(savedSource.buffer[cultivarId], RESIDUE_RATIO);
+  assert.equal(savedDestination.buffer[SUBSTRATE_KEY], 1);
+});
+
 test("a save without rainelle.job or panier.buffer (pre-epic) migrates to correct defaults without error", () => {
   const g = new GardenState(null, 1000);
   bornRainelle(g);

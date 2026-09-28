@@ -21,13 +21,9 @@
    functions read `D.recipes[e.type]` and would need an unrelated recipe entry to mean anything.
 
    Verb scope: "arroser"/"recolter" (C2.6c), "transporter" (C2.7), "trier" (C7.6), "replanter"
-   (C7.26) and now "bouturer" (C7.27) are implemented. The one remaining verb a Rainelle can be
-   taught (préparer, design §5's own table) is validated as teachable since C2.4 but deliberately
-   does nothing here — a later epic is where it gets its own tick behaviour, once a recipe system
-   for it exists. A taught-but-unimplemented verb is a silent no-op, not an error: teaching it
-   already succeeded (C2.4/C2.5), so a Rainelle just standing idle is the correct, honest state
-   until its epic lands — the readable "blocage" state a player would actually see is C2.8's job,
-   not this one's.
+   (C7.26), "bouturer" (C7.27) and now "preparer" (C7.28) are implemented — all seven rows of
+   design §5's gesture table now have a real tick effect (six taught directly, "multiplier"
+   itself permanently refused, see rainelles.js's own VERBS comment).
 
    Failure posture: an invalid poste/source/destination (unknown id, or an id that resolves to
    the wrong kind of station — e.g. a `recolter`'s poste pointing at a panier instead of a zone)
@@ -130,10 +126,17 @@
   // Epic C7.27 ("bouturer"): the literal buffer key a panier's boutures-consuming poste holds its
   // substrate stock under — a bare, non-cultivar key alongside the panier's ordinary cultivarId
   // keys (harvested produce, C2.6c) and the `jeune:<cultivarId>` keys (C7.23), same buffer, no new
-  // field. No command or gesture deposits it yet (see this function's own header comment on the
-  // Cartographe lot that introduced this epic) — a named constant here only so the key is never a
-  // magic string scattered across this file and its tests.
+  // field. Produced for the first time by tickPreparer below (C7.28) — until this epic, nothing
+  // ever deposited it, only bouturer consumed it — a named constant here only so the key is never
+  // a magic string scattered across this file and its tests.
   const SUBSTRATE_KEY = "substrat";
+
+  // Epic C7.28 ("préparer" → compost): how many units of harvested residue tickPreparer consumes
+  // per unit of substrate it deposits. Design §7 names the transformation only qualitatively ("le
+  // compost récupère une fraction des résidus") — never 1:1, always a lossy fraction — so this
+  // picks the smallest simple fraction strictly below 1 (2:1), the same "smallest simple fraction"
+  // reasoning FAST_CYCLE_SECONDS above already used for a different unnamed ratio.
+  const RESIDUE_RATIO = 2;
 
   // Resolves `id` against the registry and checks it is the expected kind; returns the station
   // itself on success or null otherwise — never throws, per this file's failure posture above.
@@ -477,6 +480,36 @@
     if (deposit.ok) s.campaignStations = deposit.registry;
   }
 
+  // "Préparer" (design §5's last row, « Ingrédients au poste » → « Une recette connue en sortie »
+  // — the only recipe the design itself already names for this stage is compost, §7: "Le compost
+  // récupère une fraction des résidus"). `geste.source` is the input panier holding harvested
+  // residue (PHRASE_BUILDERS.preparer's own "à partir de {source}"), `geste.destination` the
+  // output panier receiving substrate; `geste.poste` is required by the schema but never read
+  // here, same posture as transporter's/trier's own unused poste — there is no station of its own
+  // to resolve for "the recipe itself", only one recipe existing at all at this stage.
+  // `geste.condition` is the cultivarId of the residue to compost, mandatory in practice: a panier
+  // can hold several distinct cultivarId keys harvested at once, same posture as tickTrier/
+  // tickReplanter/tickBouturer's own mandatory condition.
+  //
+  // Same "un blocage n'affecte jamais le stock" discipline as tickReplanter/tickBouturer: the
+  // destination's room is checked *before* any withdrawal from the source, so a full destination
+  // never drains a single unit of residue. Source and destination are both paniers (never a zone),
+  // so the same same-station degeneracy tickPanierMove/tickBouturer already guard against is
+  // guarded here too, before either check runs.
+  function tickPreparer(rainelle, s) {
+    const geste = rainelle.geste;
+    if (!geste.condition) return;
+    const source = resolveKind(s, geste.source, "panier");
+    const destination = resolveKind(s, geste.destination, "panier");
+    if (!source || !destination || source === destination) return;
+    if (!advanceCycle(rainelle)) return;
+    if (Stations.panierTotal(destination) >= destination.capacity) return;
+    if ((source.buffer[geste.condition] || 0) < RESIDUE_RATIO) return;
+    source.buffer[geste.condition] -= RESIDUE_RATIO;
+    if (source.buffer[geste.condition] <= 0) delete source.buffer[geste.condition];
+    destination.buffer[SUBSTRATE_KEY] = (destination.buffer[SUBSTRATE_KEY] || 0) + 1;
+  }
+
   // One Rainelle, one tick. A null geste, or a verb this file doesn't implement yet (see header
   // comment), is a no-op — never an exception, never a silent mutation of `job`.
   function tickRainelle(rainelle, s) {
@@ -488,6 +521,7 @@
     else if (geste.verbe === "trier") tickTrier(rainelle, s);
     else if (geste.verbe === "replanter") tickReplanter(rainelle, s);
     else if (geste.verbe === "bouturer") tickBouturer(rainelle, s);
+    else if (geste.verbe === "preparer") tickPreparer(rainelle, s);
   }
 
   // The smallest additive mechanism that gives "recolter" anything to ever collect: nothing else
@@ -546,6 +580,7 @@
     ZONE_WORK_RANGE,
     FATIGUED_CAPACITY_PER_CYCLE,
     SUBSTRATE_KEY,
+    RESIDUE_RATIO,
     tickRainelle,
     updateSpecimenReadiness,
     runNightWork,
