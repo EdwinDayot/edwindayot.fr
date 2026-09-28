@@ -197,17 +197,14 @@
   function zoneOccupancy(s, zoneId) {
     return s.specimens.filter((sp) => sp.zoneId === zoneId).length;
   }
-  // Refuses, without mutating anything: an unknown specimen, an id that doesn't resolve to a real
-  // registered zone (a borne/panier/habitat id is refused the same way an unknown id is — this
-  // geste only ever targets a zone), a zone with no capacity set (see campaign-stations.js's own
-  // MIN_ZONE_CAPACITY comment for why this is a real, distinct, refusable state rather than
-  // treated as unlimited), and a zone already at capacity (occupation >= capacity). Deliberately
-  // allows relocating a specimen that is already in the target zone (occupation counts it once
-  // either way, so a redundant relocate is a harmless no-op, not a special case to detect).
-  function canRelocateSpecimen(s, specimenId, zoneId) {
-    const specimen = s.specimens.find((sp) => sp.id === specimenId);
-    if (!specimen)
-      return { ok: false, error: `Identifiant de spécimen inconnu : "${specimenId}".` };
+  // Epic C7.26: extracted from canRelocateSpecimen (never a copy) — exactly the three refusals
+  // that never depend on an already-existing specimen (unknown zone, zone with no capacity set,
+  // zone full — counting real occupation with excludeSpecimenId left out of the tally, so a
+  // specimen already occupying a slot in this same zone never double-refuses itself) plus the
+  // cultivar-label refusal (C7.25). The "unknown specimen" refusal stays in canRelocateSpecimen
+  // alone, since a not-yet-created specimen (tickReplanter's use case) has no id to be unknown
+  // about. Never mutates anything.
+  function canPlaceCultivarInZone(s, cultivarId, zoneId, { excludeSpecimenId } = {}) {
     const resolved = Stations.resolveStation(s.campaignStations, zoneId);
     if (!resolved.ok || resolved.kind !== "zone")
       return { ok: false, error: `Identifiant de zone inconnu : "${zoneId}".` };
@@ -217,8 +214,10 @@
         ok: false,
         error: `La zone "${zoneId}" n'a pas de capacité définie, aucune relocalisation n'y est possible.`,
       };
-    const alreadyThere = specimen.zoneId === zoneId;
-    if (!alreadyThere && zoneOccupancy(s, zoneId) >= zone.capacity)
+    const occupancy = s.specimens.filter(
+      (sp) => sp.zoneId === zoneId && sp.id !== excludeSpecimenId,
+    ).length;
+    if (occupancy >= zone.capacity)
       return { ok: false, error: `La zone "${zoneId}" est pleine (capacité ${zone.capacity}).` };
     // Epic C7.25 (design §5, "Replanter... respecte l'étiquette de cultivar ou la famille
     // autorisée"): isolates the cultivar-label half only — no notion of "famille" exists anywhere
@@ -229,13 +228,26 @@
     if (
       zone.allowedCultivarIds &&
       zone.allowedCultivarIds.length &&
-      !zone.allowedCultivarIds.includes(specimen.cultivarId)
+      !zone.allowedCultivarIds.includes(cultivarId)
     )
       return {
         ok: false,
-        error: `Le cultivar "${specimen.cultivarId}" n'est pas autorisé dans la zone "${zoneId}".`,
+        error: `Le cultivar "${cultivarId}" n'est pas autorisé dans la zone "${zoneId}".`,
       };
     return { ok: true };
+  }
+  // Refuses, without mutating anything: an unknown specimen, or anything canPlaceCultivarInZone
+  // itself refuses for this specimen's own cultivar (unknown zone, zone with no capacity, zone
+  // full, cultivar not allowed). Deliberately allows relocating a specimen that is already in the
+  // target zone (canPlaceCultivarInZone excludes it from the occupancy tally via
+  // excludeSpecimenId, so a redundant relocate is a harmless no-op, not a special case to detect).
+  function canRelocateSpecimen(s, specimenId, zoneId) {
+    const specimen = s.specimens.find((sp) => sp.id === specimenId);
+    if (!specimen)
+      return { ok: false, error: `Identifiant de spécimen inconnu : "${specimenId}".` };
+    return canPlaceCultivarInZone(s, specimen.cultivarId, zoneId, {
+      excludeSpecimenId: specimen.id,
+    });
   }
   // Epic C7.24: the smallest zoneSlot in [0, capacity) not already claimed by a specimen of
   // zoneId (excluding excludeSpecimenId, so a caller already inside the zone can recompute its
@@ -296,6 +308,7 @@
     isMature,
     setReadyToProduce,
     zoneOccupancy,
+    canPlaceCultivarInZone,
     canRelocateSpecimen,
     relocateSpecimen,
     zoneFreeSlot,

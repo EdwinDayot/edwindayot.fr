@@ -207,6 +207,73 @@ test("canRelocateSpecimen stays open to any cultivar when allowedCultivarIds is 
   assert.equal(Cultivars.canRelocateSpecimen(g.s, sp.id, emptyListZone.id).ok, true);
 });
 
+// Epic C7.26: canPlaceCultivarInZone is the extraction canRelocateSpecimen now wraps — it must
+// refuse everything canRelocateSpecimen refused for a specimen's cultivar, but never needs a
+// specimen to already exist (tickReplanter's own use case: the specimen doesn't exist yet at the
+// point the gesture must decide whether it can even consume a young plant).
+
+test("canPlaceCultivarInZone refuses an unknown zone, a non-zone station id and a zone with no capacity", () => {
+  const g = new GardenState(null, 1000);
+  const cv = makeCultivar(g);
+  const bareZone = Stations.registerStation(g.s.campaignStations, "zone", { x: 0, z: 0 });
+  const borne = Stations.registerStation(g.s.campaignStations, "borne", { x: 0, z: 0 });
+  assert.equal(Cultivars.canPlaceCultivarInZone(g.s, cv.id, "z999").ok, false);
+  assert.equal(Cultivars.canPlaceCultivarInZone(g.s, cv.id, borne.id).ok, false);
+  assert.equal(Cultivars.canPlaceCultivarInZone(g.s, cv.id, bareZone.id).ok, false);
+});
+
+test("canPlaceCultivarInZone refuses a zone already at capacity, accepts a zone with a free slot", () => {
+  const g = new GardenState(null, 1000);
+  const cv = makeCultivar(g);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 1,
+  });
+  Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 0, z: 0 }).zoneId = zone.id;
+  assert.equal(Cultivars.canPlaceCultivarInZone(g.s, cv.id, zone.id).ok, false);
+  const roomyZone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 1,
+    z: 1,
+    capacity: 1,
+  });
+  assert.equal(Cultivars.canPlaceCultivarInZone(g.s, cv.id, roomyZone.id).ok, true);
+});
+
+test("canPlaceCultivarInZone's excludeSpecimenId leaves that specimen's own slot out of the occupancy tally", () => {
+  const g = new GardenState(null, 1000);
+  const cv = makeCultivar(g);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 1,
+  });
+  const sp = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 0, z: 0 });
+  sp.zoneId = zone.id;
+  assert.equal(Cultivars.canPlaceCultivarInZone(g.s, cv.id, zone.id).ok, false);
+  assert.equal(
+    Cultivars.canPlaceCultivarInZone(g.s, cv.id, zone.id, { excludeSpecimenId: sp.id }).ok,
+    true,
+  );
+});
+
+test("canPlaceCultivarInZone refuses a cultivar not in allowedCultivarIds, naming both, accepts one explicitly allowed", () => {
+  const g = new GardenState(null, 1000);
+  const cvAllowed = makeCultivar(g);
+  const cvOther = makeCultivar(g);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 2,
+    allowedCultivarIds: [cvAllowed.id],
+  });
+  assert.equal(Cultivars.canPlaceCultivarInZone(g.s, cvAllowed.id, zone.id).ok, true);
+  const refused = Cultivars.canPlaceCultivarInZone(g.s, cvOther.id, zone.id);
+  assert.equal(refused.ok, false);
+  assert.match(refused.error, new RegExp(cvOther.id));
+  assert.match(refused.error, new RegExp(zone.id));
+});
+
 test("relocateSpecimen propagates the allowedCultivarIds refusal from canRelocateSpecimen without duplicating the rule", () => {
   const g = new GardenState(null, 1000);
   const cvAllowed = makeCultivar(g);

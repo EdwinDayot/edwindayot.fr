@@ -875,27 +875,283 @@ test("trier: destination capacity and source min are respected, exactly like tra
   assert.equal(Stations.panierTotal(to), 24);
 });
 
-test("the two remaining out-of-scope verbs (replanter/preparer) never crash and never start a job", () => {
-  for (const verbe of ["replanter", "preparer"]) {
-    const g = new GardenState(null, 1000);
-    const rainelle = bornRainelle(g);
-    const zone = Stations.registerStation(g.s.campaignStations, "zone", {
-      x: 0,
-      z: 0,
-    });
-    const panier = Stations.registerStation(g.s.campaignStations, "panier", {
-      x: 0,
-      z: 0,
-    });
-    teach(rainelle, {
-      verbe,
-      poste: zone.id,
-      source: panier.id,
-      destination: panier.id,
-    });
-    assert.doesNotThrow(() => g.step(CYCLE * 2));
-    assert.equal(rainelle.job, null);
-  }
+test("the one remaining out-of-scope verb (preparer) never crashes and never starts a job", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+  });
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  teach(rainelle, {
+    verbe: "preparer",
+    poste: zone.id,
+    source: panier.id,
+    destination: panier.id,
+  });
+  assert.doesNotThrow(() => g.step(CYCLE * 2));
+  assert.equal(rainelle.job, null);
+});
+
+// Epic C7.26 (design §5, « Prendre les jeunes plants de {source} ; replanter les emplacements
+// vides de {poste}. »): a taught Rainelle actually replants, cycle after cycle, drawing from a
+// panier's young-plant stock (C7.23) into a destination zone (C7.20/C7.24/C7.25), never
+// consuming stock on a blocked destination.
+
+test("replanter: a full cycle with an available young plant and a free zone slot creates a new specimen, positioned at the zone, and withdraws exactly one unit of stock", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 12,
+    z: 7,
+    capacity: 3,
+  });
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  const deposit = Stations.depositYoungPlant(g.s, panier.id, cultivarId, 2);
+  assert.equal(deposit.ok, true, deposit.error);
+  g.s.campaignStations = deposit.registry;
+  const before = g.s.specimens.length;
+  teach(rainelle, {
+    verbe: "replanter",
+    poste: zone.id,
+    source: panier.id,
+    destination: "peu-importe",
+    condition: cultivarId,
+  });
+  g.step(CYCLE);
+  assert.equal(g.s.specimens.length, before + 1);
+  const created = g.s.specimens[g.s.specimens.length - 1];
+  assert.equal(created.cultivarId, cultivarId);
+  assert.equal(created.zoneId, zone.id);
+  assert.equal(created.zoneSlot, 0);
+  assert.equal(created.x, zone.x);
+  assert.equal(created.z, zone.z);
+  const savedPanier = g.s.campaignStations.paniers.find((p) => p.id === panier.id);
+  assert.equal(savedPanier.buffer[Stations.youngPlantKey(cultivarId)], 1);
+});
+
+test("replanter: an empty condition leaves the Rainelle inactive, never starting a job", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 3,
+  });
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  const deposit = Stations.depositYoungPlant(g.s, panier.id, cultivarId, 1);
+  g.s.campaignStations = deposit.registry;
+  const before = g.s.specimens.length;
+  teach(rainelle, {
+    verbe: "replanter",
+    poste: zone.id,
+    source: panier.id,
+    destination: "peu-importe",
+    condition: "",
+  });
+  assert.doesNotThrow(() => g.step(CYCLE * 2));
+  assert.equal(rainelle.job, null);
+  assert.equal(g.s.specimens.length, before);
+});
+
+test("replanter: an unknown poste/source id, or one of the wrong kind, leaves the Rainelle inactive without throwing", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 3,
+  });
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  teach(rainelle, {
+    verbe: "replanter",
+    poste: "inconnu",
+    source: panier.id,
+    destination: "peu-importe",
+    condition: cultivarId,
+  });
+  assert.doesNotThrow(() => g.step(CYCLE * 2));
+  assert.equal(rainelle.job, null);
+  teach(rainelle, {
+    verbe: "replanter",
+    poste: panier.id,
+    source: panier.id,
+    destination: "peu-importe",
+    condition: cultivarId,
+  });
+  assert.doesNotThrow(() => g.step(CYCLE * 2));
+  assert.equal(rainelle.job, null);
+  teach(rainelle, {
+    verbe: "replanter",
+    poste: zone.id,
+    source: "inconnu",
+    destination: "peu-importe",
+    condition: cultivarId,
+  });
+  assert.doesNotThrow(() => g.step(CYCLE * 2));
+  assert.equal(rainelle.job, null);
+});
+
+test("replanter: a full zone ends the cycle without creating a specimen and without touching the young-plant stock", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 1,
+  });
+  Cultivars.createSpecimen(g.s, { cultivarId, x: 0, z: 0 }).zoneId = zone.id;
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  const deposit = Stations.depositYoungPlant(g.s, panier.id, cultivarId, 1);
+  g.s.campaignStations = deposit.registry;
+  const before = g.s.specimens.length;
+  teach(rainelle, {
+    verbe: "replanter",
+    poste: zone.id,
+    source: panier.id,
+    destination: "peu-importe",
+    condition: cultivarId,
+  });
+  g.step(CYCLE);
+  assert.equal(g.s.specimens.length, before);
+  const savedPanier = g.s.campaignStations.paniers.find((p) => p.id === panier.id);
+  assert.equal(savedPanier.buffer[Stations.youngPlantKey(cultivarId)], 1);
+});
+
+test("replanter: a cultivar not on the zone's allowedCultivarIds ends the cycle without creating a specimen and without touching the young-plant stock", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 3,
+    allowedCultivarIds: ["autre-cultivar"],
+  });
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  const deposit = Stations.depositYoungPlant(g.s, panier.id, cultivarId, 1);
+  g.s.campaignStations = deposit.registry;
+  const before = g.s.specimens.length;
+  teach(rainelle, {
+    verbe: "replanter",
+    poste: zone.id,
+    source: panier.id,
+    destination: "peu-importe",
+    condition: cultivarId,
+  });
+  g.step(CYCLE);
+  assert.equal(g.s.specimens.length, before);
+  const savedPanier = g.s.campaignStations.paniers.find((p) => p.id === panier.id);
+  assert.equal(savedPanier.buffer[Stations.youngPlantKey(cultivarId)], 1);
+});
+
+test("replanter: a panier without stock under the expected key ends the cycle without creating a specimen", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 3,
+  });
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  const before = g.s.specimens.length;
+  teach(rainelle, {
+    verbe: "replanter",
+    poste: zone.id,
+    source: panier.id,
+    destination: "peu-importe",
+    condition: cultivarId,
+  });
+  g.step(CYCLE);
+  assert.equal(g.s.specimens.length, before);
+});
+
+test("replanter: two consecutive full cycles with at least two young plants in stock place two specimens in two distinct zone slots", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 3,
+  });
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  const deposit = Stations.depositYoungPlant(g.s, panier.id, cultivarId, 2);
+  g.s.campaignStations = deposit.registry;
+  teach(rainelle, {
+    verbe: "replanter",
+    poste: zone.id,
+    source: panier.id,
+    destination: "peu-importe",
+    condition: cultivarId,
+  });
+  g.step(CYCLE * 2);
+  const created = g.s.specimens.filter((sp) => sp.zoneId === zone.id);
+  assert.equal(created.length, 2);
+  assert.notEqual(created[0].zoneSlot, created[1].zoneSlot);
+  const savedPanier = g.s.campaignStations.paniers.find((p) => p.id === panier.id);
+  assert.equal(savedPanier.buffer[Stations.youngPlantKey(cultivarId)], undefined);
+});
+
+test("replanter: a real cycle's new specimen and the panier's remaining young-plant stock survive a JSON save/reload round trip", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 5,
+    z: 9,
+    capacity: 3,
+  });
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  const deposit = Stations.depositYoungPlant(g.s, panier.id, cultivarId, 2);
+  g.s.campaignStations = deposit.registry;
+  teach(rainelle, {
+    verbe: "replanter",
+    poste: zone.id,
+    source: panier.id,
+    destination: "peu-importe",
+    condition: cultivarId,
+  });
+  g.step(CYCLE);
+  const saved = g.serialize();
+  const reloaded = new GardenState(saved);
+  const created = reloaded.s.specimens.find((sp) => sp.zoneId === zone.id);
+  assert.ok(created);
+  assert.equal(created.cultivarId, cultivarId);
+  const savedPanier = reloaded.s.campaignStations.paniers.find((p) => p.id === panier.id);
+  assert.equal(savedPanier.buffer[Stations.youngPlantKey(cultivarId)], 1);
 });
 
 test("a save without rainelle.job or panier.buffer (pre-epic) migrates to correct defaults without error", () => {

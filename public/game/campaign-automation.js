@@ -20,13 +20,14 @@
    reimplemented against a different data space rather than imported, since automation.js's own
    functions read `D.recipes[e.type]` and would need an unrelated recipe entry to mean anything.
 
-   Verb scope: "arroser"/"recolter" (C2.6c), "transporter" (C2.7) and now "trier" (C7.6) are
-   implemented. The two remaining verbs a Rainelle can be taught (replanter/preparer, design §5's
-   own table) are validated as teachable since C2.4 but deliberately do nothing here — later
-   epics are where each gets its own tick behaviour. A taught-but-unimplemented verb is a silent
-   no-op, not an error: teaching it already succeeded (C2.4/C2.5), so a Rainelle just standing
-   idle is the correct, honest state until its epic lands — the readable "blocage" state a
-   player would actually see is C2.8's job, not this one's.
+   Verb scope: "arroser"/"recolter" (C2.6c), "transporter" (C2.7), "trier" (C7.6) and now
+   "replanter" (C7.26) are implemented. The one remaining verb a Rainelle can be taught
+   (préparer, design §5's own table) is validated as teachable since C2.4 but deliberately does
+   nothing here — a later epic is where it gets its own tick behaviour, once a recipe system for
+   it exists. A taught-but-unimplemented verb is a silent no-op, not an error: teaching it already
+   succeeded (C2.4/C2.5), so a Rainelle just standing idle is the correct, honest state until its
+   epic lands — the readable "blocage" state a player would actually see is C2.8's job, not this
+   one's.
 
    Failure posture: an invalid poste/source/destination (unknown id, or an id that resolves to
    the wrong kind of station — e.g. a `recolter`'s poste pointing at a panier instead of a zone)
@@ -378,6 +379,44 @@
     tickPanierMove(rainelle, s, () => [geste.condition]);
   }
 
+  // "Replanter" (design §5, « Prendre les jeunes plants de {source} ; replanter les emplacements
+  // vides de {poste}. » — PHRASE_BUILDERS.replanter, rainelles.js, since C2.4). `geste.poste` is
+  // the destination zone, `geste.source` the panier carrying the young-plant stock (C7.23),
+  // `geste.condition` the cultivarId to replant — mandatory in practice, same posture as
+  // tickTrier's mandatory condition: a panier can hold several distinct `jeune:<cultivarId>`
+  // keys at once (C7.23), so an empty condition is a silent no-op rather than an arbitrary pick
+  // among candidates. Never a lot bounded by a capacity like doRecolter — the design names no
+  // throughput for this gesture, one operation per completed cycle (one young plant withdrawn,
+  // one specimen created and placed).
+  //
+  // Epic C7.26: checks canPlaceCultivarInZone *before* any withdrawal, so a blocked destination
+  // (full zone, cultivar not on the zone's allow-list) never touches the young-plant stock —
+  // "un blocage arrête proprement la production, sans détruire le stock", exactly tickPanierMove's
+  // own principle already in use for transporter/trier. The new specimen is created at the zone's
+  // own position (`zone.x`/`zone.z`) — no zoneSlot-derived world position yet, deferred to a
+  // future rendering epic per C7.24's own note — then relocated into the zone via
+  // relocateSpecimen (its own `ok` is read back rather than assumed, though the pre-check above
+  // makes it always succeed in practice).
+  function tickReplanter(rainelle, s) {
+    const geste = rainelle.geste;
+    if (!geste.condition) return;
+    const zone = resolveKind(s, geste.poste, "zone");
+    const panier = resolveKind(s, geste.source, "panier");
+    if (!zone || !panier) return;
+    if (!advanceCycle(rainelle)) return;
+    if (!Cultivars.canPlaceCultivarInZone(s, geste.condition, geste.poste).ok) return;
+    const withdrawal = Stations.withdrawYoungPlant(s, geste.source, geste.condition, 1);
+    if (!withdrawal.ok) return;
+    s.campaignStations = withdrawal.registry;
+    const specimen = Cultivars.createSpecimen(s, {
+      cultivarId: geste.condition,
+      x: zone.x,
+      z: zone.z,
+    });
+    const relocated = Cultivars.relocateSpecimen(s, specimen.id, geste.poste);
+    if (relocated.ok) s.specimens = relocated.specimens;
+  }
+
   // One Rainelle, one tick. A null geste, or a verb this file doesn't implement yet (see header
   // comment), is a no-op — never an exception, never a silent mutation of `job`.
   function tickRainelle(rainelle, s) {
@@ -387,6 +426,7 @@
     else if (geste.verbe === "recolter") tickRecolter(rainelle, s);
     else if (geste.verbe === "transporter") tickTransporter(rainelle, s);
     else if (geste.verbe === "trier") tickTrier(rainelle, s);
+    else if (geste.verbe === "replanter") tickReplanter(rainelle, s);
   }
 
   // The smallest additive mechanism that gives "recolter" anything to ever collect: nothing else
