@@ -254,6 +254,42 @@ const TRANSPARENT_ALLOWLIST = [
         const habitat = Stations.registerStation(s.campaignStations, "habitat", { x: 241, z: 207, capacity: 2 });
         v.sync();
         window.__auditStationIds = { activeBorne: activeBorne.id, activeZone: activeZone.id, panier: panier.id, habitat: habitat.id };
+
+        // Epic C7.22 (docs/campagne-backlog.md): exercises the real relocateStation command
+        // (GardenState.command(), never a direct registry write) through this exact live-page
+        // scene graph — the render-flow.js sync() bug this epic fixes (a moved station's Group
+        // staying visually frozen at its registration position) only reproduces through the real
+        // wiring, not in isolation (already covered by tests/campaign-station-relocate-render.cjs
+        // for the pure sync-loop logic without a full browser page).
+        const groupBeforeMove = v.stationModels.get(activeBorne.id).group;
+        const sceneCountBeforeMove = v.scene.children.length;
+        // relocateStation validates its destination against the same -64..64 bound
+        // garden-state-validate.js already imposes on every station position at load time
+        // (campaign-stations.js's own relocateStation header) — unlike this audit's other
+        // synthetic stations, which are pushed straight into the registry (never through
+        // relocateStation) and so are never subject to that check themselves, this destination
+        // must be a real, legal in-bounds position for the command to succeed at all.
+        const relocateResult = window.GardenApp.game.command({ type: "relocateStation", id: activeBorne.id, x: 60, z: -55 });
+        v.sync();
+        const groupAfterMove = v.stationModels.get(activeBorne.id).group;
+        const Terrain = window.GardenTerrain;
+        window.__auditStationRelocate = {
+          commandSucceeded: relocateResult.ok === true,
+          sameGroupInstance: groupAfterMove === groupBeforeMove,
+          sceneCountUnchangedAfterMove: v.scene.children.length === sceneCountBeforeMove,
+          positionAfterMove: groupAfterMove.position.toArray(),
+          expectedPositionAfterMove: [60, Terrain.terrainHeight(60, -55), -55],
+        };
+        // A resync with no further change must be a true no-op: neither the position nor the
+        // scene's child count may move again (same "no-op unless a real change" discipline this
+        // epic's fix itself follows for priseFortDebit/veilleuse just below it in render-flow.js).
+        const positionBeforeNoopSync = groupAfterMove.position.toArray();
+        const sceneCountBeforeNoopSync = v.scene.children.length;
+        v.sync();
+        window.__auditStationRelocate.noopSyncUnchanged =
+          groupAfterMove === v.stationModels.get(activeBorne.id).group &&
+          JSON.stringify(groupAfterMove.position.toArray()) === JSON.stringify(positionBeforeNoopSync) &&
+          v.scene.children.length === sceneCountBeforeNoopSync;
       }
 
       // Epic C2.5v-b (docs/campagne-backlog.md): a "reviewing" teaching draft's real-world
@@ -722,6 +758,7 @@ const TRANSPARENT_ALLOWLIST = [
         materialCount: seen.size,
         wiring,
         stationWiring,
+        stationRelocate: window.__auditStationRelocate,
         teachingWiring,
         passageWiring,
         giftWiring,
@@ -745,6 +782,12 @@ const TRANSPARENT_ALLOWLIST = [
     assert.equal(audit.stationWiring.allInScene, true, "C5.13: a station Group was never added to the real scene");
     assert.equal(audit.stationWiring.borneActiveEmissive, 0.35, "C5.13: an active borne's bead is not emissive at the documented signal intensity");
     assert.equal(audit.stationWiring.zoneActiveEmissive, 0.35, "C5.13: an active zone's lamp is not emissive at the documented signal intensity");
+
+    assert.equal(audit.stationRelocate.commandSucceeded, true, "C7.22: the real relocateStation command must have succeeded (in-bounds destination)");
+    assert.equal(audit.stationRelocate.sameGroupInstance, true, "C7.22: relocateStation must reposition the existing Group, never rebuild it");
+    assert.equal(audit.stationRelocate.sceneCountUnchangedAfterMove, true, "C7.22: relocateStation must never add/remove a scene child, only move one");
+    assert.deepEqual(audit.stationRelocate.positionAfterMove, audit.stationRelocate.expectedPositionAfterMove, "C7.22: the relocated station's Group must sit at (x, terrainHeight(x,z), z) after resync");
+    assert.equal(audit.stationRelocate.noopSyncUnchanged, true, "C7.22: a resync with no further change must not move the Group or touch the scene graph again");
 
     assert.equal(audit.teachingWiring.found, true, "C2.5v-b: sync() never built the teaching trajectory overlay Group");
     assert.equal(audit.teachingWiring.inScene, true, "C2.5v-b: the trajectory overlay Group was never added to the real scene");

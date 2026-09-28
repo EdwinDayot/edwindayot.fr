@@ -297,6 +297,13 @@
          `window.GardenRenderCampaignStations` inside render-flow.js's sync(), so its only load-time
          requirement is loading after /vendor/three.min.js, same as those two sibling modules. -->
     <script src="/game/render-campaign-stations.js" defer></script>
+    <!-- Epic C7.22: the stations registry sync loop itself, extracted from render-flow.js's
+         sync() into its own Node-testable module (same reasoning as render-rainelles.js/
+         render-specimens.js below) — self-contained beyond THREE, terrain.js and
+         render-campaign-stations.js just above, read lazily as `window.GardenRenderStationsSync`
+         inside render-flow.js's sync(), so its only load-time requirement is loading after those
+         three. -->
+    <script src="/game/render-stations-sync.js" defer></script>
     <!-- Epic C2.5v-b: the "reviewing" teaching draft's real-world trajectory overlay, same
          self-contained-beyond-THREE posture as render-campaign-stations.js just above — read
          lazily as `window.GardenRenderCampaignTeaching` inside render-flow.js's sync(), so its
