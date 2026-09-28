@@ -865,6 +865,22 @@
           )
         )
           throw Error("Registre de stations invalide.");
+        // Epic C7.25: allowedCultivarIds is optional (a pre-epic zone, or one registered without
+        // it, stays exactly as open to any cultivar as before — see cultivars.js's own
+        // canRelocateSpecimen comment); when present, it must be an array of strings, same gabarit
+        // as a cultivar's own parentIds check above. No referential check against s.cultivars: a
+        // zone can legitimately be registered before any cultivar exists yet, same reasoning as
+        // a specimen's zoneId not requiring the zone to already exist.
+        if (
+          kind === "zone" &&
+          list.some(
+            (st) =>
+              st.allowedCultivarIds !== undefined &&
+              (!Array.isArray(st.allowedCultivarIds) ||
+                st.allowedCultivarIds.some((id) => typeof id !== "string")),
+          )
+        )
+          throw Error("Registre de stations invalide.");
         // Epic C5.4: priseFortDebit is optional so a pre-epic borne still loads (defaulted to
         // false below, same posture as a zone's veilleuse at C5.2); when present, it must be a
         // real boolean, never a truthy stand-in.

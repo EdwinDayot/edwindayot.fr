@@ -164,6 +164,80 @@ test("canRelocateSpecimen refuses a zone already at capacity, allows re-targetin
   assert.equal(Cultivars.canRelocateSpecimen(g.s, sp1.id, zone.id).ok, true);
 });
 
+// Epic C7.25 (design §5, "Replanter... respecte l'étiquette de cultivar ou la famille
+// autorisée" — this epic isolates the cultivar-label half only, see this function's own comment
+// for why "famille" stays out of scope).
+
+test("canRelocateSpecimen refuses a specimen whose cultivar isn't in the zone's allowedCultivarIds, naming both", () => {
+  const g = new GardenState(null, 1000);
+  const cvAllowed = makeCultivar(g);
+  const cvOther = makeCultivar(g);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 2,
+    allowedCultivarIds: [cvAllowed.id],
+  });
+  const spAllowed = Cultivars.createSpecimen(g.s, { cultivarId: cvAllowed.id, x: 0, z: 0 });
+  const spOther = Cultivars.createSpecimen(g.s, { cultivarId: cvOther.id, x: 0, z: 0 });
+
+  assert.equal(Cultivars.canRelocateSpecimen(g.s, spAllowed.id, zone.id).ok, true);
+  const refused = Cultivars.canRelocateSpecimen(g.s, spOther.id, zone.id);
+  assert.equal(refused.ok, false);
+  assert.match(refused.error, new RegExp(cvOther.id));
+  assert.match(refused.error, new RegExp(zone.id));
+});
+
+test("canRelocateSpecimen stays open to any cultivar when allowedCultivarIds is absent or empty (no regression)", () => {
+  const g = new GardenState(null, 1000);
+  const cv = makeCultivar(g);
+  const sp = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 0, z: 0 });
+  const bareZone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 1,
+  });
+  const emptyListZone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 1,
+    z: 1,
+    capacity: 1,
+    allowedCultivarIds: [],
+  });
+  assert.equal(Cultivars.canRelocateSpecimen(g.s, sp.id, bareZone.id).ok, true);
+  assert.equal(Cultivars.canRelocateSpecimen(g.s, sp.id, emptyListZone.id).ok, true);
+});
+
+test("relocateSpecimen propagates the allowedCultivarIds refusal from canRelocateSpecimen without duplicating the rule", () => {
+  const g = new GardenState(null, 1000);
+  const cvAllowed = makeCultivar(g);
+  const cvOther = makeCultivar(g);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 2,
+    allowedCultivarIds: [cvAllowed.id],
+  });
+  const spOther = Cultivars.createSpecimen(g.s, { cultivarId: cvOther.id, x: 0, z: 0 });
+  const before = JSON.stringify(g.s.specimens);
+  const result = Cultivars.relocateSpecimen(g.s, spOther.id, zone.id);
+  assert.equal(result.ok, false);
+  assert.match(result.error, new RegExp(cvOther.id));
+  assert.equal(JSON.stringify(g.s.specimens), before, "a refusal never mutates anything");
+});
+
+test("a round-trip through GardenState JSON save/load preserves a zone's allowedCultivarIds", () => {
+  const g = new GardenState(null, 1000);
+  const cv = makeCultivar(g);
+  Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 1,
+    allowedCultivarIds: [cv.id],
+  });
+  const reloaded = new GardenState(JSON.parse(JSON.stringify(g.serialize())), 1000);
+  assert.deepEqual(reloaded.s.campaignStations.zones[0].allowedCultivarIds, [cv.id]);
+});
+
 test("relocateSpecimen moves a specimen into a zone with room, leaves every other specimen strictly unchanged", () => {
   const g = new GardenState(null, 1000);
   const cv = makeCultivar(g);

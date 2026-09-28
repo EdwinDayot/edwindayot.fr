@@ -78,7 +78,7 @@
   // get it — a borne/zone never holds produce — set at creation here rather than defaulted
   // globally in garden-state-lifecycle.js, the same "the factory sets its own new field" posture
   // C2.6b used for a specimen's moistureAt/readyToProduce (see cultivars.js's own header comment).
-  function registerStation(registry, kind, { x, z, capacity }) {
+  function registerStation(registry, kind, { x, z, capacity, allowedCultivarIds }) {
     const def = KINDS[kind];
     if (!def) throw Error(`Type de station inconnu : "${kind}".`);
     const station = { id: `${def.prefix}${registry[def.counter]++}`, x, z };
@@ -104,6 +104,18 @@
           `Capacité de zone invalide (minimum ${MIN_ZONE_CAPACITY}) : ${capacity}.`,
         );
       station.capacity = capacity;
+    }
+    // Epic C7.25 (design §5, "Replanter... respecte l'étiquette de cultivar ou la famille
+    // autorisée" — this epic isolates the cultivar-label half only, see cultivars.js's own
+    // canRelocateSpecimen comment for why "famille" stays out of scope). Optional, like capacity
+    // just above: most existing zone fixtures never pass it, and a zone without it stays exactly
+    // as open to any cultivar as before this epic (no empty array invented as a default — an
+    // empty array and an absent field both mean "no restriction", but only the caller's own
+    // choice is ever stored, never guessed here). Posed as-is, never validated against
+    // s.cultivars: a zone can legitimately be registered before any cultivar exists yet, the same
+    // reasoning already applied to a specimen's zoneId not requiring the zone to exist first.
+    if (kind === "zone" && allowedCultivarIds !== undefined) {
+      station.allowedCultivarIds = allowedCultivarIds;
     }
     // Epic C6.26 (design §11, third intensification lever, "extension standardisée sur un espace
     // vivant") : only a zone can carry this flag — a borne/panier is never itself the thing

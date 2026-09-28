@@ -220,6 +220,21 @@
     const alreadyThere = specimen.zoneId === zoneId;
     if (!alreadyThere && zoneOccupancy(s, zoneId) >= zone.capacity)
       return { ok: false, error: `La zone "${zoneId}" est pleine (capacité ${zone.capacity}).` };
+    // Epic C7.25 (design §5, "Replanter... respecte l'étiquette de cultivar ou la famille
+    // autorisée"): isolates the cultivar-label half only — no notion of "famille" exists anywhere
+    // in the schema today (see campagne-backlog.md's C7.25 entry for why inventing one here would
+    // be a separate, undecided design choice). A zone with no allowedCultivarIds, or an empty
+    // one, stays open to any cultivar exactly as before this epic (no regression on the dozens of
+    // zone fixtures already registered without it).
+    if (
+      zone.allowedCultivarIds &&
+      zone.allowedCultivarIds.length &&
+      !zone.allowedCultivarIds.includes(specimen.cultivarId)
+    )
+      return {
+        ok: false,
+        error: `Le cultivar "${specimen.cultivarId}" n'est pas autorisé dans la zone "${zoneId}".`,
+      };
     return { ok: true };
   }
   // Epic C7.24: the smallest zoneSlot in [0, capacity) not already claimed by a specimen of

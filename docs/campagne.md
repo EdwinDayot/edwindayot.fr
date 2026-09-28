@@ -4926,4 +4926,45 @@ Aucun choix déjà confirmé du design remis en cause. Aucun choix déjà fixé 
 
 Aucun code ni test modifié ce déclenchement — travail de planification seul dans `docs/campagne-backlog.md`, comme prescrit par `orchestration.md`/`execution-continue.md` pour ce cas.
 
+## Déclenchement automatisé du 28 septembre 2026 — Epic C7.25 : étiquette de cultivar, liste d'autorisation d'une zone pour la relocalisation
+
+**Vérification anti-hallucination faite avant tout le reste, réellement exécutée.** `HEAD` détaché au démarrage du conteneur sur `ffdbe2c` (fusion de la phase 6, ancêtre confirmé d'`origin/main` via `git fetch origin main && git merge-base --is-ancestor ffdbe2c origin/main` → vrai) ; `git checkout maison-des-possibles` a créé la branche locale depuis `origin/maison-des-possibles` (absente localement), déjà à jour, arbre de travail propre. Dernier epic « fait » du backlog : **C7.24**, commit `8197087cf1c27ed424f6eabf952919eea8eaf056` — `git show --stat 8197087` confirme un commit réel dont le message correspond exactement à l'entrée déjà existante du backlog et de ce changelog. `npm ci && npm test` relancés indépendamment avant tout nouveau travail → **1057/1057**, zéro échec, identique au rapport déjà consigné. Aucun bandeau de pause en tête de `docs/campagne-backlog.md` (première ligne vérifiée). Aucun epic `bloqué` dans tout le backlog (`grep -c "^Statut : bloqué" docs/campagne-backlog.md` → 0) : aucune pause anti-emballement à déclencher. `docs/campagne-anomalies.md` relu (une seule entrée : fusion de la phase 6 non poussée vers `origin/main`) — revérifiée réellement résolue par le `git fetch` de ce déclenchement lui-même, aucune action requise.
+
+**Choix de l'epic.** **C7.25** (dépendances C7.20/C7.24, toutes deux `fait`) était l'unique epic détaillé `todo` à dépendances satisfaites de tout le backlog, déjà entièrement détaillé par le lot Cartographe du déclenchement précédent (voir son entrée juste au-dessus) — aucun nouveau passage Cartographe nécessaire ici.
+
+**Implémentation (Artisan moteur, orchestrateur direct, aucune délégation — epic de schéma/validation pur, sans rendu ni narration, mandat déjà complètement écrit par le lot Cartographe précédent) : exactement les fichiers probables, aucun écart au-delà de ceux déjà tranchés par le mandat.**
+
+1. `public/game/campaign-stations.js` : `registerStation(registry, kind, { x, z, capacity, allowedCultivarIds })` — quatrième paramètre optionnel, posé tel quel sur la station uniquement quand `kind === "zone"` et `allowedCultivarIds !== undefined` ; absent sinon, jamais un tableau vide inventé (même discipline que `capacity` à C7.20). Aucune autre branche (`borne`/`panier`/`habitat`) n'y touche.
+2. `public/game/cultivars.js` : `canRelocateSpecimen` étendu (jamais une seconde fonction) — après les refus déjà existants (spécimen inconnu, zone inconnue, zone sans capacité, zone pleine), un nouveau refus quand `zone.allowedCultivarIds` est défini et non vide et que `specimen.cultivarId` n'y figure pas, avec un message explicite nommant le cultivar et la zone. `relocateSpecimen` n'a reçu aucune modification : il hérite du nouveau refus en rejouant `canRelocateSpecimen` comme il le fait déjà (vérifié par lecture directe avant et après l'edit — le corps de la fonction est resté identique au-delà de ce qu'elle appelle).
+3. `public/garden-state-validate.js` : nouveau contrôle dans le bloc station (`kind === "zone"`), inséré juste après le contrôle de cohérence occupation/capacité de C7.21 et avant le contrôle `priseFortDebit` — `allowedCultivarIds` optionnel ; quand présent, doit être un tableau dont chaque élément est une chaîne, même gabarit exact que le contrôle déjà existant de `c.parentIds` sur un cultivar (ligne ~352). Aucune vérification référentielle contre `s.cultivars` (une zone peut légitimement être enregistrée avant qu'aucun cultivar n'existe encore). Aucune migration ajoutée : un champ absent reste absent, comportement strictement identique à avant cet epic — vérifié en confirmant qu'aucune ligne du bloc de migration (`result.campaignStations.zones = ...`) n'a été touchée.
+4. `tests/campaign-stations.cjs` (5 nouveaux tests, étendu, jamais un nouveau fichier) : pose du champ absent par défaut (`"allowedCultivarIds" in zone` faux) ; pose telle quelle y compris un tableau vide ; `validate()` refuse une valeur non-tableau et un tableau contenant un élément non-chaîne ; `validate()` accepte absent/vide/peuplé ; une zone pré-epic (champ supprimé puis rechargée via `GardenState`) migre sans erreur et sans le champ.
+5. `tests/campaign-cultivars.cjs` (4 nouveaux tests, étendu) : `canRelocateSpecimen` refuse un spécimen dont le cultivar n'est pas dans `allowedCultivarIds` d'une zone, message vérifié nommant le cultivar et la zone (regex sur les deux identifiants) ; `canRelocateSpecimen` reste ouvert à tout cultivar quand `allowedCultivarIds` est absent ou vide (non-régression explicite sur le comportement C7.20/C7.24 déjà testé) ; `relocateSpecimen` propage le même refus sans dupliquer la règle, et ne mute rien en cas de refus (vérifié par comparaison JSON avant/après) ; round-trip JSON via `GardenState` (nouvelle instance depuis `JSON.parse(JSON.stringify(g.serialize()))`) préserve `allowedCultivarIds`.
+
+**Vérification programmatique : aucune géométrie/matériau/interface touchée, confirmé par exécution, pas supposé.** `git status --short` avant commit → exactement cinq chemins modifiés (`public/game/campaign-stations.js`, `public/game/cultivars.js`, `public/garden-state-validate.js`, `tests/campaign-cultivars.cjs`, `tests/campaign-stations.cjs`), aucun fichier de rendu, `public/index.html` inchangé. `tests/garden-material-audit.cjs`/`npm run test:browser`/`test:visual` non concernés, même exemption explicitement anticipée par le mandat Cartographe et déjà appliquée à C7.19/C7.20/C7.21/C7.23/C7.24.
+
+**Suite Node complète** : `npm ci && npm test` → **1066/1066** (1057 existants + 9 nouveaux : 5 dans `campaign-stations.cjs`, 4 dans `campaign-cultivars.cjs`), zéro régression. Sortie de fin :
+
+```
+1..1066
+# tests 1066
+# suites 0
+# pass 1066
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+```
+
+`/code-review` (niveau medium, skill `code-review`) exécuté sur le diff complet : aucun défaut relevé — logique cohérente sur absent/vide traité comme « aucune restriction » à travers les trois fichiers de code, `zoneFreeSlot`/`relocateSpecimen` confirmés appeler `canRelocateSpecimen` en premier donc le nouveau refus est bien exercé par le chemin réel, aucune convention CLAUDE.md/AGENTS.md violée (l'AGENTS.md du dépôt porte sur le site portfolio Nginx/Docker, sans rapport avec ce code de jeu).
+
+Ne ferme aucune porte de phase (la phase 7 reste ouverte : ni saisons, ni catalogue décoratif en position, ni tactile, ni performances mesurées sur appareils de référence).
+
+Aucun choix déjà confirmé du design remis en cause (Alma vivante, nom des Rainelles, culpabilisation de fin de campagne). Aucun choix déjà fixé de `direction-artistique.md` concerné (aucun rendu). La brique « famille de cultivar » (design §5, alternative à l'étiquette de cultivar) reste explicitement hors périmètre, comme documenté par le lot Cartographe qui a détaillé cet epic — non devinée ici.
+
+`docs/campagne-backlog.md` mis à jour : C7.25 passe à `fait`, détail des fichiers/tests/résultat consigné dans son propre statut.
+
+**Pour le prochain déclenchement** : plus aucun epic détaillé `todo` à dépendance satisfaite ne reste (les quatre entrées historiques C2.5v/C2.6/C2.8v/C2.8v-b restent non actionnables, situation inchangée). Un futur déclenchement devra endosser le rôle Cartographe pour détailler un vingt-sixième lot de la phase 7. Le geste `Replanter` a maintenant toutes ses briques moteur posées séparément (`zoneId`/`zoneSlot`/`relocateSpecimen` à C7.20/C7.24, la ressource « jeune plant » à C7.23, l'étiquette de cultivar à cet epic) mais rien ne les relie encore à une création réelle de spécimen depuis un panier ni à un branchement `campagne-automation.js`/`tickRainelle` — un futur lot Cartographe devra détailler ce branchement comme son propre epic plutôt que de l'improviser ici.
+
+Commit : voir `git log` sur `maison-des-possibles` (message « Epic C7.25 : étiquette de cultivar, liste d'autorisation d'une zone pour la relocalisation »). `git push origin maison-des-possibles` à confirmer par `git ls-remote origin` avant conclusion de ce déclenchement.
+
 Commit : voir `git log` sur `maison-des-possibles` (message « Cartographe : vingt-cinquième lot de la phase 7, étiquette de cultivar sur une zone (C7.25) »). `git push origin maison-des-possibles` à confirmer par `git ls-remote origin` avant conclusion de ce déclenchement.

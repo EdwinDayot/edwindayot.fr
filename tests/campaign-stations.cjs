@@ -858,3 +858,68 @@ test("a depositYoungPlant round-trip through GardenState.command()'s JSON save/l
   const reloadedPanier = reloaded.s.campaignStations.paniers.find((p) => p.id === panier.id);
   assert.equal(reloadedPanier.buffer[Stations.youngPlantKey(cv1.id)], 4);
 });
+
+// Epic C7.25 (design §5, "Replanter... respecte l'étiquette de cultivar ou la famille
+// autorisée" — this epic isolates the cultivar-label half only, see cultivars.js's own
+// canRelocateSpecimen for the actual refusal, tested in tests/campaign-cultivars.cjs). Here:
+// registerStation poses the field as-is, and validate() accepts/rejects its shape.
+
+test("registerStation('zone', ...) with no allowedCultivarIds does not carry the field at all", () => {
+  const g = new GardenState(null, 1000);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", { x: 0, z: 0 });
+  assert.equal("allowedCultivarIds" in zone, false);
+});
+
+test("registerStation('zone', ...) poses allowedCultivarIds exactly as given, including an empty array", () => {
+  const g = new GardenState(null, 1000);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    allowedCultivarIds: ["c1", "c4"],
+  });
+  assert.deepEqual(zone.allowedCultivarIds, ["c1", "c4"]);
+
+  const zoneEmpty = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 1,
+    z: 1,
+    allowedCultivarIds: [],
+  });
+  assert.deepEqual(zoneEmpty.allowedCultivarIds, []);
+});
+
+test("validate() rejects a zone's allowedCultivarIds that isn't an array, or that contains a non-string", () => {
+  const g = new GardenState(null, 1000);
+  Stations.registerStation(g.s.campaignStations, "zone", { x: 0, z: 0 });
+  const notArray = g.serialize();
+  notArray.campaignStations.zones[0].allowedCultivarIds = "c1";
+  assert.throws(() => validate(notArray), /Registre de stations invalide/);
+
+  const badElement = g.serialize();
+  badElement.campaignStations.zones[0].allowedCultivarIds = ["c1", 4];
+  assert.throws(() => validate(badElement), /Registre de stations invalide/);
+});
+
+test("validate() accepts a zone's allowedCultivarIds when absent, empty, or a real array of strings", () => {
+  const g = new GardenState(null, 1000);
+  Stations.registerStation(g.s.campaignStations, "zone", { x: 0, z: 0 });
+  const absent = g.serialize();
+  assert.equal("allowedCultivarIds" in absent.campaignStations.zones[0], false);
+  assert.doesNotThrow(() => validate(absent));
+
+  const empty = g.serialize();
+  empty.campaignStations.zones[0].allowedCultivarIds = [];
+  assert.doesNotThrow(() => validate(empty));
+
+  const populated = g.serialize();
+  populated.campaignStations.zones[0].allowedCultivarIds = ["c1", "c4"];
+  assert.doesNotThrow(() => validate(populated));
+});
+
+test("a pre-C7.25 zone (no allowedCultivarIds field at all) migrates and loads without error", () => {
+  const g = new GardenState(null, 1000);
+  Stations.registerStation(g.s.campaignStations, "zone", { x: 0, z: 0, capacity: 2 });
+  const saved = g.serialize();
+  delete saved.campaignStations.zones[0].allowedCultivarIds;
+  const reloaded = new GardenState(JSON.parse(JSON.stringify(saved)), 1000);
+  assert.equal("allowedCultivarIds" in reloaded.s.campaignStations.zones[0], false);
+});
