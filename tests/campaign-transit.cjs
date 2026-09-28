@@ -8,7 +8,7 @@
 // tests/campaign-automation.cjs already re-proves every pre-existing "transporter" budget/filter
 // test with the extra TRANSIT_TICKS wait folded in — this file is only about the transit window
 // itself: exact timing, survival across a JSON reload, the "one trajet at a time" contract, a
-// gesture change mid-flight, and the silent loss C2.8v-b still has to close.
+// gesture change mid-flight, and (test 6, updated by C2.8v-b) the vanished-destination rescue.
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { GardenState } = require("./garden-rules-helpers.cjs");
@@ -182,7 +182,7 @@ test("5: re-teaching the Rainelle to a different gesture mid-transit does not pr
   assert.equal(rainelle.geste.verbe, "arroser", "the new gesture itself is untouched by the delivery");
 });
 
-test("6: the destination vanishing mid-transit (removeStation) loses the carried quantity silently — the exact gap C2.8v-b is left to close", () => {
+test("6 (C2.8v-b): the destination vanishing mid-transit (removeStation) rescues the carried quantity into campaignRescueBin instead of losing it", () => {
   const g = new GardenState(null, 1000);
   const { rainelle, cultivarId, from, to } = setUpTransporter(g);
 
@@ -200,12 +200,13 @@ test("6: the destination vanishing mid-transit (removeStation) loses the carried
     false,
     "the destination is really gone from the registry",
   );
+  assert.equal(g.s.campaignRescueBin[cultivarId], undefined, "not rescued before the delivery is even due");
 
   g.step(TRANSIT);
-  // The gap this epic makes observable, not yet closes: destinationId no longer resolves at all,
-  // so resolveCarrying's own "landed on a panier" branch never runs — the quantity is not
-  // rerouted anywhere, it simply never appears again. Nothing in this repository's state holds
-  // it: not the (now-deleted) old destination, not `from` (it never returns there), nothing.
+  // C7.30 left this observable but unclosed; C2.8v-b closes it: destinationId no longer resolves
+  // to a panier, so resolveCarrying's "landed on a panier" branch never runs — but the quantity
+  // now joins campaignRescueBin instead of vanishing. Nothing in any panier's buffer holds it
+  // (neither the now-deleted destination nor `from`, which never returns there).
   assert.equal(rainelle.carrying, null, "the in-flight record itself is still cleared on schedule");
   assert.equal(
     g.s.campaignStations.paniers.reduce(
@@ -213,7 +214,12 @@ test("6: the destination vanishing mid-transit (removeStation) loses the carried
       0,
     ),
     0,
-    `all ${carriedQty} carried units are gone from every panier in the registry — silently lost, exactly the gap C2.8v-b exists to close`,
+    "no panier in the registry ever receives the rescued quantity",
+  );
+  assert.equal(
+    g.s.campaignRescueBin[cultivarId],
+    carriedQty,
+    `all ${carriedQty} carried units land in the rescue bin instead of being lost`,
   );
 });
 
@@ -278,4 +284,64 @@ test("7 (/code-review finding, fixed before commit): two Rainelles racing for th
   g.step(1);
   assert.equal(to.buffer[cultivarId], 10, "both deliveries land, exactly filling — never overflowing — the shared destination");
   assert.equal(Stations.panierTotal(to), 10);
+});
+
+test("8 (C2.8v-b): a rescued quantity survives a real JSON round-trip through garden-state-validate.js", () => {
+  const g = new GardenState(null, 1000);
+  const { rainelle, cultivarId, to } = setUpTransporter(g);
+
+  g.step(CYCLE);
+  assert.ok(rainelle.carrying, "cargo is in flight");
+  const carriedQty = rainelle.carrying.qty;
+  assert.equal(g.command({ type: "removeStation", id: to.id }).ok, true);
+  g.step(TRANSIT);
+  assert.equal(g.s.campaignRescueBin[cultivarId], carriedQty, "rescued before the reload");
+
+  const reloaded = new GardenState(JSON.parse(JSON.stringify(g.serialize())));
+  assert.equal(
+    reloaded.s.campaignRescueBin[cultivarId],
+    carriedQty,
+    "garden-state-validate.js accepts and preserves the rescued quantity across a real reload",
+  );
+});
+
+test("9 (C2.8v-b): two separate rescues of the same resource accumulate in campaignRescueBin, never overwrite each other", () => {
+  const g = new GardenState(null, 1000);
+  const rainelleA = bornRainelle(g);
+  const cultivarId = rainelleA.cultivarId;
+  const rainelleB = Rainelles.createRainelle(g.s, { cultivarId, name: "Seconde transporteuse" });
+
+  const fromA = Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+  const fromB = Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+  const toA = Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+  const toB = Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+  fromA.buffer[cultivarId] = 4;
+  fromB.buffer[cultivarId] = 6;
+
+  teach(g, rainelleA, {
+    verbe: "transporter",
+    poste: "peu-importe",
+    source: fromA.id,
+    destination: toA.id,
+    condition: cultivarId,
+  });
+  teach(g, rainelleB, {
+    verbe: "transporter",
+    poste: "peu-importe",
+    source: fromB.id,
+    destination: toB.id,
+    condition: cultivarId,
+  });
+
+  g.step(CYCLE);
+  assert.ok(rainelleA.carrying && rainelleB.carrying, "both in flight");
+  assert.equal(g.command({ type: "removeStation", id: toA.id }).ok, true);
+  assert.equal(g.command({ type: "removeStation", id: toB.id }).ok, true);
+
+  g.step(TRANSIT);
+  assert.equal(
+    g.s.campaignRescueBin[cultivarId],
+    10,
+    "both rescues land under the same resource key, summed rather than one overwriting the other",
+  );
 });

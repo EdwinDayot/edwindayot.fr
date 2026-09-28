@@ -416,6 +416,24 @@
         !count(s.campaignSeedBox.retrievals))
     )
       throw Error("Boîte de semences invalide.");
+    // Epic C2.8v-b (design §5, "la réservation est libérée et la ressource déjà portée rejoint
+    // un bac de secours identifié"): an item-id -> qty buffer, same shape and same three accepted
+    // key shapes as a panier's own buffer (checked again, further below) — duplicated here rather
+    // than shared, same soft-sync posture already used for the panier buffer check itself.
+    // Deliberately validated as a top-level field, not inside campaignStations: resolveCarrying
+    // (campaign-automation.js) is its only writer, and nothing ever registers or removes it.
+    if (
+      s.campaignRescueBin !== undefined &&
+      (typeof s.campaignRescueBin !== "object" ||
+        s.campaignRescueBin === null ||
+        Object.entries(s.campaignRescueBin).some(([key, qty]) => {
+          if (key === "substrat") return !count(qty);
+          const youngCultivarId = Stations.cultivarIdOfYoungPlantKey(key);
+          const cultivarId = youngCultivarId !== null ? youngCultivarId : key;
+          return !s.cultivars?.some((c) => c.id === cultivarId) || !count(qty);
+        }))
+    )
+      throw Error("Bac de secours invalide.");
     // Epic C6.12: blocked, same shape discipline as campaignSeedBox.seeded above. Epic C6.13 adds
     // x/z, the passage's fixed point on the shared 0.5-unit navigation grid (campaign-passage.js's
     // PASSAGE_POSITION) — same finite+grid-alignment check already applied to entities just above,
@@ -1140,6 +1158,7 @@
     result.cultivarNextId ??= 1;
     result.campaignPot ??= { capacity: 1, pending: [] };
     result.campaignSeedBox ??= { seeded: false, cultivarId: null, retrievals: 0 };
+    result.campaignRescueBin ??= {};
     // Epic C2.6b: moistureAt/readyToProduce migrate per specimen, not just the array as a whole
     // — a pre-epic specimen only lacks these two fields, defaulted here rather than left
     // undefined so specimenMoisture/setReadyToProduce always see a well-formed specimen.

@@ -158,6 +158,13 @@
         habitats: [],
         habitatNextId: 1,
       },
+      // Epic C2.8v-b (design §5, "si la cible disparaît, la réservation est libérée et la
+      // ressource déjà portée rejoint un bac de secours identifié"): a plain item-id -> qty
+      // buffer, same shape as a panier's own buffer (C2.6c), but deliberately kept outside
+      // campaignStations — it is never registered by registerStation and therefore never a
+      // removeStation target, so a delivery rescued here can never itself vanish the same way
+      // again. Empty on a fresh save; resolveCarrying (campaign-automation.js) is the only writer.
+      campaignRescueBin: {},
       // Epic C3.1: the refuge house's six named spaces (design §6), delabre/locked by default
       // except the reception room (locked: false, still delabre — see campaign-house.js's own
       // header comment for why unlocked and repaired are kept distinct).

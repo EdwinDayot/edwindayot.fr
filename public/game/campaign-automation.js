@@ -77,9 +77,13 @@
    portée rejoint un bac de secours identifié") gives "transporter" alone (never "trier" — see
    tickTransporter's own comment) a real, observable transit window: a withdrawal now rides on
    `rainelle.carrying = {key, qty, destinationId, ticksRemaining}` for TRANSIT_TICKS before it
-   lands, resolved every tick by resolveCarrying regardless of the Rainelle's current geste. The
-   rescue itself (a vanished destination's cargo reaching a bac de secours) stays unbuilt — this
-   epic only makes the loss observable, the prerequisite C2.8v-b needed and didn't have until now.
+   lands, resolved every tick by resolveCarrying regardless of the Rainelle's current geste. C7.30
+   itself only made the loss observable, leaving the rescue unbuilt for its own prerequisite,
+   C2.8v-b.
+
+   Epic C2.8v-b closes that gap: resolveCarrying now deposits into `s.campaignRescueBin` (a plain
+   state field, garden-state-lifecycle.js) whenever a transit's destination no longer resolves to
+   a panier at delivery time — never lost, never a second removable station to lose it from again.
    runNightWork is untouched: it never calls tickRainelle/resolveCarrying at all (a resolved night
    has no per-second tick to resolve one through), so a carry in flight simply doesn't advance
    during sleep — a direct consequence of the existing day/night split, not a new rule invented
@@ -488,11 +492,17 @@
   // reference can go stale. Landing on a panier deposits the full quantity without re-checking
   // that panier's capacity (deliberately: the budget was already fixed for good at withdrawal,
   // see tickTransporter's own comment — "conserver les ressources", never "refuser un dépôt déjà
-  // réservé"). Landing on anything else — no station resolves at all (removed via removeStation
-  // while in flight) or one of the wrong kind — loses the quantity silently: exactly the gap
-  // design §5 names ("la réservation est libérée et la ressource déjà portée rejoint un bac de
-  // secours identifié") and that this epic deliberately leaves open, observed but not closed, for
-  // C2.8v-b.
+  // réservé").
+  //
+  // Epic C2.8v-b closes the gap C7.30 deliberately left open: landing on anything else — no
+  // station resolves at all (removed via removeStation while in flight) or one of the wrong
+  // kind (never actually reachable today, since a destinationId's kind never changes once
+  // taught, but handled identically rather than assumed impossible) — no longer loses the
+  // quantity. It joins `s.campaignRescueBin` instead (design §5, "la réservation est libérée et
+  // la ressource déjà portée rejoint un bac de secours identifié"), the same item-id -> qty
+  // shape as a panier's own buffer, but a plain state field rather than a station: it is never
+  // registered through campaign-stations.js and therefore never itself a removeStation target,
+  // so a rescued delivery can never vanish silently a second time.
   function resolveCarrying(rainelle, s) {
     const carrying = rainelle.carrying;
     if (!carrying) return;
@@ -502,6 +512,9 @@
     if (resolved.ok && resolved.kind === "panier") {
       const panier = resolved.station;
       panier.buffer[carrying.key] = (panier.buffer[carrying.key] || 0) + carrying.qty;
+    } else {
+      s.campaignRescueBin[carrying.key] =
+        (s.campaignRescueBin[carrying.key] || 0) + carrying.qty;
     }
     rainelle.carrying = null;
   }
