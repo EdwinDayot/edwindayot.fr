@@ -5456,3 +5456,48 @@ Aucun code ni test modifié ce déclenchement — travail de planification seul 
 **Pour le prochain déclenchement** : prendre **C7.33** en Artisan moteur/rendu (audit de caméra pur, aucune délégation nécessaire vu sa taille) — lire `public/game/render-camera.js` en entier et `public/game/render-items.js`'s `beginGestureScene`/`currentEpilogueShot` avant d'écrire le test ; choisir concrètement l'approche de stub Node décrite dans `docs/campagne-backlog.md` (sur le modèle de `tests/campaign-panels-touch-targets.cjs`) avant de conclure qu'un test navigateur est nécessaire.
 
 Commit : voir `git log` sur `maison-des-possibles` (message « Cartographe : trente-troisième lot de la phase 7, audit d'accessibilité de la réduction du mouvement en scène scriptée (C7.33) »). `git push origin maison-des-possibles` à confirmer par `git ls-remote origin` avant conclusion de ce déclenchement.
+
+## Déclenchement automatisé du 28 septembre 2026 — Epic C7.33 (audit d'accessibilité, réduction du mouvement en scène scriptée, verrouillé en test de non-régression)
+
+Déclenchement automatisé (routine cloud horaire). `HEAD` détaché au démarrage du conteneur sur `ffdbe2c` (fusion de la phase 6, même situation que tous les déclenchements précédents) ; `git checkout maison-des-possibles` a créé la branche locale depuis `origin/maison-des-possibles`, déjà à jour (`6aa4d44`), arbre de travail propre.
+
+**Anti-hallucination faite avant tout le reste, réellement exécutée.** Dernier epic « fait » du backlog : **C7.32**, commit annoncé `b7f126da14277b1d5dbfd8d98f9573b1290ff30d` — `git show --stat b7f126da14277b1d5dbfd8d98f9573b1290ff30d` confirme le commit réel (message et trois fichiers modifiés correspondant exactement à l'entrée déjà existante de `campagne-backlog.md`/`campagne.md`). `npm ci && npm test` relancés indépendamment avant tout nouveau travail → **1129/1129**, identique au rapport déjà consigné, zéro écart. Aucun bandeau de pause en tête de `docs/campagne-backlog.md` (première ligne vérifiée). Aucun epic `bloqué` dans tout le backlog (`grep -c "^Statut : bloqué" docs/campagne-backlog.md` → 0) : aucune pause anti-emballement à déclencher. `docs/campagne-anomalies.md` relu : son unique entrée (fusion de la phase 6 jamais poussée vers `origin/main`) revérifiée réellement résolue — `git fetch origin main` puis `git rev-parse origin/main` → `ffdbe2c5a3b4fb49f90f4021e5f9dbc42c36db2c`, `git merge-base --is-ancestor ffdbe2c origin/main` → vrai.
+
+**Choix de l'epic.** Le commit de tête (`6aa4d44`, Cartographe) venait de détailler et de retenir **C7.33** comme unique epic du lot (dépend de « rien » — audite un mécanisme déjà tout `fait`). Recherche exhaustive refaite (`grep -n "^Statut : todo" docs/campagne-backlog.md`) : uniquement le gabarit et les trois entrées historiques supersédées (C2.5v, C2.6, C2.8v), C7.33 seul epic détaillé actionnable.
+
+**Implémenté directement par l'orchestrateur** (audit de caméra pur, aucune délégation vu sa taille). `public/game/render-camera.js` lu en entier (les quatre branches `target`/`span` et les deux appels `.lerp(..., reduced ? 1 : 1 - Math.exp(-dt*5))`) et `public/game/render-items.js`'s `beginGestureScene`/`currentEpilogueShot` lus avant d'écrire quoi que ce soit, comme prescrit par le lot Cartographe précédent.
+
+Nouveau `tests/campaign-camera-reduced-motion.cjs` (Node pur, aucun navigateur) : `global.window = global`, `global.GardenModels = {}`/`global.GardenBotany = {}` (les deux variables du garde `if (!T || !M || !B || !G) return;` de `render-camera.js` sans usage réel dans `updateCamera` — de simples objets vides suffisent), `global.THREE = require("../public/vendor/three.min.js")` (le vrai build UMD, jamais une réimplémentation de `Vector3`/`lerp`), `global.GardenView = function GardenView() {}` avant `require("../public/game/render-camera.js")` — même patron que `tests/campaign-station-render.cjs` (THREE réel) et `tests/campaign-panels-touch-targets.cjs` (`global.window = global` avant de charger un module IIFE browser-only). Approche Node confirmée praticable du premier coup, aucun repli navigateur nécessaire.
+
+Un objet minimal (`freshView`) porte exactement les champs lus par `updateCamera(dt, reduced)` : `look`/`camera` (vrai `THREE.OrthographicCamera`)/`angle`/`ratio`/`span`/`overview`/`position`/`inspection`/`gestureScene`/`nightfall`/`currentEpilogueShot()`. Deux cibles exercées, chacune deux tests :
+- **`gestureScene.center`** (C5.14) : sous `reduced:false`, distance restante après un appel (`dt = 1/20`) vérifiée égale exactement à `distance initiale × Math.exp(-dt*5)` — pas seulement « plus proche », la formule documentée du glissement, au delta `1e-9` près. Sous `reduced:true`, `look` atteint la cible à moins de `1e-9`.
+- **L'`epilogueShot` courant** (C6.21) : `currentEpilogueShot()` stubbée pour renvoyer un plan fixe `{center, span}` — exactement la forme réelle renvoyée par `render-items.js`, jamais une seconde dérivation indépendante de la séquence de plans. Mêmes deux assertions.
+- Dans les deux cas, sous `reduced:true`, `camera.position` est aussi vérifié à moins de `1e-9` de sa propre cible, recalculée avec le même décalage angulaire que `updateCamera` lui-même (`look cible + (sin(angle)×16, 14, cos(angle)×16)`), jamais une valeur devinée séparément.
+
+Cinquième test, lecture statique réelle de `public/game/render.js` (`fs.readFileSync`, jamais recopiée en commentaire) : un seul site d'appel de `updateCamera(` dans ce fichier, et la séquence exacte à deux lignes `      this.updateCamera(dt, reduced);\n      this.updateFlows(reduced);\n` (indentation à 6 espaces incluse) y apparaît verbatim — verrouille qu'un futur epic qui enroberait cet appel d'une branche par mode jardin libre/campagne ferait échouer ce test plutôt que de désactiver silencieusement la garantie pour un seul mode, exactement la demande explicite du mandat.
+
+**Gate revérifié réellement discriminant, pas supposé vert.** `render-camera.js` temporairement modifié (`reduced ? 1` → `reduced ? 0.5` sur les deux appels `.lerp`) : 2 des 5 tests échouent bien (les deux assertions `reduced:true`), confirmant que le test détecte réellement une régression et n'est pas un test qui passerait de toute façon. Fichier restauré immédiatement après depuis une sauvegarde faite avant modification ; `git diff --stat public/game/render-camera.js` confirmé vide (aucune trace laissée) avant de continuer.
+
+`npm ci && npm test` → **1134/1134** (1129 existants + 5 nouveaux), zéro régression. Sortie complète :
+
+```
+# tests 1134
+# suites 0
+# pass 1134
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+```
+
+Vérification programmatique faite, pas supposée : `git status --short` en fin d'implémentation confirme exactement `package.json` (ajout de `tests/campaign-camera-reduced-motion.cjs` à la liste `npm test`) et le nouveau fichier de test lui-même — aucun fichier de production touché (`render-camera.js` restauré identique à avant), aucune géométrie/matériau/interface concerné. `tests/garden-material-audit.cjs`/`npm run test:browser`/`test:visual` non requis, même exemption que C6.4/C6.9/C7.19-C7.32, confirmée plutôt que supposée.
+
+`/code-review` (skill, niveau medium) exécuté sur le diff complet : aucun défaut relevé — diff minimal (un fichier de test nouveau, une ligne de `package.json`), aucune logique de production modifiée, mathématiques de décalage caméra et correspondance indentation-sensible avec `render.js` vérifiées par exécution réelle plutôt que par relecture seule.
+
+Ne ferme aucune porte de phase (la phase 7 reste ouverte : saisons été/hiver, catalogue décoratif en position, extensions de maison, septième annexe, tactile au-delà de l'existant, histoires secondaires, remappage des commandes/taille du texte/volumes séparés — aucun concerné par ce lot). Aucun choix déjà confirmé du design remis en cause (Alma vivante, nom des Rainelles, culpabilisation de fin de campagne — aucun concerné). Aucune règle de `direction-artistique.md` concernée : aucun rendu introduit, un audit de caméra pur (transformations, ni maillage ni matériau).
+
+`docs/campagne-backlog.md` mis à jour : C7.33 passe à `fait`, détail complet (approche de stub Node, formule de glissement vérifiée, gate revérifié discriminant, résultat de `/code-review`) consigné dans son propre statut ; la note « pour le prochain déclenchement » de l'entrée précédente mise à jour pour ne plus pointer vers un epic désormais livré.
+
+**Pour le prochain déclenchement** : plus aucun epic détaillé `todo` à dépendances satisfaites nulle part dans le backlog — recherche exhaustive à refaire en tête du prochain déclenchement, pas supposée reconduite. La phase 7 n'a atteint aucune de ses portes de sortie (design §15) ; le rôle Cartographe est probablement la voie à endosser au prochain déclenchement, sur l'un des chantiers déjà identifiés comme restants (saisons été/hiver, catalogue décoratif en position, extensions de maison, tactile au-delà de l'existant, histoires secondaires, remappage des commandes/taille du texte/volumes séparés pour l'accessibilité).
+
+Commit : voir `git log` sur `maison-des-possibles` (message « Epic C7.33 : verrouillage par test de la réduction du mouvement pour les scènes de caméra scriptées de la campagne »). `git push origin maison-des-possibles` à confirmer par `git ls-remote origin` avant conclusion de ce déclenchement.
