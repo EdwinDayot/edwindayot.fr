@@ -301,6 +301,122 @@
     };
   }
 
+  // Epic C7.23 (design §5, "Multiplier une plante -> jeunes plants dans le bac de sortie" /
+  // "Replanter... jeunes plants à portée -> emplacements vides d'une zone définie"): a second
+  // buffer-key shape, distinct from a bare cultivarId (harvested produce, C2.6c), so a panier can
+  // hold both without either being mistaken for the other. See campagne-backlog.md's C7.23 entry
+  // ("deux options pesées") for why this generalises the key shape rather than adding a second
+  // field alongside buffer: panierTotal/capacity already apply unchanged to any key shape, and no
+  // migration is needed (an existing save's buffer only ever has bare keys, still valid as-is).
+  const YOUNG_PLANT_PREFIX = "jeune:";
+
+  function youngPlantKey(cultivarId) {
+    return `${YOUNG_PLANT_PREFIX}${cultivarId}`;
+  }
+
+  // null on anything that isn't exactly "jeune:<non-empty>" — no further shape assumed (never a
+  // pattern like `c\d+`): the extracted id's actual validity against s.cultivars is checked by
+  // the caller (canDepositYoungPlant/garden-state-validate.js), never guessed from a string here.
+  function cultivarIdOfYoungPlantKey(key) {
+    if (typeof key !== "string" || !key.startsWith(YOUNG_PLANT_PREFIX)) return null;
+    const cultivarId = key.slice(YOUNG_PLANT_PREFIX.length);
+    return cultivarId ? cultivarId : null;
+  }
+
+  // Shared by canDepositYoungPlant/canWithdrawYoungPlant: resolves panierId to a real panier and
+  // cultivarId to a real cultivar, the two refusals both verbs share before their own, distinct,
+  // qty check. Takes the full state `s` (not just the registry, unlike resolveStation) because a
+  // cultivarId can only be checked for realness against s.cultivars.
+  function resolvePanierForYoungPlant(s, panierId, cultivarId) {
+    const resolved = resolveStation(s.campaignStations, panierId);
+    if (!resolved.ok || resolved.kind !== "panier")
+      return { ok: false, error: `Identifiant de panier inconnu : "${panierId}".` };
+    if (!s.cultivars?.some((c) => c.id === cultivarId))
+      return { ok: false, error: `Identifiant de cultivar inconnu : "${cultivarId}".` };
+    return { ok: true, panier: resolved.station };
+  }
+
+  // Refuses, without mutating anything: an unknown panierId or one that isn't a panier, an
+  // unknown cultivarId, a non-integer/non-positive qty, and a deposit that would push the
+  // panier's total (panierTotal, already generic on key shape) past its declared capacity —
+  // shared with harvested produce under a bare cultivarId key, never a second ceiling.
+  function canDepositYoungPlant(s, panierId, cultivarId, qty) {
+    const resolved = resolvePanierForYoungPlant(s, panierId, cultivarId);
+    if (!resolved.ok) return resolved;
+    if (!Number.isInteger(qty) || qty <= 0)
+      return { ok: false, error: `Quantité invalide : ${qty}.` };
+    const { panier } = resolved;
+    if (panier.capacity !== undefined && panierTotal(panier) + qty > panier.capacity)
+      return {
+        ok: false,
+        error: `Le panier "${panierId}" ne peut pas recevoir ${qty} jeune(s) plant(s) de plus (capacité ${panier.capacity}).`,
+      };
+    return { ok: true };
+  }
+
+  // Rejoue canDepositYoungPlant (jamais une seconde copie du même calcul) puis retourne un
+  // campaignStations neuf où seul le panier concerné change, sa clé youngPlantKey(cultivarId)
+  // incrémentée (créée si absente) — tous les autres paniers/bornes/zones/habitats et toutes les
+  // autres clés du même buffer strictement inchangés, même discipline d'immutabilité que
+  // relocateStation/Cultivars.relocateSpecimen.
+  function depositYoungPlant(s, panierId, cultivarId, qty) {
+    const check = canDepositYoungPlant(s, panierId, cultivarId, qty);
+    if (!check.ok) return check;
+    const key = youngPlantKey(cultivarId);
+    return {
+      ok: true,
+      registry: {
+        ...s.campaignStations,
+        paniers: s.campaignStations.paniers.map((p) =>
+          p.id !== panierId
+            ? p
+            : { ...p, buffer: { ...p.buffer, [key]: (p.buffer[key] || 0) + qty } },
+        ),
+      },
+    };
+  }
+
+  // Symétrique de canDepositYoungPlant : mêmes refus de panier/cultivarId, plus une qty qui
+  // dépasserait le stock actuellement présent sous cette clé (0 si la clé est absente — jamais un
+  // accès non défini).
+  function canWithdrawYoungPlant(s, panierId, cultivarId, qty) {
+    const resolved = resolvePanierForYoungPlant(s, panierId, cultivarId);
+    if (!resolved.ok) return resolved;
+    if (!Number.isInteger(qty) || qty <= 0)
+      return { ok: false, error: `Quantité invalide : ${qty}.` };
+    const stock = resolved.panier.buffer[youngPlantKey(cultivarId)] || 0;
+    if (qty > stock)
+      return {
+        ok: false,
+        error: `Le panier "${panierId}" ne contient que ${stock} jeune(s) plant(s) de ce cultivar.`,
+      };
+    return { ok: true };
+  }
+
+  // Rejoue canWithdrawYoungPlant puis retourne un campaignStations neuf, même discipline
+  // d'immutabilité que depositYoungPlant. Un retrait qui vide exactement la clé la supprime du
+  // buffer plutôt que de laisser un 0 traînant — même discipline que tickTransporter's
+  // `if (from.buffer[key] <= 0) delete from.buffer[key]` déjà en usage.
+  function withdrawYoungPlant(s, panierId, cultivarId, qty) {
+    const check = canWithdrawYoungPlant(s, panierId, cultivarId, qty);
+    if (!check.ok) return check;
+    const key = youngPlantKey(cultivarId);
+    return {
+      ok: true,
+      registry: {
+        ...s.campaignStations,
+        paniers: s.campaignStations.paniers.map((p) => {
+          if (p.id !== panierId) return p;
+          const remaining = p.buffer[key] - qty;
+          const buffer = { ...p.buffer };
+          if (remaining <= 0) delete buffer[key];
+          else buffer[key] = remaining;
+          return { ...p, buffer };
+        }),
+      },
+    };
+  }
+
   // Pure lookup, never a silent `undefined`: an unknown id always comes back as an explicit
   // { ok: false, error } rather than a falsy value a caller might forward unchecked.
   function resolveStation(registry, id) {
@@ -326,6 +442,12 @@
     removeStation,
     labelStation,
     relocateStation,
+    youngPlantKey,
+    cultivarIdOfYoungPlantKey,
+    canDepositYoungPlant,
+    depositYoungPlant,
+    canWithdrawYoungPlant,
+    withdrawYoungPlant,
   };
   if (typeof module !== "undefined") module.exports = api;
   else root.GardenCampaignStations = api;

@@ -724,6 +724,11 @@
         // when present. cultivarId is used as the buffer's key (see campaign-automation.js's own
         // tickRecolter comment) so a valid key is any known cultivar, not knownItem() — a
         // campaign cultivar was never an inventory item to begin with.
+        // Epic C7.23 generalises the accepted key shape: a key is valid when it is either a bare,
+        // real cultivarId (unchanged, harvested produce) or Stations.youngPlantKey(cultivarId) for
+        // a real cultivarId (young plants, a distinct stock under the same panier/buffer). Any
+        // third shape (a malformed prefix, an unknown extracted cultivarId, a double prefix) is
+        // refused exactly like an unknown bare cultivarId was before this epic.
         if (
           kind === "panier" &&
           list.some(
@@ -731,10 +736,11 @@
               st.buffer !== undefined &&
               (typeof st.buffer !== "object" ||
                 st.buffer === null ||
-                Object.entries(st.buffer).some(
-                  ([cultivarId, qty]) =>
-                    !s.cultivars?.some((c) => c.id === cultivarId) || !count(qty),
-                )),
+                Object.entries(st.buffer).some(([key, qty]) => {
+                  const youngCultivarId = Stations.cultivarIdOfYoungPlantKey(key);
+                  const cultivarId = youngCultivarId !== null ? youngCultivarId : key;
+                  return !s.cultivars?.some((c) => c.id === cultivarId) || !count(qty);
+                })),
           )
         )
           throw Error("Registre de stations invalide.");

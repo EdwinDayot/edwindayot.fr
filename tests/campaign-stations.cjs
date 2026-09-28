@@ -677,3 +677,184 @@ test("A zone's capacity below MIN_ZONE_CAPACITY, or non-finite, is rejected by v
   saved.campaignStations.zones[0].capacity = 1;
   assert.doesNotThrow(() => validate(saved));
 });
+
+// Epic C7.23 (design §5, "Multiplier une plante -> jeunes plants dans le bac de sortie" /
+// "Replanter... jeunes plants à portée") : a second buffer-key shape, distinct from a bare
+// cultivarId (harvested produce, C2.6c) — see campaign-stations.js's own header comment on
+// youngPlantKey for the reasoning. No gesture is wired to these functions yet (Multiplier and
+// Replanter remain out of scope, see this epic's own campagne-backlog.md entry).
+
+test("youngPlantKey/cultivarIdOfYoungPlantKey round-trip a real cultivarId", () => {
+  assert.equal(Stations.youngPlantKey("c3"), "jeune:c3");
+  assert.equal(Stations.cultivarIdOfYoungPlantKey(Stations.youngPlantKey("c3")), "c3");
+});
+
+test("cultivarIdOfYoungPlantKey returns null on a bare key, a suffix-less key and a prefix-less key", () => {
+  assert.equal(Stations.cultivarIdOfYoungPlantKey("c3"), null);
+  assert.equal(Stations.cultivarIdOfYoungPlantKey("jeune:"), null);
+  assert.equal(Stations.cultivarIdOfYoungPlantKey("jeuneX"), null);
+});
+
+test("depositYoungPlant increments exactly the target panier's young-plant key, all else strictly unchanged", () => {
+  const g = new GardenState(null, 1000);
+  const cv1 = Cultivars.createCultivar(g.s, { name: "A", traits: {} });
+  const cv2 = Cultivars.createCultivar(g.s, { name: "B", traits: {} });
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+  const otherPanier = Stations.registerStation(g.s.campaignStations, "panier", { x: 1, z: 1 });
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", { x: 2, z: 2 });
+  panier.buffer[cv2.id] = 4; // existing harvested produce, must survive unchanged
+
+  const before = JSON.stringify(g.s.campaignStations);
+  const result = Stations.depositYoungPlant(g.s, panier.id, cv1.id, 3);
+  assert.equal(result.ok, true, result.error);
+  assert.equal(JSON.stringify(g.s.campaignStations), before, "the call itself never mutates");
+
+  const updated = result.registry.paniers.find((p) => p.id === panier.id);
+  assert.deepEqual(updated.buffer, { [cv2.id]: 4, [Stations.youngPlantKey(cv1.id)]: 3 });
+  const untouchedOther = result.registry.paniers.find((p) => p.id === otherPanier.id);
+  assert.equal(untouchedOther, otherPanier, "the other panier is the exact same reference");
+  assert.equal(result.registry.zones[0], zone, "a non-panier collection is untouched");
+
+  // Pure function: applying the first result back onto the live state before depositing again is
+  // what "increments an existing key" actually means (depositYoungPlant itself never mutates g.s).
+  g.s.campaignStations = result.registry;
+  const again = Stations.depositYoungPlant(g.s, panier.id, cv1.id, 2);
+  const updatedAgain = again.registry.paniers.find((p) => p.id === panier.id);
+  assert.equal(
+    updatedAgain.buffer[Stations.youngPlantKey(cv1.id)],
+    5,
+    "a second deposit on an existing key creates it if absent, increments otherwise",
+  );
+});
+
+test("canDepositYoungPlant refuses an unknown panier, a non-panier station, an unknown cultivar and a bad qty", () => {
+  const g = new GardenState(null, 1000);
+  const cv1 = Cultivars.createCultivar(g.s, { name: "A", traits: {} });
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", { x: 1, z: 1 });
+
+  assert.equal(Stations.canDepositYoungPlant(g.s, "pn999", cv1.id, 1).ok, false);
+  assert.equal(Stations.canDepositYoungPlant(g.s, zone.id, cv1.id, 1).ok, false);
+  assert.equal(Stations.canDepositYoungPlant(g.s, panier.id, "c999", 1).ok, false);
+  for (const bad of [0, -1, 1.5, NaN, Infinity]) {
+    assert.equal(
+      Stations.canDepositYoungPlant(g.s, panier.id, cv1.id, bad).ok,
+      false,
+      `qty=${bad} should be refused`,
+    );
+  }
+});
+
+test("canDepositYoungPlant refuses a deposit that would exceed capacity, shared with harvested produce", () => {
+  const g = new GardenState(null, 1000);
+  const cv1 = Cultivars.createCultivar(g.s, { name: "A", traits: {} });
+  const cv2 = Cultivars.createCultivar(g.s, { name: "B", traits: {} });
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+  panier.capacity = 5;
+  panier.buffer[cv2.id] = 3; // harvested produce already occupies part of the shared ceiling
+
+  const refused = Stations.canDepositYoungPlant(g.s, panier.id, cv1.id, 3);
+  assert.equal(refused.ok, false);
+  assert.match(refused.error, /capacité/);
+
+  const accepted = Stations.canDepositYoungPlant(g.s, panier.id, cv1.id, 2);
+  assert.equal(accepted.ok, true, accepted.error);
+});
+
+test("withdrawYoungPlant decrements a young-plant key, removes it when it reaches zero, all else unchanged", () => {
+  const g = new GardenState(null, 1000);
+  const cv1 = Cultivars.createCultivar(g.s, { name: "A", traits: {} });
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+  panier.buffer[Stations.youngPlantKey(cv1.id)] = 5;
+
+  const before = JSON.stringify(g.s.campaignStations);
+  const partial = Stations.withdrawYoungPlant(g.s, panier.id, cv1.id, 2);
+  assert.equal(partial.ok, true, partial.error);
+  assert.equal(JSON.stringify(g.s.campaignStations), before, "the call itself never mutates");
+  const afterPartial = partial.registry.paniers.find((p) => p.id === panier.id);
+  assert.equal(afterPartial.buffer[Stations.youngPlantKey(cv1.id)], 3);
+
+  panier.buffer[Stations.youngPlantKey(cv1.id)] = 3;
+  const emptied = Stations.withdrawYoungPlant(g.s, panier.id, cv1.id, 3);
+  const afterEmptied = emptied.registry.paniers.find((p) => p.id === panier.id);
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(afterEmptied.buffer, Stations.youngPlantKey(cv1.id)),
+    false,
+    "a withdrawal that empties the key removes it rather than leaving a trailing 0",
+  );
+});
+
+test("canWithdrawYoungPlant refuses an unknown panier/cultivar and a qty above the current stock, treating an absent key as 0", () => {
+  const g = new GardenState(null, 1000);
+  const cv1 = Cultivars.createCultivar(g.s, { name: "A", traits: {} });
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+
+  assert.equal(Stations.canWithdrawYoungPlant(g.s, "pn999", cv1.id, 1).ok, false);
+  assert.equal(Stations.canWithdrawYoungPlant(g.s, panier.id, "c999", 1).ok, false);
+  assert.equal(
+    Stations.canWithdrawYoungPlant(g.s, panier.id, cv1.id, 1).ok,
+    false,
+    "no key present at all reads as a stock of 0",
+  );
+  for (const bad of [0, -1, 1.5, NaN, Infinity]) {
+    assert.equal(Stations.canWithdrawYoungPlant(g.s, panier.id, cv1.id, bad).ok, false);
+  }
+  panier.buffer[Stations.youngPlantKey(cv1.id)] = 2;
+  assert.equal(Stations.canWithdrawYoungPlant(g.s, panier.id, cv1.id, 3).ok, false);
+  assert.equal(Stations.canWithdrawYoungPlant(g.s, panier.id, cv1.id, 2).ok, true);
+});
+
+test("validate accepts a panier buffer with a real jeune:<cultivarId> key, refuses a malformed or unknown one", () => {
+  const g = new GardenState(null, 1000);
+  const cv1 = Cultivars.createCultivar(g.s, { name: "A", traits: {} });
+  Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+  const base = () => {
+    const saved = g.serialize();
+    saved.campaignStations.paniers[0].buffer = {};
+    return saved;
+  };
+
+  const valid = base();
+  valid.campaignStations.paniers[0].buffer[Stations.youngPlantKey(cv1.id)] = 3;
+  assert.doesNotThrow(() => validate(valid));
+
+  for (const badKey of [
+    Stations.youngPlantKey("c999"), // unknown cultivarId inside a well-formed prefix
+    "jeune:", // empty suffix
+    "jeuneX", // missing the colon
+    Stations.youngPlantKey(Stations.youngPlantKey(cv1.id)), // double prefix
+  ]) {
+    const saved = base();
+    saved.campaignStations.paniers[0].buffer[badKey] = 1;
+    assert.throws(() => validate(saved), /Registre de stations invalide/, `key "${badKey}" should be refused`);
+  }
+});
+
+test("validate: a jeune:<cultivarId> key counts toward the shared panier capacity ceiling", () => {
+  const g = new GardenState(null, 1000);
+  const cv1 = Cultivars.createCultivar(g.s, { name: "A", traits: {} });
+  const cv2 = Cultivars.createCultivar(g.s, { name: "B", traits: {} });
+  Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+  const saved = g.serialize();
+  saved.campaignStations.paniers[0].capacity = 5;
+  saved.campaignStations.paniers[0].buffer = {
+    [cv1.id]: 3,
+    [Stations.youngPlantKey(cv2.id)]: 3,
+  };
+  assert.throws(() => validate(saved), /Registre de stations invalide/);
+  saved.campaignStations.paniers[0].buffer[Stations.youngPlantKey(cv2.id)] = 2;
+  assert.doesNotThrow(() => validate(saved));
+});
+
+test("a depositYoungPlant round-trip through GardenState.command()'s JSON save/load preserves the key and its qty", () => {
+  const g = new GardenState(null, 1000);
+  const cv1 = Cultivars.createCultivar(g.s, { name: "A", traits: {} });
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+  const deposit = Stations.depositYoungPlant(g.s, panier.id, cv1.id, 4);
+  assert.equal(deposit.ok, true, deposit.error);
+  g.s.campaignStations = deposit.registry;
+
+  const reloaded = new GardenState(JSON.parse(JSON.stringify(g.serialize())), 1000);
+  const reloadedPanier = reloaded.s.campaignStations.paniers.find((p) => p.id === panier.id);
+  assert.equal(reloadedPanier.buffer[Stations.youngPlantKey(cv1.id)], 4);
+});
