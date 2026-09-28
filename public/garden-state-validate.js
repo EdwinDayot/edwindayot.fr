@@ -92,6 +92,26 @@
     if (xEmpty !== zEmpty) return true;
     return !xEmpty && (!finite(x, -64, 64) || !finite(z, -64, 64));
   }
+  // Epic C7.24: zoneSlot is optional, and null/absent exactly when zoneId is null/absent — never
+  // an orphan slot with no zone. When zoneId resolves to a real zone with a declared capacity,
+  // zoneSlot must be null or a finite integer in [0, capacity). A zone with no declared capacity
+  // can never receive a specimen via relocateSpecimen in the first place, so a non-null zoneSlot
+  // on such a zone in a hand-edited save is rejected here too — the zone lookup itself doesn't
+  // need to distinguish "unknown zone" from "zone with no capacity" here, since either shape
+  // already makes this return true, and a genuinely unknown zoneId is already caught by the
+  // zoneId check above regardless.
+  function badSpecimenZoneSlot(s, sp) {
+    const noZone = sp.zoneId === undefined || sp.zoneId === null;
+    const noSlot = sp.zoneSlot === undefined || sp.zoneSlot === null;
+    if (noZone) return !noSlot;
+    if (noSlot) return false;
+    const zone = (s.campaignStations?.zones || []).find((z) => z?.id === sp.zoneId);
+    return !(
+      zone?.capacity !== undefined &&
+      count(sp.zoneSlot) &&
+      sp.zoneSlot < zone.capacity
+    );
+  }
   function validate(s) {
     s = migrateLandscape(s);
     if (
@@ -497,7 +517,19 @@
             // rather than silently reinterpret).
             (sp.zoneId !== undefined &&
               sp.zoneId !== null &&
-              !(s.campaignStations?.zones || []).some((z) => z?.id === sp.zoneId)),
+              !(s.campaignStations?.zones || []).some((z) => z?.id === sp.zoneId)) ||
+            badSpecimenZoneSlot(s, sp) ||
+            // Epic C7.24: two specimens never share the same (zoneId, zoneSlot) pair once both
+            // are non-null — checked pairwise against every other specimen, same "compare against
+            // the real array" discipline as the rest of this predicate.
+            s.specimens.some(
+              (other) =>
+                other !== sp &&
+                sp.zoneId != null &&
+                sp.zoneSlot != null &&
+                other.zoneId === sp.zoneId &&
+                other.zoneSlot === sp.zoneSlot,
+            ),
         ))
     )
       throw Error("Spécimen invalide.");
@@ -1082,12 +1114,15 @@
     // Epic C7.20: zoneId migrates to null (never affected to a zone), same "field simply absent
     // before this epic" reasoning as the other specimen fields defaulted just above — never
     // guessed from a zone's own contents (no zone ever tracked its occupants before this epic).
+    // Epic C7.24: zoneSlot migrates to null the same way — a specimen saved before this epic
+    // never had a slot to begin with, whatever its zoneId.
     result.specimens = (result.specimens ?? []).map((sp) => ({
       moistureAt: s.elapsed ?? 0,
       plantedAt: s.elapsed ?? 0,
       plantedSeason: "ete",
       readyToProduce: false,
       zoneId: null,
+      zoneSlot: null,
       ...sp,
     }));
     result.specimenNextId ??= 1;

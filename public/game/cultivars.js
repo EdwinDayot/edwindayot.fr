@@ -42,7 +42,14 @@
    relocated) and three pure functions — zoneOccupancy/canRelocateSpecimen/relocateSpecimen — that
    move a specimen into a registered, capacity-bound zone (campaign-stations.js). No tick loop or
    command calls relocateSpecimen yet, same "pure factory/function, not yet wired" posture
-   registerStation itself started at in C2.6a. */
+   registerStation itself started at in C2.6a.
+
+   Epic C7.24 adds `zoneSlot` alongside `zoneId`: null whenever zoneId is null, otherwise a stable
+   integer in [0, capacity) unique among the specimens sharing that zone — a preallocated "which
+   spot in the zone" index a future rendu epic can turn into a real world position (x/z), never
+   computed here. relocateSpecimen keeps a specimen's existing slot when it is still valid and the
+   specimen isn't actually moving zones, and only ever hands out the smallest free slot otherwise
+   (zoneFreeSlot) — never a second, independent notion of "where in the zone". */
 (function (root) {
   const Seasons =
     typeof module !== "undefined"
@@ -121,6 +128,7 @@
       moistureAt: s.elapsed,
       readyToProduce: false,
       zoneId: null,
+      zoneSlot: null,
     };
     s.specimens.push(specimen);
     return specimen;
@@ -214,16 +222,52 @@
       return { ok: false, error: `La zone "${zoneId}" est pleine (capacité ${zone.capacity}).` };
     return { ok: true };
   }
+  // Epic C7.24: the smallest zoneSlot in [0, capacity) not already claimed by a specimen of
+  // zoneId (excluding excludeSpecimenId, so a caller already inside the zone can recompute its
+  // own slot without seeing itself as "taken"), or null if every slot is claimed — a defensive
+  // case canRelocateSpecimen's own capacity check already refuses before this is ever reached
+  // from relocateSpecimen, but this function stays safe on its own regardless. Pure: never
+  // mutates s.specimens.
+  function zoneFreeSlot(s, zoneId, excludeSpecimenId) {
+    const resolved = Stations.resolveStation(s.campaignStations, zoneId);
+    if (!resolved.ok || resolved.kind !== "zone" || resolved.station.capacity === undefined)
+      return null;
+    const taken = new Set(
+      s.specimens
+        .filter((sp) => sp.zoneId === zoneId && sp.id !== excludeSpecimenId)
+        .map((sp) => sp.zoneSlot)
+        .filter((slot) => Number.isInteger(slot)),
+    );
+    for (let slot = 0; slot < resolved.station.capacity; slot++)
+      if (!taken.has(slot)) return slot;
+    return null;
+  }
   // Rejoue canRelocateSpecimen (jamais une seconde copie du même calcul) puis retourne un
   // s.specimens neuf, tous les autres spécimens strictement inchangés — même discipline
   // d'immutabilité que Stations/Decor.
   function relocateSpecimen(s, specimenId, zoneId) {
     const check = canRelocateSpecimen(s, specimenId, zoneId);
     if (!check.ok) return check;
+    const specimen = s.specimens.find((sp) => sp.id === specimenId);
+    const zone = Stations.resolveStation(s.campaignStations, zoneId).station;
+    // Epic C7.24: a specimen that isn't actually changing zones keeps its current slot as-is,
+    // as long as that slot is still a valid, unshared integer in [0, capacity) — never
+    // recomputed for a specimen that doesn't really move. Anything else (a new entry into the
+    // zone, or a slot left stale by a capacity shrink) gets the smallest free slot instead.
+    const keepsSlot =
+      specimen.zoneId === zoneId &&
+      Number.isInteger(specimen.zoneSlot) &&
+      specimen.zoneSlot >= 0 &&
+      specimen.zoneSlot < zone.capacity &&
+      !s.specimens.some(
+        (sp) =>
+          sp.id !== specimenId && sp.zoneId === zoneId && sp.zoneSlot === specimen.zoneSlot,
+      );
+    const zoneSlot = keepsSlot ? specimen.zoneSlot : zoneFreeSlot(s, zoneId, specimenId);
     return {
       ok: true,
       specimens: s.specimens.map((sp) =>
-        sp.id === specimenId ? { ...sp, zoneId } : sp,
+        sp.id === specimenId ? { ...sp, zoneId, zoneSlot } : sp,
       ),
     };
   }
@@ -239,6 +283,7 @@
     zoneOccupancy,
     canRelocateSpecimen,
     relocateSpecimen,
+    zoneFreeSlot,
     MATURE_STAGE,
     STAGE_DURATION_ELAPSED_SECONDS,
     SPRING_YOUNG_STAGE_DURATION_ELAPSED_SECONDS,

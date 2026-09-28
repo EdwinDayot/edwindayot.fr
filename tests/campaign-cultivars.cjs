@@ -54,6 +54,7 @@ test("createSpecimen assigns a stable id and appends the specimen to s.specimens
     moistureAt: 0,
     readyToProduce: false,
     zoneId: null,
+    zoneSlot: null,
   });
   assert.deepEqual(g.s.specimens, [specimen]);
   assert.equal(g.s.specimenNextId, 2);
@@ -177,11 +178,14 @@ test("relocateSpecimen moves a specimen into a zone with room, leaves every othe
   assert.equal(result.ok, true, result.error);
   const moved = result.specimens.find((sp) => sp.id === sp1.id);
   assert.equal(moved.zoneId, zone.id);
-  assert.deepEqual({ ...moved, zoneId: sp1.zoneId }, sp1);
+  // Epic C7.24: the only zone occupant so far claims the smallest free slot, 0.
+  assert.equal(moved.zoneSlot, 0);
+  assert.deepEqual({ ...moved, zoneId: sp1.zoneId, zoneSlot: sp1.zoneSlot }, sp1);
   const untouched = result.specimens.find((sp) => sp.id === sp2.id);
   assert.deepEqual(untouched, sp2);
   // Original array/object untouched — relocateSpecimen never mutates s.specimens in place.
   assert.equal(sp1.zoneId, null);
+  assert.equal(sp1.zoneSlot, null);
 });
 
 test("relocateSpecimen refuses without mutating anything when the target zone is unknown or full", () => {
@@ -203,7 +207,7 @@ test("relocateSpecimen refuses without mutating anything when the target zone is
   assert.equal(JSON.stringify(g.s.specimens), before);
 });
 
-test("A specimen's zoneId survives a real JSON save/reload round trip", () => {
+test("A specimen's zoneId and zoneSlot survive a real JSON save/reload round trip", () => {
   const g = new GardenState(null, 1000);
   const cv = makeCultivar(g);
   const zone = Stations.registerStation(g.s.campaignStations, "zone", {
@@ -217,6 +221,7 @@ test("A specimen's zoneId survives a real JSON save/reload round trip", () => {
   const saved = JSON.parse(JSON.stringify(g.serialize()));
   const reloaded = new GardenState(saved);
   assert.equal(reloaded.s.specimens[0].zoneId, zone.id);
+  assert.equal(reloaded.s.specimens[0].zoneSlot, 0);
 });
 
 test("A specimen saved before this epic (no zoneId) migrates to null without error", () => {
@@ -227,6 +232,119 @@ test("A specimen saved before this epic (no zoneId) migrates to null without err
   delete saved.specimens[0].zoneId;
   const migrated = new GardenState(saved);
   assert.equal(migrated.s.specimens[0].zoneId, null);
+});
+
+// Epic C7.24: a specimen saved before this epic never had a zoneSlot at all, whatever its
+// zoneId — migrates to null the same way zoneId itself migrated at C7.20.
+test("A specimen saved before this epic (no zoneSlot) migrates to null without error", () => {
+  const g = new GardenState(null, 1000);
+  const cv = makeCultivar(g);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 1,
+  });
+  const sp = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 0, z: 0 });
+  sp.zoneId = zone.id;
+  const saved = g.serialize();
+  delete saved.specimens[0].zoneSlot;
+  const migrated = new GardenState(saved);
+  assert.equal(migrated.s.specimens[0].zoneId, zone.id);
+  assert.equal(migrated.s.specimens[0].zoneSlot, null);
+});
+
+test("zoneFreeSlot returns the smallest free index in an empty zone, skips already-taken slots, and returns null once full", () => {
+  const g = new GardenState(null, 1000);
+  const cv = makeCultivar(g);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 3,
+  });
+  assert.equal(Cultivars.zoneFreeSlot(g.s, zone.id), 0);
+  const sp0 = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 0, z: 0 });
+  const sp2 = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 1, z: 1 });
+  sp0.zoneId = zone.id;
+  sp0.zoneSlot = 0;
+  sp2.zoneId = zone.id;
+  sp2.zoneSlot = 2;
+  assert.equal(Cultivars.zoneFreeSlot(g.s, zone.id), 1);
+  const sp1 = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 2, z: 2 });
+  sp1.zoneId = zone.id;
+  sp1.zoneSlot = 1;
+  assert.equal(Cultivars.zoneFreeSlot(g.s, zone.id), null);
+  // excludeSpecimenId lets a specimen already in the zone see its own slot as free again.
+  assert.equal(Cultivars.zoneFreeSlot(g.s, zone.id, sp1.id), 1);
+});
+
+test("relocateSpecimen assigns distinct, increasing slots to three specimens relocated successively into the same zone", () => {
+  const g = new GardenState(null, 1000);
+  const cv = makeCultivar(g);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 3,
+  });
+  const sp1 = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 0, z: 0 });
+  const sp2 = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 1, z: 1 });
+  const sp3 = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 2, z: 2 });
+  g.s.specimens = Cultivars.relocateSpecimen(g.s, sp1.id, zone.id).specimens;
+  g.s.specimens = Cultivars.relocateSpecimen(g.s, sp2.id, zone.id).specimens;
+  g.s.specimens = Cultivars.relocateSpecimen(g.s, sp3.id, zone.id).specimens;
+  assert.equal(g.s.specimens.find((sp) => sp.id === sp1.id).zoneSlot, 0);
+  assert.equal(g.s.specimens.find((sp) => sp.id === sp2.id).zoneSlot, 1);
+  assert.equal(g.s.specimens.find((sp) => sp.id === sp3.id).zoneSlot, 2);
+});
+
+test("Re-targeting a specimen already inside a zone at the same zone keeps its initial zoneSlot, never recomputed", () => {
+  const g = new GardenState(null, 1000);
+  const cv = makeCultivar(g);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 3,
+  });
+  const sp1 = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 0, z: 0 });
+  const sp2 = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 1, z: 1 });
+  g.s.specimens = Cultivars.relocateSpecimen(g.s, sp1.id, zone.id).specimens;
+  g.s.specimens = Cultivars.relocateSpecimen(g.s, sp2.id, zone.id).specimens;
+  const before = g.s.specimens.find((sp) => sp.id === sp1.id).zoneSlot;
+  assert.equal(before, 0);
+  g.s.specimens = Cultivars.relocateSpecimen(g.s, sp1.id, zone.id).specimens;
+  assert.equal(g.s.specimens.find((sp) => sp.id === sp1.id).zoneSlot, before);
+});
+
+test("Relocating a specimen from zone A to zone B assigns a fresh free slot in B, without touching the slots of A's other specimens", () => {
+  const g = new GardenState(null, 1000);
+  const cv = makeCultivar(g);
+  const zoneA = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 3,
+  });
+  const zoneB = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 5,
+    z: 5,
+    capacity: 3,
+  });
+  const sp1 = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 0, z: 0 });
+  const sp2 = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 1, z: 1 });
+  const spB = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 5, z: 5 });
+  g.s.specimens = Cultivars.relocateSpecimen(g.s, sp1.id, zoneA.id).specimens;
+  g.s.specimens = Cultivars.relocateSpecimen(g.s, sp2.id, zoneA.id).specimens;
+  g.s.specimens = Cultivars.relocateSpecimen(g.s, spB.id, zoneB.id).specimens;
+  const sp2SlotBefore = g.s.specimens.find((sp) => sp.id === sp2.id).zoneSlot;
+  const result = Cultivars.relocateSpecimen(g.s, sp1.id, zoneB.id);
+  assert.equal(result.ok, true, result.error);
+  const moved = result.specimens.find((sp) => sp.id === sp1.id);
+  assert.equal(moved.zoneId, zoneB.id);
+  // spB already claims slot 0 of zoneB, so sp1 gets the next free slot, 1.
+  assert.equal(moved.zoneSlot, 1);
+  // sp2, left behind in zone A, keeps its own slot untouched.
+  assert.equal(
+    result.specimens.find((sp) => sp.id === sp2.id).zoneSlot,
+    sp2SlotBefore,
+  );
 });
 
 test("A specimen with a zoneId that resolves to a non-zone station or an unknown zone is rejected", () => {
@@ -294,5 +412,62 @@ test("validate rejects a zone whose real occupation exceeds its declared capacit
   spBare1.zoneId = bareZone.id;
   spBare2.zoneId = bareZone.id;
   assert.doesNotThrow(() => validate(bare.serialize()));
+});
+
+// Epic C7.24: zoneSlot's own validation, independent of the C7.21 occupation-vs-capacity
+// control above (which only ever counts specimens, never reads zoneSlot at all).
+test("validate rejects a non-integer, negative or out-of-range zoneSlot, and a non-null zoneSlot on a specimen without a zoneId", () => {
+  const g = new GardenState(null, 1000);
+  const cv = makeCultivar(g);
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 2,
+  });
+  const sp = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 0, z: 0 });
+  sp.zoneId = zone.id;
+  const saved = g.serialize();
+  for (const bad of [0.5, "0", -1, 2, 100]) {
+    saved.specimens[0].zoneSlot = bad;
+    assert.throws(() => validate(saved), /Spécimen invalide/);
+  }
+  saved.specimens[0].zoneSlot = 0;
+  assert.doesNotThrow(() => validate(saved));
+  saved.specimens[0].zoneSlot = 1;
+  assert.doesNotThrow(() => validate(saved));
+
+  // A zoneSlot with no zoneId at all is always rejected, whatever its value.
+  saved.specimens[0].zoneId = null;
+  saved.specimens[0].zoneSlot = 0;
+  assert.throws(() => validate(saved), /Spécimen invalide/);
+  saved.specimens[0].zoneSlot = null;
+  assert.doesNotThrow(() => validate(saved));
+});
+
+test("validate rejects two specimens sharing the same (zoneId, zoneSlot) pair, accepts the same zoneSlot in two different zones", () => {
+  const g = new GardenState(null, 1000);
+  const cv = makeCultivar(g);
+  const zoneA = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 2,
+  });
+  const zoneB = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 5,
+    z: 5,
+    capacity: 2,
+  });
+  const sp1 = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 0, z: 0 });
+  const sp2 = Cultivars.createSpecimen(g.s, { cultivarId: cv.id, x: 1, z: 1 });
+  sp1.zoneId = zoneA.id;
+  sp1.zoneSlot = 0;
+  sp2.zoneId = zoneA.id;
+  sp2.zoneSlot = 0;
+  assert.throws(() => validate(g.serialize()), /Spécimen invalide/);
+
+  // The same slot index in a different zone is never a conflict.
+  sp2.zoneId = zoneB.id;
+  sp2.zoneSlot = 0;
+  assert.doesNotThrow(() => validate(g.serialize()));
 });
 
