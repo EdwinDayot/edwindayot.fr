@@ -5,10 +5,13 @@
    specimens of the contract's cultivar from s.specimens, up to its remaining quota, crediting
    Memory.contractsFed by exactly what was actually moved. Neither targets a world entity (no
    c.id — a contract is addressed by its own campaignContracts id, c.contractId), so neither is
-   added to garden-state.js's `physical` list, same posture as setPriseFortDebit/setVeilleuse. No
-   payment/economy.js wiring here — see campaign-contracts.js's header comment for why that is
-   deliberately out of this epic's scope. Epic C6.5 further extends deliverContract with the
-   second "note de Jeanne" reveal (see below, right after Memory.recordContractDelivery). */
+   added to garden-state.js's `physical` list, same posture as setPriseFortDebit/setVeilleuse.
+   Epic C7.32 wires the actual payment: deliverContract now credits s.inventory.coins by exactly
+   `accepted * contract.pricePerUnit`, reusing the same accumulate-in-place pattern already proven
+   by garden-state-cmd-e.js's quest reward.coins (campaign-contracts.js's header comment is stale
+   on this point — its "no payment wiring" note describes C6.4's own scope, not this later epic).
+   Epic C6.5 further extends deliverContract with the second "note de Jeanne" reveal (see below,
+   right after Memory.recordContractDelivery). */
 (function (root) {
   const Contracts =
     typeof module !== "undefined"
@@ -70,6 +73,11 @@
         const deliveredIds = new Set(delivered.map((sp) => sp.id));
         s.specimens = s.specimens.filter((sp) => !deliveredIds.has(sp.id));
         Memory.recordContractDelivery(s.campaignMemory, contract.id, accepted);
+        // Epic C7.32: same accumulate-in-place pattern already proven by garden-state-cmd-e.js's
+        // quest reward.coins — never a second credit primitive, never Economy.credit (which
+        // expects a pre-declared {id: n} reward, not a value computed here from accepted/price).
+        s.inventory.coins =
+          (s.inventory.coins || 0) + accepted * contract.pricePerUnit;
         // Epic C6.5 (design §10, chapitre 12) : la seconde note de Jeanne (« La serre de
         // Jeanne : après la prochaine commande. », identique à la première, data-narrative.js)
         // se révèle au prochain contrat honoré strictement après que la première a déjà été vue

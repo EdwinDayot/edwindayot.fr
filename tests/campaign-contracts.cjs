@@ -195,3 +195,117 @@ test("a refused signContract/deliverContract never moves campaignMemory (no fict
 
   assert.equal(JSON.stringify(g.s.campaignMemory), before);
 });
+
+// Epic C7.32 (design §10, chapitre 12) : deliverContract crédite s.inventory.coins d'exactement
+// `accepted * contract.pricePerUnit` — jamais `c.quantity` demandé quand la livraison est cappée
+// par le quota restant ou le stock réel, jamais de crédit sur une livraison refusée.
+
+test("deliverContract: credits coins by exactly quantity * pricePerUnit on a full delivery", () => {
+  const g = new GardenState(null, 1000);
+  const cultivar = firstCultivar(g);
+  const before = g.s.inventory.coins;
+  g.command({ type: "signContract", cultivarId: cultivar.id, quota: 3, pricePerUnit: 15 });
+  const contractId = g.s.campaignContracts[0].id;
+  Array.from({ length: 3 }, () =>
+    Cultivars.createSpecimen(g.s, { cultivarId: cultivar.id, x: 0, z: 0 }),
+  );
+
+  const delivery = g.command({ type: "deliverContract", contractId, quantity: 3 });
+  assert.equal(delivery.ok, true, delivery.error);
+  assert.equal(g.s.inventory.coins, before + 3 * 15, "credited exactly quantity * pricePerUnit");
+});
+
+test("deliverContract: credits coins for the amount accepted, never the quantity requested, when capped by quota", () => {
+  const g = new GardenState(null, 1000);
+  const cultivar = firstCultivar(g);
+  const before = g.s.inventory.coins;
+  g.command({ type: "signContract", cultivarId: cultivar.id, quota: 2, pricePerUnit: 20 });
+  const contractId = g.s.campaignContracts[0].id;
+  Array.from({ length: 5 }, () =>
+    Cultivars.createSpecimen(g.s, { cultivarId: cultivar.id, x: 0, z: 0 }),
+  );
+
+  const cappedByQuota = g.command({ type: "deliverContract", contractId, quantity: 5 });
+  assert.equal(cappedByQuota.ok, true, cappedByQuota.error);
+  assert.equal(
+    g.s.inventory.coins,
+    before + 2 * 20,
+    "credited for the 2 accepted by quota, never the 5 requested",
+  );
+});
+
+test("deliverContract: credits coins for the amount accepted, never the quantity requested, when capped by real stock", () => {
+  const g = new GardenState(null, 1000);
+  const cultivar = firstCultivar(g);
+  const before = g.s.inventory.coins;
+  g.command({ type: "signContract", cultivarId: cultivar.id, quota: 10, pricePerUnit: 25 });
+  const contractId = g.s.campaignContracts[0].id;
+  Cultivars.createSpecimen(g.s, { cultivarId: cultivar.id, x: 0, z: 0 });
+
+  const cappedByStock = g.command({ type: "deliverContract", contractId, quantity: 10 });
+  assert.equal(cappedByStock.ok, true, cappedByStock.error);
+  assert.equal(
+    g.s.inventory.coins,
+    before + 1 * 25,
+    "credited for the 1 real specimen available, never the 10 requested",
+  );
+});
+
+test("deliverContract: no credit at all on a refused delivery (unknown contract, quota already reached, no real specimen)", () => {
+  const g = new GardenState(null, 1000);
+  const cultivar = firstCultivar(g);
+  g.command({ type: "signContract", cultivarId: cultivar.id, quota: 1, pricePerUnit: 50 });
+  const contractId = g.s.campaignContracts[0].id;
+  const before = g.s.inventory.coins;
+
+  const unknown = g.command({ type: "deliverContract", contractId: "ct999", quantity: 1 });
+  assert.equal(unknown.ok, false);
+  assert.equal(g.s.inventory.coins, before, "unknown contract: no credit");
+
+  const noStock = g.command({ type: "deliverContract", contractId, quantity: 1 });
+  assert.equal(noStock.ok, false, "no real specimen exists yet");
+  assert.equal(g.s.inventory.coins, before, "no real specimen: no credit");
+
+  Cultivars.createSpecimen(g.s, { cultivarId: cultivar.id, x: 0, z: 0 });
+  const filled = g.command({ type: "deliverContract", contractId, quantity: 1 });
+  assert.equal(filled.ok, true, filled.error);
+  const afterFill = g.s.inventory.coins;
+  assert.equal(afterFill, before + 50);
+
+  Cultivars.createSpecimen(g.s, { cultivarId: cultivar.id, x: 0, z: 0 });
+  const beyondQuota = g.command({ type: "deliverContract", contractId, quantity: 1 });
+  assert.equal(beyondQuota.ok, false, "quota already reached");
+  assert.equal(g.s.inventory.coins, afterFill, "quota already reached: no further credit");
+});
+
+test("deliverContract: coins accumulate correctly across several successive deliveries of the same contract", () => {
+  const g = new GardenState(null, 1000);
+  const cultivar = firstCultivar(g);
+  const before = g.s.inventory.coins;
+  g.command({ type: "signContract", cultivarId: cultivar.id, quota: 6, pricePerUnit: 10 });
+  const contractId = g.s.campaignContracts[0].id;
+
+  Array.from({ length: 2 }, () =>
+    Cultivars.createSpecimen(g.s, { cultivarId: cultivar.id, x: 0, z: 0 }),
+  );
+  g.command({ type: "deliverContract", contractId, quantity: 2 });
+  assert.equal(g.s.inventory.coins, before + 2 * 10);
+
+  Array.from({ length: 4 }, () =>
+    Cultivars.createSpecimen(g.s, { cultivarId: cultivar.id, x: 0, z: 0 }),
+  );
+  g.command({ type: "deliverContract", contractId, quantity: 4 });
+  assert.equal(g.s.inventory.coins, before + 6 * 10, "accumulated across two separate deliveries");
+});
+
+test("deliverContract: the credited coins balance survives a real JSON round-trip", () => {
+  const g = new GardenState(null, 1000);
+  const cultivar = firstCultivar(g);
+  g.command({ type: "signContract", cultivarId: cultivar.id, quota: 2, pricePerUnit: 15 });
+  const contractId = g.s.campaignContracts[0].id;
+  Cultivars.createSpecimen(g.s, { cultivarId: cultivar.id, x: 0, z: 0 });
+  g.command({ type: "deliverContract", contractId, quantity: 1 });
+
+  const reloaded = validate(JSON.parse(JSON.stringify(g.s)));
+  assert.equal(reloaded.inventory.coins, g.s.inventory.coins);
+});

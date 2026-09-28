@@ -5394,3 +5394,41 @@ Aucun code ni test modifié ce déclenchement — travail de planification seul 
 **Pour le prochain déclenchement** : prendre **C7.32** en Artisan moteur (commande pure, aucun rendu ni interface) — lire `garden-state-cmd-r.js` et `garden-state-cmd-e.js` (crédit de `reward.coins`) en entier avant d'y toucher, et étendre `tests/campaign-contracts.cjs` plutôt que d'en créer un nouveau fichier. Vérifier aussi qu'aucun des tests existants qui appellent déjà `deliverContract` (`tests/campaign-chapter12.cjs`, `campaign-chapter15.cjs`, `campaign-chapter16.cjs`, `campaign-chapter16-repair.cjs`, `campaign-contract-reduction.cjs`, `campaign-phase6-gate.cjs`, `campaign-specimen-render.cjs` — aucun n'asserte aujourd'hui `s.inventory.coins`, recherche exhaustive faite par ce lot) ne casse silencieusement une hypothèse implicite sur l'inventaire.
 
 Commit : voir `git log` sur `maison-des-possibles` (message « Cartographe : trente-deuxième lot de la phase 7, câblage du paiement des contrats (C7.32) »). `git push origin maison-des-possibles` à confirmer par `git ls-remote origin` avant conclusion de ce déclenchement.
+
+## Déclenchement automatisé du 28 septembre 2026 — Epic C7.32 : câblage du paiement des contrats commerciaux
+
+Déclenchement automatisé (routine cloud horaire). `HEAD` détaché au démarrage du conteneur ; `git checkout maison-des-possibles` a créé la branche locale depuis `origin/maison-des-possibles`, déjà à jour (`b794052`), arbre de travail propre.
+
+**Anti-hallucination faite avant tout le reste, réellement exécutée.** Dernier epic « fait » du backlog : **C7.31**, commit annoncé `3c38aa08942c20e234eee906bbf792a10f8d81ce` — `git show --stat 3c38aa0` confirme le commit réel (message et contenu correspondent exactement à l'entrée déjà existante de `campagne-backlog.md`/`campagne.md`). `npm ci && npm test` relancés indépendamment avant tout nouveau travail → **1123/1123**, identique au rapport déjà consigné, zéro écart. Aucun bandeau de pause en tête de `docs/campagne-backlog.md`. Aucun epic `bloqué` dans tout le backlog (`grep -c "^Statut : bloqué"` → 0). `docs/campagne-anomalies.md` relu : son unique entrée (fusion de la phase 6 jamais poussée vers `origin/main`) revérifiée réellement résolue (`git fetch origin main` puis `git merge-base --is-ancestor ffdbe2c origin/main` → vrai). Trois derniers epics consignés (C7.30/C2.8v-b/C7.31) tous `fait` : aucune pause anti-emballement à déclencher.
+
+**Choix de l'epic.** Le commit de tête (`b794052`, Cartographe) venait de détailler et de retenir **C7.32** comme unique epic du lot, dépendance C6.4 déjà `fait`. Seul epic `todo` détaillé et actionnable de tout le backlog, confirmé par relecture du fichier complet (`grep -n "^Statut : todo"` : seuls le gabarit et les entrées historiques supersédées C2.5v/C2.6/C2.8v).
+
+**Implémenté directement par l'orchestrateur** (Artisan moteur, épic de commande pur, aucune délégation). `garden-state-cmd-r.js` et `garden-state-cmd-e.js` lus en entier avant toute modification, comme prescrit par le lot Cartographe précédent. `deliverContract` crédite désormais `s.inventory.coins` d'exactement `accepted * contract.pricePerUnit` (`s.inventory.coins = (s.inventory.coins || 0) + accepted * contract.pricePerUnit`, juste après `Memory.recordContractDelivery`), réutilisant tel quel le patron déjà prouvé par `garden-state-cmd-e.js`'s crédit de `reward.coins`, jamais une seconde primitive ni `Economy.credit`. Aucun nouveau champ persisté, aucune migration : `pricePerUnit` existe depuis C6.4, `s.inventory.coins` depuis le jardin libre. En-tête de `public/game/campaign-contracts.js` mis à jour (écart non anticipé par le gabarit initial, documenté dans son propre diff) : son affirmation historique « no payment wiring... left for a later epic » nommait désormais explicitement C7.32 comme cet epic, plutôt que laissée silencieusement obsolète.
+
+Six nouveaux tests dans `tests/campaign-contracts.cjs` (fichier étendu, jamais un nouveau fichier, même discipline que C7.19/C7.20/C7.21/C7.23/C7.24/C7.25) : crédit exact sur livraison complète ; crédit cappé au quota, jamais la quantité demandée ; crédit cappé au stock réel disponible, jamais la quantité demandée ; aucun crédit sur un refus (contrat inconnu, aucun spécimen réel, quota déjà atteint) ; accumulation correcte sur deux livraisons successives du même contrat ; le solde crédité survit à un aller-retour JSON réel.
+
+**Échec de test réellement rencontré et corrigé une seule fois**, conformément à la règle « une seule tentative de correction » d'`orchestration.md`/`execution-continue.md` — pas un défaut de production, un vrai bug de test découvert en exécutant réellement `npm test`, jamais supposé passant. Le premier jet du test « cappé par le quota ou le stock réel » enchaînait deux scénarios sur le même `GardenState`/cultivar : après le premier plafonnement (quota 2, 5 spécimens créés, 3 restent réellement invendus dans `s.specimens`), le second scénario ajoutait un seul nouveau spécimen et affirmait qu'un seul serait disponible — en réalité 4 (3 restants + 1 nouveau), puisque rien n'avait consommé les invendus du premier scénario. Résultat observé à l'exécution : `148 !== 73` (crédit réellement observé contre crédit attendu par une assertion erronée). Corrigé en scindant en deux tests indépendants, chacun avec son propre `GardenState` frais, plutôt qu'en réduisant discrètement l'assertion ou en devinant une autre cause.
+
+`npm ci && npm test` → **1129/1129** (1123 existants + 6 nouveaux, zéro régression après correction). Sortie complète :
+
+```
+# tests 1129
+# suites 0
+# pass 1129
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+```
+
+Vérification programmatique faite, pas supposée : `git status --short` en fin d'implémentation confirme exactement `public/game/campaign-contracts.js` (commentaire d'en-tête), `public/garden-state-cmd-r.js` et `tests/campaign-contracts.cjs` — aucun fichier de rendu/matériau/interface touché, confirmant l'exemption déjà prévue par l'epic lui-même : `npm run test:browser`/`test:visual` complets non requis, `tests/garden-material-audit.cjs` non concerné.
+
+`/code-review` (skill, niveau medium) exécuté sur le diff complet : aucun défaut relevé — patron de crédit tracé contre `garden-state-cmd-e.js:43` et contre `Contracts.deliverableCount`/`isContractOpen` pour confirmer qu'aucun crédit n'échappe à un refus/plafonnement, validation de `s.inventory.coins` par `garden-state-validate.js` confirmée compatible (entier connu de l'inventaire), commentaires mis à jour confirmés cohérents avec le changement réel.
+
+Ne ferme aucune porte de phase (la phase 7 reste ouverte : saisons été/hiver, catalogue décoratif en position, extensions de maison, septième annexe, tactile au-delà de l'existant, histoires secondaires — aucun concerné par ce lot). Aucun choix déjà confirmé du design remis en cause (Alma vivante, nom des Rainelles, culpabilisation de fin de campagne — aucun concerné). Aucune règle de `direction-artistique.md` concernée (aucun rendu introduit, aucune teinte inventée).
+
+`docs/campagne-backlog.md` mis à jour : C7.32 passe à `fait`, détail complet (patron de crédit, écart de commentaire documenté, échec de test réel et sa correction, résultat de `/code-review`) consigné dans son propre statut.
+
+**Pour le prochain déclenchement** : plus aucun epic détaillé `todo` à dépendances satisfaites nulle part dans le backlog — recherche exhaustive à refaire en tête du prochain déclenchement, pas supposée reconduite. Seules les entrées historiques supersédées (C2.5v, C2.6, C2.8v) subsistent avec le statut `todo` littéral, aucune à choisir directement. La phase 7 n'a atteint aucune de ses portes de sortie (design §15) ; le rôle Cartographe est probablement la voie à endosser au prochain déclenchement, sur l'un des chantiers déjà identifiés comme restants (saisons été/hiver, catalogue décoratif en position, extensions de maison, tactile au-delà de l'existant, histoires secondaires).
+
+Commit : voir `git log` sur `maison-des-possibles` (message « Epic C7.32 : câblage du paiement des contrats commerciaux, livrer un contrat crédite réellement des pièces »). `git push origin maison-des-possibles` à confirmer par `git ls-remote origin` avant conclusion de ce déclenchement.

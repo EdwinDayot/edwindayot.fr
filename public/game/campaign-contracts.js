@@ -10,11 +10,14 @@
    A contract fixes `cultivarId`/`quota`/`pricePerUnit` at signature, never recomputed afterwards
    — signContract refuses outright while another contract is still open, so "le prix reste figé
    après la signature d'un second contrat différent" is true by construction (there is only ever
-   one open contract to compare against). No payment is wired into economy.js/inventory by this
-   epic: the literal exit criterion never mentions crediting coins, only that the price itself is
-   fixed and readable — an actual sale/credit flow is left for a later epic (narration, C6.5, or a
-   future économie epic) rather than invented here, same "généraliser plutôt que spécialiser"
-   posture already applied throughout this campaign.
+   one open contract to compare against). No payment was wired into economy.js/inventory by this
+   epic: the literal exit criterion never mentioned crediting coins, only that the price itself is
+   fixed and readable — an actual sale/credit flow was deliberately left for a later epic, same
+   "généraliser plutôt que spécialiser" posture already applied throughout this campaign. That
+   later epic is C7.32 (garden-state-cmd-r.js's own header comment): deliverContract now credits
+   s.inventory.coins by exactly `accepted * pricePerUnit`, using pricePerUnit exactly as fixed here
+   at signature — nothing in this file changed to make that possible, it was already the fixed,
+   readable value the design named.
 
    Delivery *consumes* real specimens (design: "jamais fabriqués pour l'occasion, prélevés dans
    s.specimens") — a delivered specimen is removed from s.specimens by the caller (garden-state-
