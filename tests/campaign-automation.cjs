@@ -14,6 +14,12 @@ const CampaignAutomation = require("../public/game/campaign-automation.js");
 
 const CYCLE = CampaignAutomation.CYCLE_SECONDS;
 const RANGE = CampaignAutomation.ZONE_WORK_RANGE;
+// Epic C7.30: a "transporter" withdrawal no longer deposits in the same tick it leaves
+// `from.buffer` — every existing transporter test below that used to observe both at once now
+// waits this many extra ticks for the delivery. "trier" is untouched (still instantaneous, see
+// campaign-automation.js's own tickTransporter/tickTrier comments), so its own tests need no
+// change.
+const TRANSIT = CampaignAutomation.TRANSIT_TICKS;
 
 // Only the scripted frog encounter (C2.3) can create a Rainelle — and its own cultivar — through
 // commands. Same fixture already used by tests/campaign-teaching.cjs/-gestures.cjs.
@@ -253,15 +259,29 @@ test("transporter: moves a filtered resource from the source panier's buffer to 
     destination: to.id,
     condition: cultivarId,
   });
+  // Epic C7.30: the withdrawal itself still happens exactly at CYCLE (unchanged — see the
+  // budget/timing comments on tickTransporter), but the resource only reaches `to.buffer` after a
+  // further TRANSIT_TICKS in flight, carried on the Rainelle (`rainelle.carrying`).
   g.step(CYCLE - 1);
   assert.equal(from.buffer[cultivarId], 3);
   assert.equal(to.buffer[cultivarId], undefined);
   g.step(1);
   assert.equal(from.buffer[cultivarId], undefined);
+  assert.equal(to.buffer[cultivarId], undefined);
+  assert.deepEqual(rainelle.carrying, {
+    key: cultivarId,
+    qty: 3,
+    destinationId: to.id,
+    ticksRemaining: TRANSIT,
+  });
+  g.step(TRANSIT - 1);
+  assert.equal(to.buffer[cultivarId], undefined);
+  g.step(1);
   assert.equal(to.buffer[cultivarId], 3);
+  assert.equal(rainelle.carrying, null);
 });
 
-test("transporter: an empty condition (no filter taught) moves every resource currently in the source panier", () => {
+test("transporter: an empty condition (no filter taught) departs with only the first eligible key, in buffer order — the rest wait for a future trajet", () => {
   const g = new GardenState(null, 1000);
   const rainelle = bornRainelle(g);
   const from = Stations.registerStation(g.s.campaignStations, "panier", {
@@ -280,8 +300,32 @@ test("transporter: an empty condition (no filter taught) moves every resource cu
     source: from.id,
     destination: to.id,
   });
+  // Epic C7.30: a carry only ever holds a single resource key ("chaque transporteuse garde un
+  // seul trajet actif", design §5) — an untaught condition no longer moves every eligible key in
+  // the same tick the way it did before this epic. The first cycle departs with only `a1` (first
+  // in `Object.keys(from.buffer)` order); `a2` waits, untouched, in `from.buffer`.
   g.step(CYCLE);
+  assert.deepEqual(from.buffer, { a2: 5 });
+  assert.equal(to.buffer.a1, undefined);
+  // Epic C7.30: while `carrying` blocks a second withdrawal, advanceCycle is still called every
+  // tick (tickTransporter's own "carrying" branch) — the job keeps ticking (and would complete
+  // and restart on its own timer) underneath the wait, exactly like every other verb's cycle,
+  // rather than freezing just because a delivery is in flight. So by the time this first delivery
+  // lands (TRANSIT ticks later), the job is already TRANSIT ticks into its next cycle — only
+  // CYCLE - TRANSIT more ticks are needed for `a2` to depart, not a fresh full CYCLE.
+  g.step(TRANSIT);
+  assert.deepEqual(to.buffer, { a1: 2 });
+  g.step(CYCLE - TRANSIT - 1);
+  assert.deepEqual(from.buffer, { a2: 5 });
+  g.step(1);
   assert.deepEqual(from.buffer, {});
+  assert.deepEqual(rainelle.carrying, {
+    key: "a2",
+    qty: 5,
+    destinationId: to.id,
+    ticksRemaining: TRANSIT,
+  });
+  g.step(TRANSIT);
   assert.deepEqual(to.buffer, { a1: 2, a2: 5 });
 });
 
@@ -406,14 +450,24 @@ test("chain: arroser then recolter then transporter carries a real resource end 
 
   // No command other than the passage of time from here on. One cycle is enough: harvester and
   // transporter are taught (and so start their own countdown) at the same tick, so both complete
-  // together — the harvest lands in localPanier and is carried out to cuisine within that same
-  // tick (see campaign-automation.js's tickRainelle: s.rainelles are ticked in order, harvester
-  // before transporter). A second/third cycle would harvest the same specimen again (the
+  // together — the harvest lands in localPanier and is *withdrawn* into the transporter's own
+  // `carrying` within that same tick (see campaign-automation.js's tickRainelle: s.rainelles are
+  // ticked in order, harvester before transporter). Epic C7.30: the withdrawal no longer deposits
+  // in cuisine the same tick it leaves localPanier — a further TRANSIT_TICKS in flight are needed
+  // before it actually lands. A second/third cycle would harvest the same specimen again (the
   // documented unbounded-regeneration limit from C2.6c, unrelated to what this test proves).
   g.step(CYCLE);
 
   assert.ok(Cultivars.specimenMoisture(specimen, g.s.elapsed) > 95);
   assert.deepEqual(localPanier.buffer, {});
+  assert.equal(cuisine.buffer[cultivarId], undefined);
+  assert.deepEqual(transporter.carrying, {
+    key: cultivarId,
+    qty: 1,
+    destinationId: cuisine.id,
+    ticksRemaining: CampaignAutomation.TRANSIT_TICKS,
+  });
+  g.step(CampaignAutomation.TRANSIT_TICKS);
   assert.equal(cuisine.buffer[cultivarId], 1);
 });
 
@@ -679,8 +733,12 @@ test("transporter: a partially-full destination moves only as much as fits, spli
     destination: to.id,
     condition: cultivarId,
   });
+  // Epic C7.30: the withdrawal (and so the budget split) still happens exactly at CYCLE,
+  // unaffected — only the deposit into `to` is now deferred by TRANSIT_TICKS.
   g.step(CYCLE);
   assert.equal(from.buffer[cultivarId], 3);
+  assert.equal(to.buffer[cultivarId], undefined);
+  g.step(TRANSIT);
   assert.equal(to.buffer[cultivarId], 2);
   assert.equal(Stations.panierTotal(to), 24);
 });
@@ -706,10 +764,14 @@ test("transporter: a protected source min never gets drained below its floor", (
     destination: to.id,
     condition: cultivarId,
   });
+  // Epic C7.30: the withdrawal (so the source's own floor) still happens exactly at CYCLE — only
+  // the deposit into `to` is now deferred by TRANSIT_TICKS.
   g.step(CYCLE);
   assert.equal(from.buffer[cultivarId], 2);
-  assert.equal(to.buffer[cultivarId], 3);
+  assert.equal(to.buffer[cultivarId], undefined);
   assert.equal(Stations.panierTotal(from), 2);
+  g.step(TRANSIT);
+  assert.equal(to.buffer[cultivarId], 3);
 });
 
 test("transporter: a source already at or below its min moves nothing, blocking cleanly", () => {

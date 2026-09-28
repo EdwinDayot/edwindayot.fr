@@ -612,6 +612,24 @@
               r.job !== null &&
               (typeof r.job !== "object" ||
                 !finite(r.job.remaining, 0, CampaignAutomation.CYCLE_SECONDS))) ||
+            // Epic C7.30: carrying is optional (a pre-epic save, or a Rainelle that never taught
+            // "transporter"/never yet completed a withdrawal, has none) but well-formed when
+            // present — shape only, same posture as geste's own poste/source/destination strings
+            // just above: whether destinationId still resolves to a real panier is decided
+            // dynamically at delivery time (campaign-automation.js's resolveCarrying), never
+            // re-checked here.
+            (r.carrying !== undefined &&
+              r.carrying !== null &&
+              (typeof r.carrying !== "object" ||
+                typeof r.carrying.key !== "string" ||
+                !r.carrying.key ||
+                !count(r.carrying.qty) ||
+                r.carrying.qty <= 0 ||
+                typeof r.carrying.destinationId !== "string" ||
+                !r.carrying.destinationId ||
+                !Number.isInteger(r.carrying.ticksRemaining) ||
+                r.carrying.ticksRemaining < 0 ||
+                r.carrying.ticksRemaining > CampaignAutomation.TRANSIT_TICKS)) ||
             // Epic C3.4: a bourgeon has no shape of its own beyond "present or not" (see
             // rainelles.js's own comment) — optional so a pre-epic rainelle still loads.
             (r.bourgeon !== undefined &&

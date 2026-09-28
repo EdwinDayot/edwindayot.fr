@@ -53,13 +53,15 @@
    workable), so "passage bloqué" can and should override "au-travail"/"repos"/anything else
    rather than compete with it.
 
-   For the same reason "passage bloqué" itself was deferred at first, "réserver un emplacement de
-   sortie... si la cible disparaît, la réservation se libère et l'objet déjà porté rejoint un bac
-   de secours" (an item already
-   "in transit" needing rescue) has no scenario to cover yet either: every gesture here still
-   picks up and delivers a resource in the same atomic step (see campaign-automation.js), and no
-   command exists yet to remove a borne/zone/panier once registered, so a target can't actually
-   "disappear" mid-cycle in real play. What this epic *does* deliver of that same design
+   At the time "passage bloqué" was added, "réserver un emplacement de sortie... si la cible
+   disparaît, la réservation se libère et l'objet déjà porté rejoint un bac de secours" (an item
+   already "in transit" needing rescue) had no scenario to cover yet either: every gesture picked
+   up and delivered a resource in the same atomic step, and no command removed a borne/zone/panier
+   once registered, so a target could not actually "disappear" mid-cycle in real play. Both
+   prerequisites are gone now — removeStation (C7.11) and a real, multi-tick "transporter" transit
+   window (C7.30, `rainelle.carrying`) — but the rescue (a bac de secours) itself remains
+   unbuilt (C2.8v-b): a delivery whose destination vanished mid-transit is lost silently today,
+   observed but not caught by anything here. What C2.8 *did* deliver of that same design
    paragraph — a resource and an output slot genuinely unavailable to a second Rainelle, because
    panier.capacity/min are enforced before campaign-automation.js ever mutates a buffer — is
    exposed below as "sortie pleine"/"stock cible atteint", and proven never to double-count in
@@ -124,7 +126,17 @@
     return { kind: "au-travail", message: "Récolte les productions mûres de la zone." };
   }
 
-  function statusTransporter(geste, s) {
+  // Epic C7.30: a Rainelle mid-transit (`rainelle.carrying`) has already withdrawn from `from` —
+  // reading `from.buffer` alone would now often read "source-vide"/"repos" for a Rainelle that is
+  // in fact actively working, just not at the source panier this instant. Checked first, ahead of
+  // (and independent of) the source/destination reads below, the same "orthogonal fact, checked
+  // before the rest" posture already used for "passage bloqué" above.
+  function statusTransporter(rainelle, geste, s) {
+    if (rainelle.carrying)
+      return {
+        kind: "au-travail",
+        message: "En chemin vers la destination avec son chargement.",
+      };
     const from = resolve(s, geste.source, "panier");
     const to = resolve(s, geste.destination, "panier");
     if (!from || !to || from === to)
@@ -166,7 +178,7 @@
       return { kind: "repos", message: "Au repos : aucun geste enseigné." };
     if (geste.verbe === "arroser") return statusArroser(geste, s);
     if (geste.verbe === "recolter") return statusRecolter(geste, s);
-    if (geste.verbe === "transporter") return statusTransporter(geste, s);
+    if (geste.verbe === "transporter") return statusTransporter(rainelle, geste, s);
     return { kind: "repos", message: "Au repos : ce geste n'est pas encore mis en œuvre." };
   }
 

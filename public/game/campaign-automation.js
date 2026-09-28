@@ -71,7 +71,19 @@
    CYCLE_SECONDS exactly as before this epic. A cycle already mid-count when the season turns
    finishes at whatever duration it started with — advanceCycle never rescales a running
    countdown, same rule already stated above for C5.4's borne flag. runNightWork/doRecolter stay
-   untouched: a resolved night has no per-second countdown to accelerate. */
+   untouched: a resolved night has no per-second countdown to accelerate.
+
+   Epic C7.30 (design §5, "si la cible disparaît, la réservation est libérée et la ressource déjà
+   portée rejoint un bac de secours identifié") gives "transporter" alone (never "trier" — see
+   tickTransporter's own comment) a real, observable transit window: a withdrawal now rides on
+   `rainelle.carrying = {key, qty, destinationId, ticksRemaining}` for TRANSIT_TICKS before it
+   lands, resolved every tick by resolveCarrying regardless of the Rainelle's current geste. The
+   rescue itself (a vanished destination's cargo reaching a bac de secours) stays unbuilt — this
+   epic only makes the loss observable, the prerequisite C2.8v-b needed and didn't have until now.
+   runNightWork is untouched: it never calls tickRainelle/resolveCarrying at all (a resolved night
+   has no per-second tick to resolve one through), so a carry in flight simply doesn't advance
+   during sleep — a direct consequence of the existing day/night split, not a new rule invented
+   here. */
 (function (root) {
   const C =
     typeof module !== "undefined"
@@ -137,6 +149,18 @@
   // picks the smallest simple fraction strictly below 1 (2:1), the same "smallest simple fraction"
   // reasoning FAST_CYCLE_SECONDS above already used for a different unnamed ratio.
   const RESIDUE_RATIO = 2;
+
+  // Epic C7.30 ("transporter" → un trajet réellement étalé sur plusieurs ticks, design §5's own
+  // "si la cible disparaît, la réservation est libérée et la ressource déjà portée rejoint un bac
+  // de secours identifié" only makes sense once a delivery has a window during which the cargo is
+  // neither in the source nor yet in the destination). How long that window lasts, in the same
+  // simulated seconds as CYCLE_SECONDS — half of it, the smallest simple fraction that makes a
+  // transit clearly observable against a full cycle (not instantaneous, not so long the transport
+  // reads as broken), the same "smallest simple fraction" reasoning already used above for
+  // RESIDUE_RATIO/FAST_CYCLE_SECONDS. Deliberately its own constant, never merged with
+  // FAST_CYCLE_SECONDS despite sharing a value: one shortens a cycle's own countdown before it
+  // completes, the other times an already-completed withdrawal's flight — two independent knobs.
+  const TRANSIT_TICKS = 10;
 
   // Resolves `id` against the registry and checks it is the expected kind; returns the station
   // itself on success or null otherwise — never throws, per this file's failure posture above.
@@ -335,6 +359,51 @@
   // keys they are allowed to move, decided by their own caller (`pickKeys`, called once the
   // paniers are resolved and the cycle has actually advanced, exactly the point `keys` was
   // computed at before this split).
+  //
+  // Epic C7.30 pulls the shared budget math (destination room + source floor, both read once,
+  // right now) out into panierMoveBudget below: "trier" still deposits in this same call
+  // (instantaneous, unchanged); "transporter" still calls it too, for the exact same withdrawal-
+  // time budget, but no longer deposits in the same call — see tickTransporter's own comment.
+  //
+  // `inFlightTowards` closes a gap /code-review caught before this epic's own commit: once a
+  // withdrawal can sit "in flight" for a while (rainelle.carrying), the destination's *own*
+  // `panierTotal` alone under-counts its true committed total while a delivery already headed
+  // there hasn't landed yet. Two Rainelles — two "transporter" withdrawals, or one "transporter"
+  // and one "trier" — could otherwise both read the same "empty" room at their own withdrawal
+  // tick (neither carry has landed yet) and jointly overshoot `to.capacity` once both eventually
+  // land: exactly the double-count rainelles-status.js's own header comment already promises can
+  // never happen ("panier.capacity/min are enforced before campaign-automation.js ever mutates a
+  // buffer... proven never to double-count"). Summing every Rainelle's own `carrying.qty` bound
+  // for this exact destination and subtracting it from the room budget keeps that promise true
+  // under the one new thing this epic adds (a withdrawal that doesn't land immediately) without
+  // reopening "revérifier la capacité au moment du dépôt" (still never done — the budget is still
+  // fixed once, at withdrawal, just correctly informed about every other Rainelle's own
+  // reservation, not only what has already physically landed).
+  //
+  // Residual, narrower gap, left open rather than guessed at here: recolter/bouturer/preparer's
+  // own capacity checks against a panier still read only `Stations.panierTotal`, not this — a
+  // deposit from one of those verbs could in principle still land on top of an in-flight
+  // "transporter" reservation targeting the very same panier. No current epic composes two flows
+  // into the same destination this way (nursery-chain/rainelles-chain each feed one destination
+  // from a single upstream flow), so this is flagged rather than fixed pre-emptively across every
+  // verb in one epic — the same "isoler d'abord, ne pas construire tout le système de réservation
+  // d'un bloc" posture this epic's own backlog entry already applies to the bac de secours itself.
+  function inFlightTowards(s, destinationId) {
+    let total = 0;
+    for (const r of s.rainelles)
+      if (r.carrying && r.carrying.destinationId === destinationId) total += r.carrying.qty;
+    return total;
+  }
+
+  function panierMoveBudget(s, from, to) {
+    const roomAtDestination = Math.max(
+      0,
+      to.capacity - Stations.panierTotal(to) - inFlightTowards(s, to.id),
+    );
+    const takeableFromSource = Math.max(0, Stations.panierTotal(from) - from.min);
+    return Math.min(roomAtDestination, takeableFromSource);
+  }
+
   function tickPanierMove(rainelle, s, pickKeys) {
     const geste = rainelle.geste;
     const from = resolveKind(s, geste.source, "panier");
@@ -342,15 +411,7 @@
     if (!from || !to || from === to) return;
     if (!advanceCycle(rainelle)) return;
     const keys = pickKeys(from);
-    const roomAtDestination = Math.max(
-      0,
-      to.capacity - Stations.panierTotal(to),
-    );
-    const takeableFromSource = Math.max(
-      0,
-      Stations.panierTotal(from) - from.min,
-    );
-    let budget = Math.min(roomAtDestination, takeableFromSource);
+    let budget = panierMoveBudget(s, from, to);
     for (const key of keys) {
       if (budget <= 0) break;
       const qty = Math.min(from.buffer[key] || 0, budget);
@@ -362,11 +423,87 @@
     }
   }
 
+  // Epic C7.30: unlike "trier" (still tickPanierMove above, instantaneous — design §5 only ever
+  // names "un trajet" for "transporter", never for "trier"'s own adjacent-bac move, see this
+  // epic's own backlog entry), a "transporter" withdrawal no longer deposits in the same call
+  // that takes it from `from.buffer`. The quantity travels on the Rainelle herself instead
+  // (`rainelle.carrying`, resolved every tick by resolveCarrying below, entirely independently of
+  // this function and of whatever `geste` the Rainelle is taught by the time it lands — design
+  // §5, "réenseigner remplace le geste" never stalls a delivery already under way) for
+  // TRANSIT_TICKS before it reaches the destination. The withdrawal keeps today's exact budget —
+  // destination room + source floor, both read once, right now, never recomputed mid-transit, the
+  // same "a cycle's own math is never rescaled once started" discipline advanceCycle's own `fast`
+  // argument already relies on — only the deposit moves later, never the decision of how much to
+  // take.
+  //
+  // "Chaque transporteuse garde un seul trajet actif" (design §5) is enforced here, not just
+  // narrated: a Rainelle already carrying something never starts a second withdrawal — her cycle
+  // still completes (and restarts) underneath her while she waits, since advanceCycle is still
+  // called every tick, but a completed cycle simply isn't acted on until `carrying` clears.
+  //
+  // A carry only ever holds one resource key at a time — the field is `{key, qty, ...}`, singular,
+  // never a second buffer-shaped structure of its own (same discipline `rainelle.job` already
+  // keeps for the cycle countdown itself). An untaught condition (every key in `from.buffer`
+  // eligible, same as before this epic) now only ever departs with the first key that has
+  // anything to give, in `Object.keys` order — the remaining keys simply wait for a future
+  // trajet, once this one has landed and a fresh cycle completes. This is a real, deliberate
+  // behaviour change from before this epic (when an untaught condition moved every eligible key
+  // in the same tick) — tests/campaign-automation.cjs's own "empty condition" test is updated
+  // accordingly rather than left to fail silently.
   function tickTransporter(rainelle, s) {
     const geste = rainelle.geste;
-    tickPanierMove(rainelle, s, (from) =>
-      geste.condition ? [geste.condition] : Object.keys(from.buffer),
-    );
+    if (rainelle.carrying) {
+      advanceCycle(rainelle);
+      return;
+    }
+    const from = resolveKind(s, geste.source, "panier");
+    const to = resolveKind(s, geste.destination, "panier");
+    if (!from || !to || from === to) return;
+    if (!advanceCycle(rainelle)) return;
+    const keys = geste.condition ? [geste.condition] : Object.keys(from.buffer);
+    const budget = panierMoveBudget(s, from, to);
+    if (budget <= 0) return;
+    for (const key of keys) {
+      const qty = Math.min(from.buffer[key] || 0, budget);
+      if (qty <= 0) continue;
+      from.buffer[key] -= qty;
+      if (from.buffer[key] <= 0) delete from.buffer[key];
+      rainelle.carrying = {
+        key,
+        qty,
+        destinationId: geste.destination,
+        ticksRemaining: TRANSIT_TICKS,
+      };
+      return;
+    }
+  }
+
+  // Epic C7.30: resolves one tick of an in-flight "transporter" delivery, for every Rainelle that
+  // carries one — called unconditionally from tickRainelle, before the per-verb dispatch, so it
+  // never depends on `rainelle.geste` at all (a Rainelle re-taught mid-transit still delivers
+  // exactly on schedule). `destinationId` is re-resolved against the *current* registry, never a
+  // station reference captured at the withdrawal — the same precaution `livePanier` needed in
+  // tests/campaign-nursery-chain.cjs (C7.29): campaign-stations.js replaces a station object
+  // wholesale on some paths (e.g. removeStation) rather than mutating it in place, so a captured
+  // reference can go stale. Landing on a panier deposits the full quantity without re-checking
+  // that panier's capacity (deliberately: the budget was already fixed for good at withdrawal,
+  // see tickTransporter's own comment — "conserver les ressources", never "refuser un dépôt déjà
+  // réservé"). Landing on anything else — no station resolves at all (removed via removeStation
+  // while in flight) or one of the wrong kind — loses the quantity silently: exactly the gap
+  // design §5 names ("la réservation est libérée et la ressource déjà portée rejoint un bac de
+  // secours identifié") and that this epic deliberately leaves open, observed but not closed, for
+  // C2.8v-b.
+  function resolveCarrying(rainelle, s) {
+    const carrying = rainelle.carrying;
+    if (!carrying) return;
+    carrying.ticksRemaining -= 1;
+    if (carrying.ticksRemaining > 0) return;
+    const resolved = Stations.resolveStation(s.campaignStations, carrying.destinationId);
+    if (resolved.ok && resolved.kind === "panier") {
+      const panier = resolved.station;
+      panier.buffer[carrying.key] = (panier.buffer[carrying.key] || 0) + carrying.qty;
+    }
+    rainelle.carrying = null;
   }
 
   // "Trier" (design §5, « arrivée mélangée au poste » → « une catégorie extraite vers le bac
@@ -512,7 +649,12 @@
 
   // One Rainelle, one tick. A null geste, or a verb this file doesn't implement yet (see header
   // comment), is a no-op — never an exception, never a silent mutation of `job`.
+  //
+  // Epic C7.30: resolveCarrying runs first, unconditionally, even for a null geste — an in-flight
+  // delivery is never gated on what (if anything) the Rainelle is currently taught, see its own
+  // comment above.
   function tickRainelle(rainelle, s) {
+    resolveCarrying(rainelle, s);
     const geste = rainelle.geste;
     if (!geste) return;
     if (geste.verbe === "arroser") tickArroser(rainelle, s);
@@ -581,6 +723,7 @@
     FATIGUED_CAPACITY_PER_CYCLE,
     SUBSTRATE_KEY,
     RESIDUE_RATIO,
+    TRANSIT_TICKS,
     tickRainelle,
     updateSpecimenReadiness,
     runNightWork,

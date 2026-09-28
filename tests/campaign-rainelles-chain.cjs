@@ -102,11 +102,13 @@ test("chain: eau → arroseuse → fraisiers → récolteuse → panier → tran
   // that stands in for an external consumer of the kitchen reserve (see file header).
 
   // 60 cycles is comfortably past the 48 needed to fill both the local panier and the kitchen
-  // reserve to their default capacity (24 each): cycles 1-24 fill cuisine directly (harvester and
-  // transporter complete in the same tick, so each cycle's unit is carried all the way through);
-  // cycles 25-48 then fill localPanier once cuisine has no more room; from cycle 49 on the
-  // récolteuse's own capacity guard stops harvesting cleanly, leaving the specimen ready and
-  // untouched rather than losing it.
+  // reserve to their default capacity (24 each): cycles 1-24 fill cuisine (harvester and
+  // transporter complete their own cycle on the same tick, so each cycle's unit leaves the local
+  // panier right away — Epic C7.30 only defers *landing* in cuisine by a further TRANSIT_TICKS,
+  // never the departure cadence itself, so by cycle 24 + a fraction of a cycle every unit taken
+  // has long since arrived); cycles 25-48 then fill localPanier once cuisine has no more room;
+  // from cycle 49 on the récolteuse's own capacity guard stops harvesting cleanly, leaving the
+  // specimen ready and untouched rather than losing it.
   g.step(60 * CYCLE);
 
   assert.equal(cuisine.buffer[cultivarId], CAPACITY, "kitchen reserve must saturate at its capacity, not overflow");
@@ -130,16 +132,25 @@ test("chain: eau → arroseuse → fraisiers → récolteuse → panier → tran
   cuisine.buffer[cultivarId] -= 10;
   assert.equal(cuisine.buffer[cultivarId], 14);
 
-  // A single transporter cycle is enough to notice the new room and move the whole ten-unit
-  // budget from the (still full) local panier in one shot — no re-teaching, no new command.
+  // A single transporter cycle is enough to notice the new room and withdraw the whole ten-unit
+  // budget from the (still full) local panier in one shot — no re-teaching, no new command. Epic
+  // C7.30: the withdrawal itself still lands on this exact tick (unchanged timing — see
+  // campaign-automation.js's own tickTransporter comment), but the deposit into `cuisine` is now
+  // deferred a further TRANSIT_TICKS.
+  const TRANSIT = CampaignAutomation.TRANSIT_TICKS;
   g.step(CYCLE);
-  assert.equal(cuisine.buffer[cultivarId], CAPACITY, "the chain must refill the kitchen reserve on its own once room reopens");
   assert.equal(localPanier.buffer[cultivarId], CAPACITY - 10);
+  assert.equal(cuisine.buffer[cultivarId], CAPACITY - 10, "the withdrawn units are in flight, not yet landed");
+  g.step(TRANSIT);
+  assert.equal(cuisine.buffer[cultivarId], CAPACITY, "the chain must refill the kitchen reserve on its own once room reopens");
 
   // With the local panier no longer full, the récolteuse — which had been idly stopping at its
   // capacity guard every cycle since cycle 49 above — resumes depositing on its very next cycle,
-  // entirely on its own.
-  g.step(CYCLE);
+  // entirely on its own. Its own countdown is untouched by any of this (recolter never carries
+  // anything), so its next completion still falls exactly CYCLE ticks after the withdrawal above,
+  // comfortably after the delivery just observed (TRANSIT < CYCLE) — only the remaining CYCLE -
+  // TRANSIT ticks are left to reach it from here.
+  g.step(CYCLE - TRANSIT);
   assert.equal(localPanier.buffer[cultivarId], CAPACITY - 10 + 1, "harvesting must resume on its own once the local panier has room again");
   assert.equal(cuisine.buffer[cultivarId], CAPACITY, "the kitchen reserve is full again, so this cycle's harvest must stay in the local panier");
 

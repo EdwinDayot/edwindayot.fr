@@ -241,6 +241,31 @@ test("transporter: source has stock, room at destination, no floor in the way �
   assert.equal(Status.status(rainelle, g.s).kind, "au-travail");
 });
 
+// Epic C7.30: a Rainelle mid-transit has already withdrawn from `from` — its buffer alone would
+// otherwise misreport her as idle/blocked while she is in fact actively delivering.
+test("transporter: mid-transit (rainelle.carrying set) reads au-travail even though the source panier is now empty", () => {
+  const g = new GardenState(null, 1000);
+  const { rainelle, cultivarId } = freshRainelle(g);
+  const from = Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+  const to = Stations.registerStation(g.s.campaignStations, "panier", { x: 0, z: 0 });
+  teach(rainelle, {
+    verbe: "transporter",
+    poste: "peu-importe",
+    source: from.id,
+    destination: to.id,
+    condition: cultivarId,
+  });
+  // Nothing left in `from` (already withdrawn) — without the carrying check, this would read
+  // "source-vide".
+  rainelle.carrying = {
+    key: cultivarId,
+    qty: 3,
+    destinationId: to.id,
+    ticksRemaining: 4,
+  };
+  assert.equal(Status.status(rainelle, g.s).kind, "au-travail");
+});
+
 test("status never throws for any of the six covered states across many random-ish setups", () => {
   const g = new GardenState(null, 1000);
   const { rainelle } = freshRainelle(g);
