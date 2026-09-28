@@ -20,14 +20,14 @@
    reimplemented against a different data space rather than imported, since automation.js's own
    functions read `D.recipes[e.type]` and would need an unrelated recipe entry to mean anything.
 
-   Verb scope: "arroser"/"recolter" (C2.6c), "transporter" (C2.7), "trier" (C7.6) and now
-   "replanter" (C7.26) are implemented. The one remaining verb a Rainelle can be taught
-   (préparer, design §5's own table) is validated as teachable since C2.4 but deliberately does
-   nothing here — a later epic is where it gets its own tick behaviour, once a recipe system for
-   it exists. A taught-but-unimplemented verb is a silent no-op, not an error: teaching it already
-   succeeded (C2.4/C2.5), so a Rainelle just standing idle is the correct, honest state until its
-   epic lands — the readable "blocage" state a player would actually see is C2.8's job, not this
-   one's.
+   Verb scope: "arroser"/"recolter" (C2.6c), "transporter" (C2.7), "trier" (C7.6), "replanter"
+   (C7.26) and now "bouturer" (C7.27) are implemented. The one remaining verb a Rainelle can be
+   taught (préparer, design §5's own table) is validated as teachable since C2.4 but deliberately
+   does nothing here — a later epic is where it gets its own tick behaviour, once a recipe system
+   for it exists. A taught-but-unimplemented verb is a silent no-op, not an error: teaching it
+   already succeeded (C2.4/C2.5), so a Rainelle just standing idle is the correct, honest state
+   until its epic lands — the readable "blocage" state a player would actually see is C2.8's job,
+   not this one's.
 
    Failure posture: an invalid poste/source/destination (unknown id, or an id that resolves to
    the wrong kind of station — e.g. a `recolter`'s poste pointing at a panier instead of a zone)
@@ -126,6 +126,14 @@
   // yet a polygon, so "in range of the zone's point" stands in for "in the zone" until a real
   // shape exists.
   const ZONE_WORK_RANGE = 4;
+
+  // Epic C7.27 ("bouturer"): the literal buffer key a panier's boutures-consuming poste holds its
+  // substrate stock under — a bare, non-cultivar key alongside the panier's ordinary cultivarId
+  // keys (harvested produce, C2.6c) and the `jeune:<cultivarId>` keys (C7.23), same buffer, no new
+  // field. No command or gesture deposits it yet (see this function's own header comment on the
+  // Cartographe lot that introduced this epic) — a named constant here only so the key is never a
+  // magic string scattered across this file and its tests.
+  const SUBSTRATE_KEY = "substrat";
 
   // Resolves `id` against the registry and checks it is the expected kind; returns the station
   // itself on success or null otherwise — never throws, per this file's failure posture above.
@@ -417,6 +425,58 @@
     if (relocated.ok) s.specimens = relocated.specimens;
   }
 
+  // "Bouturer" (design §5, « Multiplier une plante » row — taught under a distinct verb name,
+  // never "multiplier" itself, see rainelles.js's own VERBS comment). `geste.poste` is the input
+  // panier, carrying both boutures (an ordinary harvested-produce key, `geste.condition`'s
+  // cultivarId, already produced by tickRecolter since C2.6c — nothing distinguishes "bouture"
+  // from "produit récolté" at the schema level, by choice) and substrate (the literal
+  // SUBSTRATE_KEY, not yet produced by anything, same "proven, not yet produced" posture C7.23's
+  // young-plant keys held before this epic); `geste.destination` is the output panier, fed via
+  // Stations.depositYoungPlant (C7.23, its first real caller); `geste.source` is required by the
+  // schema but deliberately unread here, same posture as transporter's/trier's own unused poste.
+  // `geste.condition` is mandatory in practice — an empty condition is a silent no-op, same
+  // reasoning as tickTrier/tickReplanter's own mandatory condition (a poste can hold boutures of
+  // several distinct cultivars at once).
+  //
+  // Epic C7.27: checks canDepositYoungPlant *before* touching either input stock, so a full/
+  // invalid destination never drains the poste — "un blocage arrête proprement la production,
+  // sans détruire le stock", the same principle tickReplanter already applies to its own
+  // withdrawal. Both input keys are decremented by direct mutation (not through an immutable
+  // helper — there is none for a bare buffer key, the same direct-mutation discipline already
+  // used by doRecolter/tickPanierMove for a bare cultivarId key), each key deleted outright if it
+  // reaches zero, same discipline as tickTransporter's `if (from.buffer[key] <= 0) delete
+  // from.buffer[key]`. One operation per completed cycle, exactly like tickReplanter — the design
+  // names no throughput for this gesture either.
+  //
+  // Found by /code-review before this epic's own commit: the poste and destination are both
+  // paniers (unlike tickReplanter, whose poste is a zone), so the same degenerate configuration
+  // tickPanierMove already guards against for transporter/trier (moving a panier into itself) is
+  // possible here too — and, unguarded, worse than a no-op: canDepositYoungPlant would evaluate
+  // capacity against the poste's *pre-consumption* total, permanently refusing a deposit that
+  // consuming the two inputs first would actually have room for (a real, silent, permanent
+  // deadlock, not just a wasted cycle). Guarded the same way tickPanierMove is, before any check
+  // that reads the shared panier's state.
+  function tickBouturer(rainelle, s) {
+    const geste = rainelle.geste;
+    if (!geste.condition) return;
+    const poste = resolveKind(s, geste.poste, "panier");
+    const destination = resolveKind(s, geste.destination, "panier");
+    if (!poste || !destination || poste === destination) return;
+    if (!advanceCycle(rainelle)) return;
+    if (!Stations.canDepositYoungPlant(s, geste.destination, geste.condition, 1).ok) return;
+    if (
+      (poste.buffer[geste.condition] || 0) < 1 ||
+      (poste.buffer[SUBSTRATE_KEY] || 0) < 1
+    )
+      return;
+    poste.buffer[geste.condition] -= 1;
+    if (poste.buffer[geste.condition] <= 0) delete poste.buffer[geste.condition];
+    poste.buffer[SUBSTRATE_KEY] -= 1;
+    if (poste.buffer[SUBSTRATE_KEY] <= 0) delete poste.buffer[SUBSTRATE_KEY];
+    const deposit = Stations.depositYoungPlant(s, geste.destination, geste.condition, 1);
+    if (deposit.ok) s.campaignStations = deposit.registry;
+  }
+
   // One Rainelle, one tick. A null geste, or a verb this file doesn't implement yet (see header
   // comment), is a no-op — never an exception, never a silent mutation of `job`.
   function tickRainelle(rainelle, s) {
@@ -427,6 +487,7 @@
     else if (geste.verbe === "transporter") tickTransporter(rainelle, s);
     else if (geste.verbe === "trier") tickTrier(rainelle, s);
     else if (geste.verbe === "replanter") tickReplanter(rainelle, s);
+    else if (geste.verbe === "bouturer") tickBouturer(rainelle, s);
   }
 
   // The smallest additive mechanism that gives "recolter" anything to ever collect: nothing else
@@ -484,6 +545,7 @@
     FAST_CYCLE_SECONDS,
     ZONE_WORK_RANGE,
     FATIGUED_CAPACITY_PER_CYCLE,
+    SUBSTRATE_KEY,
     tickRainelle,
     updateSpecimenReadiness,
     runNightWork,

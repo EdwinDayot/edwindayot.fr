@@ -1154,6 +1154,328 @@ test("replanter: a real cycle's new specimen and the panier's remaining young-pl
   assert.equal(savedPanier.buffer[Stations.youngPlantKey(cultivarId)], 1);
 });
 
+// Epic C7.27 (design §5, « Multiplier une plante | Boutures + substrat au poste | Jeunes plants
+// dans le bac de sortie », taught under the distinct verb "bouturer" — "multiplier" itself stays
+// permanently refused, see rainelles.js/campaign-refusal.cjs): a taught Rainelle actually
+// bouture, cycle after cycle, consuming boutures (an ordinary harvested-produce buffer key) and
+// substrate (SUBSTRATE_KEY, a literal key nothing produces yet) from a single input panier into a
+// young-plant stock (C7.23) in a destination panier, never consuming either input on a blocked
+// destination.
+
+const SUBSTRATE_KEY = CampaignAutomation.SUBSTRATE_KEY;
+
+test("bouturer: a full cycle with available boutures and substrate deposits one young plant and consumes exactly one unit of each input", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const poste = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  poste.buffer[cultivarId] = 2;
+  poste.buffer[SUBSTRATE_KEY] = 2;
+  const destination = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 5,
+    z: 5,
+  });
+  teach(rainelle, {
+    verbe: "bouturer",
+    poste: poste.id,
+    source: "peu-importe",
+    destination: destination.id,
+    condition: cultivarId,
+  });
+  g.step(CYCLE);
+  const savedPoste = g.s.campaignStations.paniers.find((p) => p.id === poste.id);
+  const savedDestination = g.s.campaignStations.paniers.find(
+    (p) => p.id === destination.id,
+  );
+  assert.equal(savedPoste.buffer[cultivarId], 1);
+  assert.equal(savedPoste.buffer[SUBSTRATE_KEY], 1);
+  assert.equal(savedDestination.buffer[Stations.youngPlantKey(cultivarId)], 1);
+});
+
+test("bouturer: an empty condition leaves the Rainelle inactive, never starting a job", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const poste = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  poste.buffer[cultivarId] = 1;
+  poste.buffer[SUBSTRATE_KEY] = 1;
+  const destination = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  teach(rainelle, {
+    verbe: "bouturer",
+    poste: poste.id,
+    source: "peu-importe",
+    destination: destination.id,
+    condition: "",
+  });
+  assert.doesNotThrow(() => g.step(CYCLE * 2));
+  assert.equal(rainelle.job, null);
+  assert.equal(poste.buffer[cultivarId], 1);
+  assert.equal(poste.buffer[SUBSTRATE_KEY], 1);
+});
+
+test("bouturer: an unknown poste/destination id, or one of the wrong kind, leaves the Rainelle inactive without throwing", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const poste = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  poste.buffer[cultivarId] = 1;
+  poste.buffer[SUBSTRATE_KEY] = 1;
+  const destination = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  const zone = Stations.registerStation(g.s.campaignStations, "zone", {
+    x: 0,
+    z: 0,
+    capacity: 3,
+  });
+  teach(rainelle, {
+    verbe: "bouturer",
+    poste: "inconnu",
+    source: "peu-importe",
+    destination: destination.id,
+    condition: cultivarId,
+  });
+  assert.doesNotThrow(() => g.step(CYCLE * 2));
+  assert.equal(rainelle.job, null);
+  teach(rainelle, {
+    verbe: "bouturer",
+    poste: zone.id,
+    source: "peu-importe",
+    destination: destination.id,
+    condition: cultivarId,
+  });
+  assert.doesNotThrow(() => g.step(CYCLE * 2));
+  assert.equal(rainelle.job, null);
+  teach(rainelle, {
+    verbe: "bouturer",
+    poste: poste.id,
+    source: "peu-importe",
+    destination: "inconnu",
+    condition: cultivarId,
+  });
+  assert.doesNotThrow(() => g.step(CYCLE * 2));
+  assert.equal(rainelle.job, null);
+});
+
+test("bouturer: geste.source is never read — an unresolved source never blocks the gesture", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const poste = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  poste.buffer[cultivarId] = 1;
+  poste.buffer[SUBSTRATE_KEY] = 1;
+  const destination = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  teach(rainelle, {
+    verbe: "bouturer",
+    poste: poste.id,
+    source: "identifiant-jamais-resolu",
+    destination: destination.id,
+    condition: cultivarId,
+  });
+  g.step(CYCLE);
+  const savedDestination = g.s.campaignStations.paniers.find(
+    (p) => p.id === destination.id,
+  );
+  assert.equal(savedDestination.buffer[Stations.youngPlantKey(cultivarId)], 1);
+});
+
+// Found by /code-review before this epic's own commit: unlike tickReplanter (poste is a zone,
+// destination a panier — never the same station), bouturer's poste and destination are both
+// paniers, so the same-panier degeneracy tickPanierMove already guards for transporter/trier is
+// possible here too — and, unguarded, worse than a no-op (see tickBouturer's own comment).
+test("bouturer: a panier taught as both poste and destination is a degenerate no-op, never depositing or consuming anything", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const panier = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+    capacity: 2,
+  });
+  panier.buffer[cultivarId] = 1;
+  panier.buffer[SUBSTRATE_KEY] = 1;
+  teach(rainelle, {
+    verbe: "bouturer",
+    poste: panier.id,
+    source: "peu-importe",
+    destination: panier.id,
+    condition: cultivarId,
+  });
+  assert.doesNotThrow(() => g.step(CYCLE * 2));
+  assert.equal(rainelle.job, null);
+  assert.equal(panier.buffer[cultivarId], 1);
+  assert.equal(panier.buffer[SUBSTRATE_KEY], 1);
+  assert.equal(panier.buffer[Stations.youngPlantKey(cultivarId)], undefined);
+});
+
+test("bouturer: a full destination panier ends the cycle without consuming either input", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const poste = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  poste.buffer[cultivarId] = 1;
+  poste.buffer[SUBSTRATE_KEY] = 1;
+  const destination = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  destination.capacity = 0;
+  teach(rainelle, {
+    verbe: "bouturer",
+    poste: poste.id,
+    source: "peu-importe",
+    destination: destination.id,
+    condition: cultivarId,
+  });
+  g.step(CYCLE);
+  assert.equal(poste.buffer[cultivarId], 1);
+  assert.equal(poste.buffer[SUBSTRATE_KEY], 1);
+  assert.equal(destination.buffer[Stations.youngPlantKey(cultivarId)], undefined);
+});
+
+test("bouturer: a poste missing boutures, missing substrate, or missing both ends the cycle without depositing anything", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const destination = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+
+  const posteMissingSubstrate = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  posteMissingSubstrate.buffer[cultivarId] = 1;
+  teach(rainelle, {
+    verbe: "bouturer",
+    poste: posteMissingSubstrate.id,
+    source: "peu-importe",
+    destination: destination.id,
+    condition: cultivarId,
+  });
+  g.step(CYCLE);
+  assert.equal(destination.buffer[Stations.youngPlantKey(cultivarId)], undefined);
+  assert.equal(posteMissingSubstrate.buffer[cultivarId], 1);
+
+  const posteMissingBoutures = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  posteMissingBoutures.buffer[SUBSTRATE_KEY] = 1;
+  teach(rainelle, {
+    verbe: "bouturer",
+    poste: posteMissingBoutures.id,
+    source: "peu-importe",
+    destination: destination.id,
+    condition: cultivarId,
+  });
+  g.step(CYCLE);
+  assert.equal(destination.buffer[Stations.youngPlantKey(cultivarId)], undefined);
+  assert.equal(posteMissingBoutures.buffer[SUBSTRATE_KEY], 1);
+
+  const posteMissingBoth = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  teach(rainelle, {
+    verbe: "bouturer",
+    poste: posteMissingBoth.id,
+    source: "peu-importe",
+    destination: destination.id,
+    condition: cultivarId,
+  });
+  g.step(CYCLE);
+  assert.equal(destination.buffer[Stations.youngPlantKey(cultivarId)], undefined);
+});
+
+test("bouturer: two consecutive full cycles with at least two boutures and two substrate deposit two cumulative young plants", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const poste = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  poste.buffer[cultivarId] = 2;
+  poste.buffer[SUBSTRATE_KEY] = 2;
+  const destination = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  teach(rainelle, {
+    verbe: "bouturer",
+    poste: poste.id,
+    source: "peu-importe",
+    destination: destination.id,
+    condition: cultivarId,
+  });
+  g.step(CYCLE * 2);
+  // depositYoungPlant (C7.23) is immutable — it returns a *new* campaignStations registry rather
+  // than mutating `destination` in place (unlike `poste`, drained by direct buffer mutation, same
+  // discipline as tickTransporter/doRecolter) — so the destination's buffer must be re-read from
+  // the live registry, never off the stale `destination` reference captured before either cycle.
+  const savedDestination = g.s.campaignStations.paniers.find((p) => p.id === destination.id);
+  assert.equal(savedDestination.buffer[Stations.youngPlantKey(cultivarId)], 2);
+  assert.equal(poste.buffer[cultivarId], undefined);
+  assert.equal(poste.buffer[SUBSTRATE_KEY], undefined);
+});
+
+test("bouturer: a real cycle's new young-plant stock and the poste's remaining boutures/substrate survive a JSON save/reload round trip", () => {
+  const g = new GardenState(null, 1000);
+  const rainelle = bornRainelle(g);
+  const cultivarId = g.s.cultivars[0].id;
+  const poste = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  poste.buffer[cultivarId] = 2;
+  poste.buffer[SUBSTRATE_KEY] = 2;
+  const destination = Stations.registerStation(g.s.campaignStations, "panier", {
+    x: 0,
+    z: 0,
+  });
+  teach(rainelle, {
+    verbe: "bouturer",
+    poste: poste.id,
+    source: "peu-importe",
+    destination: destination.id,
+    condition: cultivarId,
+  });
+  g.step(CYCLE);
+  const saved = g.serialize();
+  const reloaded = new GardenState(saved);
+  const savedPoste = reloaded.s.campaignStations.paniers.find((p) => p.id === poste.id);
+  const savedDestination = reloaded.s.campaignStations.paniers.find(
+    (p) => p.id === destination.id,
+  );
+  assert.equal(savedPoste.buffer[cultivarId], 1);
+  assert.equal(savedPoste.buffer[SUBSTRATE_KEY], 1);
+  assert.equal(savedDestination.buffer[Stations.youngPlantKey(cultivarId)], 1);
+});
+
 test("a save without rainelle.job or panier.buffer (pre-epic) migrates to correct defaults without error", () => {
   const g = new GardenState(null, 1000);
   bornRainelle(g);

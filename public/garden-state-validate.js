@@ -761,6 +761,14 @@
         // a real cultivarId (young plants, a distinct stock under the same panier/buffer). Any
         // third shape (a malformed prefix, an unknown extracted cultivarId, a double prefix) is
         // refused exactly like an unknown bare cultivarId was before this epic.
+        // Epic C7.27 adds a third accepted key shape: the literal SUBSTRATE_KEY string
+        // ("substrat"), tickBouturer's input alongside a bare cultivarId key (boutures) — a
+        // fourth key shape (not a cultivarId, not youngPlantKey(cultivarId), not this literal) is
+        // still refused exactly as before. Duplicated here rather than imported from
+        // campaign-automation.js (a much heavier module — construction.js/cultivars.js/
+        // campaign-memory.js/campaign-seasons.js — for one string), same soft-sync posture already
+        // used between this file and campaign-automation.js for CYCLE_SECONDS; keep both in sync
+        // if this value ever changes.
         if (
           kind === "panier" &&
           list.some(
@@ -769,6 +777,7 @@
               (typeof st.buffer !== "object" ||
                 st.buffer === null ||
                 Object.entries(st.buffer).some(([key, qty]) => {
+                  if (key === "substrat") return !count(qty);
                   const youngCultivarId = Stations.cultivarIdOfYoungPlantKey(key);
                   const cultivarId = youngCultivarId !== null ? youngCultivarId : key;
                   return !s.cultivars?.some((c) => c.id === cultivarId) || !count(qty);

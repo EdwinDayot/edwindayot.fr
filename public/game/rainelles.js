@@ -42,7 +42,13 @@
    tests/campaign-refusal.cjs rather than a code change here. */
 (function (root) {
   // The design's gesture table (§5) lists seven rows, but "Multiplier une plante" never applies
-  // to a Rainelle (see header comment above) — six verbs remain teachable by this mechanism.
+  // to a Rainelle (see header comment above) — six of its own rows remain teachable directly.
+  // Epic C7.27: the seventh row ("Multiplier une plante | Boutures + substrat au poste | Jeunes
+  // plants dans le bac de sortie") still needs a teachable verb — "multiplier" itself stays
+  // permanently excluded above (MULTIPLY_REFUSAL, unchanged by this epic), so this row is taught
+  // under a distinct name, "bouturer" (the exact French verb for producing young plants from
+  // cuttings — already the word the design's own row uses for the action, not invented here),
+  // never a collision with the self-reproduction refusal.
   const VERBS = [
     "arroser",
     "recolter",
@@ -50,6 +56,7 @@
     "replanter",
     "preparer",
     "trier",
+    "bouturer",
   ];
   // Epic C2.6c: `job` is the countdown campaign-automation.js's tickRainelle drives for
   // "arroser"/"recolter" (the same `{ remaining }` shape as automation.js's own e.job) — null
@@ -194,6 +201,11 @@
       `Préparer la recette de ${poste} à partir de ${source} ; sortir vers ${destination}.`,
     trier: (poste, source, destination) =>
       `Trier l'arrivée de ${source} à ${poste} ; extraire vers ${destination}.`,
+    // Epic C7.27: `source` deliberately absent from the phrase (like `poste` for transporter
+    // above) — tickBouturer never reads it, it exists only because validateGestureFields
+    // requires every field non-empty for every verb.
+    bouturer: (poste, _source, destination) =>
+      `Bouturer les boutures et le substrat de ${poste} ; déposer les jeunes plants dans ${destination}.`,
   };
   function defaultPhrase({ verbe, poste, source, destination, condition }) {
     const build = PHRASE_BUILDERS[verbe];
