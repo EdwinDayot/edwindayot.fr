@@ -83,3 +83,42 @@ dans un epic `todo` sans la rejouer soi-même avant de bâtir dessus, même quan
 comme « vérifié à l'instant » par le lot Cartographe qui l'a écrite — la même règle que l'étape 3
 de ce prompt impose déjà pour le dernier epic `fait`, étendue ici par prudence à toute affirmation
 de commande rencontrée dans le backlog, pas seulement celles d'un epic déjà clos.
+
+## 2026-10-02 — Deux déclenchements concurrents ont implémenté C7.36 en parallèle
+
+**Constat, vérifié par commande, pas supposé.** Ce déclenchement a choisi **C7.36** (seul epic
+`todo` à dépendances satisfaites après C7.35), l'a implémenté entièrement en local (moteur
+`public/garden.js`, panneau `public/game/hud-panel.js`, dispatcheur `public/garden-dispatch.js`,
+extension de `tests/garden-interface.cjs`), vérifié (`npm test` → 1142/1142,
+`tests/garden-material-audit.cjs` → PASS, `/code-review` sans défaut) et committé localement
+(`d933249`). Au moment de pousser (`git push origin maison-des-possibles`), le push a été rejeté :
+`git fetch origin maison-des-possibles` a révélé qu'un **autre** déclenchement avait déjà poussé,
+entre-temps, son propre commit pour ce même epic C7.36 (`eb3d153a135476571abf6b3b5779a9701c745ca6`,
+horodaté 11:23:12 UTC, sur le même parent `9f50520` que le commit local de ce déclenchement) — deux
+sessions cloud distinctes ont donc traité le même epic en parallèle, chacune l'ignorant de l'autre
+(aucun mécanisme actuel n'empêche deux déclenchements de la routine horaire de se chevaucher).
+
+**Action prise, conforme à la garde-fou de concurrence d'`execution-continue.md`** (« si un autre
+déclenchement a poussé entre-temps... s'arrêter et consigner plutôt que forcer ») : le commit
+distant `eb3d153` a été vérifié indépendamment avant toute décision, pas seulement sa prose —
+`git show --stat` confirme un commit réel touchant exactement les fichiers attendus pour cet epic ;
+`npm ci && npm test` relancés sur l'état remote réel (après `git reset --hard
+origin/maison-des-possibles`) → **1142/1142**, identique au rapport de son propre commit ;
+`tests/garden-material-audit.cjs` → **PASS** (121 matériaux, inchangé) ; aucun bandeau de pause ;
+aucun epic `bloqué`. Le commit distant est donc une implémentation réelle et cohérente de C7.36,
+pas une hallucination. Le commit local dupliqué de ce déclenchement (`d933249`, jamais poussé) a
+été abandonné par `git reset --hard origin/maison-des-possibles` plutôt que forcé par-dessus ou
+fusionné : les deux implémentations divergent dans le détail (nom de la fonction de cycle,
+libellé de bouton, fichier `hud-panel-rows.js` touché par l'une et pas l'autre) mais résolvent le
+même critère de sortie de façon également valide ; empiler les deux aurait réintroduit une
+régression ou une incohérence inutile sur une branche partagée pour un gain nul.
+
+**Ce qu'un futur déclenchement doit faire.** Ceci n'est pas un défaut du backlog ni du dépôt : la
+cause réelle est que deux sessions cloud de la routine horaire ont pu tourner en chevauchement sans
+se voir l'une l'autre avant de choisir leur epic, pas une rédaction incohérente de
+`campagne-backlog.md`. Le garde-fou déjà écrit (vérifier l'état distant juste avant de pousser,
+jamais forcer) a fonctionné comme prévu et suffit à absorber ce cas sans perte ; aucune action
+corrective supplémentaire sur le code ou le backlog n'est nécessaire. Un futur déclenchement qui
+rencontre un rejet de push similaire doit suivre exactement cette même séquence : `git fetch`,
+vérifier indépendamment (jamais seulement lire) le commit distant inattendu, et s'aligner dessus
+(`git reset --hard`) plutôt que de forcer un push ou de tenter une fusion des deux implémentations.
