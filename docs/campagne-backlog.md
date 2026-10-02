@@ -1,3 +1,15 @@
+⚠️ **EN PAUSE — six décisions humaines nécessaires avant de poursuivre la phase 7.** Quatre lots Cartographe consécutifs (37e à 40e) ont confirmé, chacun par relecture directe du dépôt et non par recopie, qu'aucun epic de la phase 7 n'est détaillable sans trancher l'une des six décisions ci-dessous. Ce n'est pas un blocage au sens de la garde-fou « trois epics `bloqué` consécutifs » (aucun epic n'a été tenté), mais le même constat de fond : relancer la routine horaire en l'état ne produit plus de progrès, seulement des confirmations identiques. Un humain a été notifié explicitement par le 40e déclenchement (2026-10-02, seule session de la série à disposer d'un canal de notification réel). **Tant que ce bandeau reste en tête de ce fichier, un déclenchement automatisé ne doit rien faire d'autre que le signaler et s'arrêter** (voir étape 8 du prompt d'exécution continue) — ne pas tenter de lever la pause soi-même.
+
+Décisions requises, chacune débloquerait un futur lot :
+1. Un chiffre ou un mécanisme nommé pour l'effet de l'été et de l'hiver sur la botanique/l'eau (design §12).
+2. Une convention de coordonnées pour une scène d'intérieur de maison (position/rotation d'un meuble), et le choix de la ou des annexes modulaires à construire (design §6).
+3. Pour une histoire secondaire au choix (design §10) : quelle mécanique de contenu exacte, et comment elle s'articule avec les fils déjà écrits (Alma/Jeanne notamment).
+4. Une formule de prix/quantité journalière pour le présentoir de pépinière (design §7).
+5. Un périmètre explicite pour une première tranche de réévaluation de l'interface Canvas (design §14) — remappage, taille du texte, ou contrôles sémantiques, un seul à la fois.
+6. Une mesure d'images/s sur un ordinateur et un téléphone physiques réels (hors de cette routine cloud), pour chiffrer la porte de sortie de la phase 7 elle-même.
+
+---
+
 # Backlog de la campagne — file d'epics
 
 Source de vérité sur l'avancement. Voir [orchestration.md](orchestration.md) pour le processus, [game-design.md](game-design.md) pour la conception. Chaque epic a la taille d'une session d'agent, sur le modèle de ceux déjà livrés dans [garden.md](garden.md).
