@@ -114,6 +114,23 @@
   }
   function validate(s) {
     s = migrateLandscape(s);
+    // Epic C7.35: a pre-epic save carries a single settings.sound boolean; migrated here
+    // (before the strict shape check below, same placement as migrateLandscape above) into
+    // the two numeric levels this epic replaces it with, so the check below only ever has to
+    // know the current shape. true -> 1/1 (identical perceived volume), false -> 0/0 (the
+    // fresh-save default, garden-state-lifecycle.js). sound itself never coexists with the
+    // two new keys afterwards — there is only ever one representation of this setting.
+    if (
+      s?.settings &&
+      typeof s.settings.sound === "boolean" &&
+      s.settings.soundEffects === undefined &&
+      s.settings.soundAmbient === undefined
+    ) {
+      s = clone(s);
+      const level = s.settings.sound ? 1 : 0;
+      s.settings = { ...s.settings, soundEffects: level, soundAmbient: level };
+      delete s.settings.sound;
+    }
     if (
       !s ||
       s.version !== 3 ||
@@ -268,9 +285,9 @@
       throw Error("Ressource invalide.");
     if (
       !s.settings ||
-      ["hints", "sound", "reduced"].some(
-        (k) => typeof s.settings[k] !== "boolean",
-      ) ||
+      ["hints", "reduced"].some((k) => typeof s.settings[k] !== "boolean") ||
+      !finite(s.settings.soundEffects, 0, 1) ||
+      !finite(s.settings.soundAmbient, 0, 1) ||
       !s.stats ||
       ["produced", "collected", "waterUsed"].some((k) => !finite(s.stats[k]))
     )

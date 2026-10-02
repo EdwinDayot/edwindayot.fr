@@ -76,7 +76,10 @@
       requests: [],
       requestSerial: 0,
       irrigationCursor: 0,
-      settings: { hints: true, sound: false, reduced: false },
+      // Epic C7.35: soundEffects/soundAmbient replace the single sound boolean, each a
+      // finite [0, 1] level (0 = silent) rather than on/off — see garden-state-validate.js
+      // for the migration of a pre-epic save's single sound flag into these two.
+      settings: { hints: true, soundEffects: 0, soundAmbient: 0, reduced: false },
       stats: { produced: 0, collected: 0, waterUsed: 0 },
       botanyRewards: [],
       quests: { active: [], completed: [] },

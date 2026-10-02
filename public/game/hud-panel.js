@@ -581,7 +581,15 @@
         ])
           rows.push({
             title: label,
-            detail: m.s.settings[key] ? "Activé" : "Désactivé",
+            // Epic C7.35: "sound" is a combined display of the two real settings
+            // (soundEffects/soundAmbient) until C7.36 gives each its own row — see
+            // garden-dispatch.js's "setting" case for the matching toggle logic.
+            detail:
+              (key === "sound"
+                ? m.s.settings.soundEffects > 0 || m.s.settings.soundAmbient > 0
+                : m.s.settings[key])
+                ? "Activé"
+                : "Désactivé",
             action: "setting",
             data: { key },
           });

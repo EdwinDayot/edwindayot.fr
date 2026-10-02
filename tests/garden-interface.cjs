@@ -4,6 +4,13 @@ const url = process.env.GARDEN_URL || "http://127.0.0.1:4174/";
 (async () => {
   const b = await chromium.launch({
     headless: true,
+    // Epic C7.35: same documented fallback as tests/garden-material-audit.cjs/
+    // campaign-house-visual.cjs, needed in this container to actually run this file (the
+    // one test that exercises the settings panel's sound toggle this epic's compatibility
+    // glue depends on) rather than leaving the regression unverified.
+    executablePath: require("node:fs").existsSync("/opt/pw-browsers/chromium")
+      ? "/opt/pw-browsers/chromium"
+      : undefined,
     args:
       process.platform === "darwin"
         ? ["--use-angle=" + (process.env.GARDEN_ANGLE || "metal")]
@@ -50,7 +57,13 @@ const url = process.env.GARDEN_URL || "http://127.0.0.1:4174/";
     };
     await click("open-settings");
     await click("row-0");
-    assert.equal(await p.evaluate(() => __view.game.s.settings.sound), true);
+    assert.deepEqual(
+      await p.evaluate(() => [
+        __view.game.s.settings.soundEffects,
+        __view.game.s.settings.soundAmbient,
+      ]),
+      [1, 1],
+    );
     await click("row-0");
     const download = p.waitForEvent("download");
     await click("row-4");

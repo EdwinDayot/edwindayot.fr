@@ -204,15 +204,46 @@
         A.execute({ type: action, request: data.request });
         break;
       case "setting":
-        A.execute({
-          type: "settings",
-          key: data.key,
-          value: !A.game.s.settings[data.key],
-        });
+        // Epic C7.35: settings.sound (single on/off) was replaced by soundEffects/
+        // soundAmbient (two independent [0, 1] levels, see garden-state-cmd-c.js). The
+        // settings panel still exposes one combined "Sons et ambiance" row (hud-panel.js)
+        // until C7.36 splits it into its own two rows with real gain control — this row's
+        // toggle sets both new levels together to 0 or 1, reproducing the exact previous
+        // on/off behavior rather than leaving the row non-functional in the meantime.
+        // Both updates go through the real command (same validation as A.execute, public/
+        // garden-cmd.js) but its save/sync/view.action/sound/announce side effects run only
+        // once for this one logical toggle, not once per field (code review caught an
+        // earlier version of this patch calling A.execute, and so those side effects,
+        // twice).
         if (data.key === "sound") {
-          if (A.game.s.settings.sound) A.sound("plant");
-          else A.audio?.suspend();
-        }
+          const next =
+            A.game.s.settings.soundEffects > 0 ||
+            A.game.s.settings.soundAmbient > 0
+              ? 0
+              : 1;
+          const r1 = A.game.command(
+            { type: "settings", key: "soundEffects", value: next },
+            { position: A.view.position },
+          );
+          const r2 = A.game.command(
+            { type: "settings", key: "soundAmbient", value: next },
+            { position: A.view.position },
+          );
+          if (r1.ok && r2.ok) {
+            A.save();
+            A.view.sync();
+            A.view.action(r2.kind, A.selected);
+            A.sound(r2.kind);
+            if (next) A.sound("plant");
+            else A.audio?.suspend();
+          }
+          A.announce(r2.message);
+        } else
+          A.execute({
+            type: "settings",
+            key: data.key,
+            value: !A.game.s.settings[data.key],
+          });
         break;
       case "pause":
         A.paused = !A.paused;

@@ -97,7 +97,13 @@
     if (!A.store.save(A.game)) A.announce(A.store.message);
   };
   A.sound = function sound(kind) {
-    if (!A.game.s.settings.sound) return;
+    // Epic C7.35: settings.sound (single on/off) was replaced by soundEffects/soundAmbient
+    // (two independent [0, 1] levels, garden-state-cmd-c.js). Gating on either being above
+    // zero reproduces the previous on/off behavior exactly (both move together today, see
+    // garden-dispatch.js); scaling the ambient/effect gains below by their own distinct
+    // level, rather than just gating playback on/off, is C7.36's own job.
+    if (!(A.game.s.settings.soundEffects > 0 || A.game.s.settings.soundAmbient > 0))
+      return;
     try {
       A.audio ??= new (window.AudioContext || window.webkitAudioContext)();
       if (A.audio.state === "suspended") A.audio.resume();

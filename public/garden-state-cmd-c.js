@@ -77,11 +77,15 @@
           "Deux graines de Pilea offertes pour recommencer tranquillement.";
       } else if (c.type === "settings") {
         st.taken = true;
-        if (
-          !["hints", "sound", "reduced"].includes(c.key) ||
-          typeof c.value !== "boolean"
-        )
-          return fail("Réglage invalide.");
+        // Epic C7.35: hints/reduced stay boolean flags; soundEffects/soundAmbient (replacing
+        // the single sound boolean, see garden-state-lifecycle.js/garden-state-validate.js)
+        // are each a finite [0, 1] level instead. sound itself is no longer a valid key here
+        // once a save is migrated — never two representations of the same setting at once.
+        if (["hints", "reduced"].includes(c.key)) {
+          if (typeof c.value !== "boolean") return fail("Réglage invalide.");
+        } else if (["soundEffects", "soundAmbient"].includes(c.key)) {
+          if (!finite(c.value, 0, 1)) return fail("Réglage invalide.");
+        } else return fail("Réglage invalide.");
         s.settings[c.key] = c.value;
       }
       return null;

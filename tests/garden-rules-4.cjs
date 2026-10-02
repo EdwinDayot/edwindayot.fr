@@ -121,10 +121,58 @@ test("Current wall-clock saves are valid; imported malformed networks, capacitie
     (s) => (s.requests[0].item = "seed:cactus"),
     (s) => s.links.push(["e1", "e2"]),
     (s) => (s.nextId = 1),
-    (s) => (s.settings.sound = "yes"),
+    (s) => (s.settings.soundEffects = "yes"),
+    (s) => (s.settings.soundAmbient = 2),
   ]) {
     const s = g.serialize();
     mutate(s);
     assert.throws(() => validate(s));
   }
+});
+// Epic C7.35: settings.sound (single boolean) is replaced by settings.soundEffects/
+// soundAmbient (two independent [0, 1] levels) — the four tests below lock in the
+// migration of a pre-epic save and the new command's exact accept/reject shape.
+test("A pre-epic save's single settings.sound migrates to soundEffects/soundAmbient, both ways", () => {
+  const g = new GardenState();
+  const on = g.serialize();
+  delete on.settings.soundEffects;
+  delete on.settings.soundAmbient;
+  on.settings.sound = true;
+  assert.deepEqual(validate(on).settings, {
+    hints: true,
+    reduced: false,
+    soundEffects: 1,
+    soundAmbient: 1,
+  });
+  const off = g.serialize();
+  delete off.settings.soundEffects;
+  delete off.settings.soundAmbient;
+  off.settings.sound = false;
+  assert.deepEqual(validate(off).settings, {
+    hints: true,
+    reduced: false,
+    soundEffects: 0,
+    soundAmbient: 0,
+  });
+});
+test("The settings command rejects key \"sound\" once a save carries soundEffects/soundAmbient", () => {
+  const g = new GardenState();
+  assert.equal(g.command({ type: "settings", key: "sound", value: true }).ok, false);
+  assert.deepEqual(g.s.settings, {
+    hints: true,
+    reduced: false,
+    soundEffects: 0,
+    soundAmbient: 0,
+  });
+});
+test("The settings command accepts soundEffects/soundAmbient at both bounds and in between, rejects out-of-range or non-numeric", () => {
+  const g = new GardenState();
+  for (const key of ["soundEffects", "soundAmbient"])
+    for (const value of [0, 1, 0.4])
+      assert.equal(g.command({ type: "settings", key, value }).ok, true);
+  assert.equal(g.s.settings.soundEffects, 0.4);
+  assert.equal(g.s.settings.soundAmbient, 0.4);
+  for (const key of ["soundEffects", "soundAmbient"])
+    for (const value of [-0.01, 1.01, "1", NaN, true])
+      assert.equal(g.command({ type: "settings", key, value }).ok, false);
 });
