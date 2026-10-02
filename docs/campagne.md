@@ -5521,3 +5521,51 @@ Aucun code ni test modifié ce déclenchement — travail de planification seul 
 **Pour le prochain déclenchement** : prendre **C7.34** en Artisan moteur (audit pur, aucune délégation nécessaire vu sa taille) — lire `cultivars.js`/`campaign-automation.js`/`campaign-seasons.js` en entier avant d'écrire le test, sur le modèle Node pur déjà en usage par `tests/campaign-specimen-seasonal-growth.cjs`/`tests/campaign-seasons.cjs`.
 
 Commit : voir `git log` sur `maison-des-possibles` (message « Cartographe : trente-quatrième lot de la phase 7, audit de non-régression saison/solde pour les quêtes principales (C7.34) »). `git push origin maison-des-possibles` à confirmer par `git ls-remote origin` avant conclusion de ce déclenchement.
+
+## Déclenchement automatisé du 2 octobre 2026 — Epic C7.34 (audit de non-régression saison/solde pour les quêtes principales)
+
+Déclenchement automatisé (routine cloud horaire). `git checkout maison-des-possibles` (créée depuis `origin/maison-des-possibles`), branche à jour (`d1272bf`), arbre de travail propre.
+
+**Anti-hallucination faite avant tout le reste, réellement exécutée.** Dernier epic « fait » du backlog : **C7.33** (C7.34, le dernier commit, est un lot Cartographe de planification, pas un epic « fait »), commit annoncé `ce1c3f007419d8c6266707889cc73478e5e0d455` — `git show --stat ce1c3f0` confirme le commit réel, message et fichiers correspondant exactement à l'entrée déjà existante de `campagne-backlog.md`/`campagne.md`. `npm ci && npm test` relancés indépendamment avant tout nouveau travail → **1134/1134**, identique au rapport déjà consigné, zéro écart. Aucun bandeau de pause en tête de `docs/campagne-backlog.md`. Aucun epic `bloqué` dans tout le backlog (`grep -c "^Statut : bloqué"` → 0).
+
+**Choix : C7.34**, seul epic `todo` détaillé et actionnable (dépend de « rien »), retenu par le lot Cartographe précédent. Artisan moteur endossé directement (audit pur, taille d'une session, aucune délégation nécessaire).
+
+**Anomalie réelle découverte en implémentant, consignée dans `docs/campagne-anomalies.md` avant de continuer, pas corrigée silencieusement.** La note « vérifié à l'instant » du lot Cartographe de C7.34 affirme `grep -rni "season" public/garden-state-cmd-*.js` → vide. Rejoué pour de vrai avant d'écrire le test : ce grep renvoie en réalité `garden-state-cmd-f.js:395: "jeanneReconstitutionSeason"`. Vérifié inoffensif par lecture directe de sa condition de révélation réelle (`garden-state-cmd-f.js`, lignes qui précèdent) : gated uniquement par `campaignFlags.some/includes` et `s.rainelles.length`, jamais par une saison — c'est un nom de flag narratif du chapitre 15 (`Narrative.pendingReveal`), pas une lecture de l'horloge saisonnière. La garantie de fond visée par C7.34 reste donc vraie ; seule l'affirmation du backlog, telle quelle, était fausse. Détail complet, y compris la portée exacte de l'anomalie et ce qu'un futur déclenchement doit en retenir, dans `docs/campagne-anomalies.md` (entrée du 2026-10-02).
+
+**Nouveau `tests/campaign-season-quest-nonblocking.cjs` (Node pur, cinq tests) :**
+1. Lecture statique réelle des fichiers de commande gatant un chapitre (ceux référençant `campaignFlags`, calculés dynamiquement plutôt que recopiés d'une liste figée) : aucun ne contient la sous-chaîne `season`, à l'exception documentée du nom de flag `jeanneReconstitutionSeason` (liste blanche explicite d'un seul élément, avec sa justification écrite dans le test lui-même).
+2. Test de garde dédié sur cette liste blanche : relit la condition de révélation réelle de `jeanneReconstitutionSeason` et casse si elle venait à mentionner une saison — rend la liste blanche elle-même vérifiable plutôt qu'une exception de confiance aveugle.
+3. `inventory.coins` n'apparaît, dans ces mêmes fichiers, qu'aux deux sites déjà connus (`garden-state-cmd-e.js`, `garden-state-cmd-r.js`) ; les deux textes exacts des affectations sont verrouillés verbatim, et cinq formes de condition (`if(...)`, comparaisons, égalité stricte, ternaire) sont vérifiées absentes.
+4. Pour chacune des quatre valeurs réelles de `GardenCampaignSeasons.SEASONS` (jamais une liste recopiée à la main) : la durée réelle du stade 0→1 d'un spécimen fraîchement planté (`Cultivars.specimenStage`) n'est jamais supérieure à `STAGE_DURATION_ELAPSED_SECONDS`, et strictement inférieure seulement au printemps.
+5. Même principe pour la durée réelle d'un cycle de récolte (`tickRecolter` via `g.step`, sur le modèle exact déjà en usage par `tests/campaign-automation.cjs`) : jamais supérieure à `CYCLE_SECONDS`, strictement inférieure seulement en automne.
+
+**Gate revérifié réellement discriminant pour les cinq assertions, pas supposé.** Chaque régression injectée temporairement, test rejoué, échec réel observé, fichier de production restauré à l'identique avant de continuer (`git diff --stat` confirmé vide à chaque fois) :
+- saison injectée (`// season-test-injection`) en tête de `garden-state-cmd-e.js` → test 1 échoue ;
+- saison injectée dans la condition réelle de révélation de `jeanneReconstitutionSeason` (`garden-state-cmd-f.js`) → tests 1 et 2 échouent ;
+- condition ajoutée sur `inventory.coins` (`if (s.inventory.coins > 999999) ...`) dans `garden-state-cmd-e.js` → test 3 échoue ;
+- `SPRING_YOUNG_STAGE_DURATION_ELAPSED_SECONDS` porté au-dessus de `STAGE_DURATION_ELAPSED_SECONDS` dans `cultivars.js` → test 4 échoue ;
+- `FAST_CYCLE_SECONDS` porté au-dessus de `CYCLE_SECONDS` dans `campaign-automation.js` → test 5 échoue.
+
+Résultat réel de `npm ci && npm test`, relancé après restauration complète des cinq fichiers de production :
+```
+# tests 1139
+# suites 0
+# pass 1139
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+```
+(1134 existants + 5 nouveaux, zéro régression.)
+
+Vérification programmatique faite, pas supposée : `git status --short` en fin d'implémentation confirme exactement `package.json` (ajout de `tests/campaign-season-quest-nonblocking.cjs` à la liste `npm test`), le nouveau fichier de test, `docs/campagne-backlog.md`, `docs/campagne.md` et `docs/campagne-anomalies.md` — aucun fichier de production resté modifié (les cinq perturbations temporaires toutes annulées, confirmé fichier par fichier). Aucune géométrie/matériau/interface concerné : `tests/garden-material-audit.cjs`/`npm run test:browser`/`test:visual` non requis, même exemption que C7.31-C7.33, confirmée plutôt que supposée.
+
+`/code-review` (skill, niveau medium) exécuté sur le diff complet : aucun défaut relevé — diff additif (un fichier de test nouveau, une ligne de `package.json`), assertions vérifiées contre l'implémentation réelle, aucune logique de production modifiée dans le résultat final.
+
+Ne ferme aucune porte de phase (la phase 7 reste ouverte — aucun des six thèmes déjà écartés par les lots Cartographe précédents n'a changé). Aucun choix déjà confirmé du design remis en cause (Alma vivante, nom des Rainelles, culpabilisation de fin de campagne — aucun concerné). Aucune règle de `direction-artistique.md` concernée (aucun rendu introduit).
+
+`docs/campagne-backlog.md` mis à jour : C7.34 passe à `fait`, détail complet (anomalie trouvée, cinq assertions, gate revérifié discriminant, résultat de `/code-review`) consigné dans son propre statut.
+
+**Pour le prochain déclenchement** : plus aucun epic détaillé `todo` à dépendances satisfaites nulle part dans le backlog — recherche exhaustive à refaire en tête du prochain déclenchement, pas supposée reconduite. La phase 7 n'a atteint aucune de ses portes de sortie (design §15) ; le rôle Cartographe est probablement la voie à endosser au prochain déclenchement, sur l'un des chantiers déjà identifiés comme restants (saisons été/hiver, catalogue décoratif en position, extensions de maison, tactile au-delà de l'existant, histoires secondaires, remappage des commandes/taille du texte/volumes séparés pour l'accessibilité).
+
+Commit : voir `git log` sur `maison-des-possibles` (message « Epic C7.34 : audit de non-régression saison/solde pour les quêtes principales, anomalie de grep du backlog corrigée »). `git push origin maison-des-possibles` à confirmer par `git ls-remote origin` avant conclusion de ce déclenchement.

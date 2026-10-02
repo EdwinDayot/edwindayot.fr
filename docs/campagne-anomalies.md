@@ -46,3 +46,40 @@ phase 6 (`git merge-base --is-ancestor <hash de C6.29's merge> origin/main`) ; s
 toujours pas le cas, pousser d'abord ce rattrapage (fusion déjà faite localement, ou à refaire
 depuis l'état courant si `ffdbe2c` a fini par être élagué) avant d'empiler une nouvelle fusion de
 phase par-dessus un `main` qui n'a jamais reçu la précédente.
+
+## 2026-10-02 — C7.34 : le grep « anti-hallucination » cité dans le backlog pour cet epic était faux
+
+**Constat, vérifié par commande, pas supposé.** L'entrée de **C7.34** dans `campagne-backlog.md`
+(lot Cartographe du 2026-09-28) affirme, sous « Vérifié à l'instant par lecture directe, pas
+supposé » : « `grep -rni "season" public/garden-state-cmd-*.js` → vide ». Rejoué à l'identique en
+implémentant cet epic : `grep -rni "season" public/garden-state-cmd-*.js` renvoie en réalité une
+occurrence réelle, `public/garden-state-cmd-f.js:395: "jeanneReconstitutionSeason",`. La commande
+citée dans le backlog n'a soit jamais été exécutée telle quelle, soit mal lue — exactement le
+risque que l'étape 3 de ce prompt et la discipline « vérifié veut dire exécuté, pas plausible »
+existent pour attraper, ici trouvé dans l'epic `todo` lui-même plutôt que dans un epic déjà `fait`.
+
+**Gravité réelle, vérifiée avant toute conclusion.** `jeanneReconstitutionSeason` est le nom d'un
+flag de révélation narrative (chapitre 15, `Narrative.pendingReveal`), jamais une lecture de
+`GardenCampaignSeasons`/`seasonForDay`/`campaignDay`. Sa condition de révélation réelle, relue
+directement (`garden-state-cmd-f.js`, juste avant cette ligne), ne teste que
+`campaignFlags.some/includes` et `s.rainelles.length` — aucune saison. La garantie de fond que
+C7.34 cherche à verrouiller (aucune porte de chapitre ne lit la saison) reste donc vraie ; seule
+l'affirmation « grep → vide » du backlog, telle quelle, était fausse.
+
+**Action prise ce déclenchement.** Le nouveau test (`tests/campaign-season-quest-nonblocking.cjs`)
+n'a pas recopié l'affirmation fausse du backlog : il effectue le même grep pour de vrai, échoue
+d'abord dessus (observé réellement, pas supposé), puis adopte une liste blanche explicite et
+vérifiable d'un seul nom (`jeanneReconstitutionSeason`), avec son propre test dédié qui relit la
+condition de révélation réelle et casse si elle venait un jour à mentionner une saison. Rejoué en
+cassant chacune des deux assertions séparément (grep nu, puis la condition elle-même) : les deux
+échouent bien avant restauration à l'identique — voir l'entrée de `docs/campagne.md` pour ce même
+epic, section « gate revérifié ». Aucun fichier de production modifié par cette anomalie elle-même
+(seule la description de l'epic dans `campagne-backlog.md` contenait l'affirmation fausse ; elle
+n'est pas réécrite rétroactivement ici pour préserver l'historique exact du lot Cartographe —
+seule cette entrée d'anomalie et l'entrée `fait` de C7.34 documentent la correction).
+
+**Ce qu'un futur déclenchement doit faire.** Ne jamais recopier une commande de vérification citée
+dans un epic `todo` sans la rejouer soi-même avant de bâtir dessus, même quand elle est présentée
+comme « vérifié à l'instant » par le lot Cartographe qui l'a écrite — la même règle que l'étape 3
+de ce prompt impose déjà pour le dernier epic `fait`, étendue ici par prudence à toute affirmation
+de commande rencontrée dans le backlog, pas seulement celles d'un epic déjà clos.
