@@ -200,6 +200,7 @@
         "gesture-scene": "Un geste observé",
         teaching: "« Regarde-moi »",
         "epilogue-scene": "Le lendemain",
+        "content-notice": "Avant de commencer",
       };
       this.text(
         titles[m.panel],

@@ -294,6 +294,18 @@
         if (orientationEntry)
           rows.push({ title: orientationEntry.title, detail: orientationEntry.text });
         if (suiteEntry) rows.push({ title: suiteEntry.title, detail: suiteEntry.text });
+      } else if (m.panel === "content-notice") {
+        // Epic C7.37 (design §14, "annoncer dès la présentation du jeu la présence de thèmes
+        // d'exploitation et de culpabilité, sans détailler les retournements"). Read-only, no
+        // action row needed beyond the generic close (Échap/×) every panel already has. This
+        // text addresses the player directly, outside the fiction — unlike Narrative.TEXTS
+        // (garden-state-cmd-f.js's reveals), which are always in-world observations triggered
+        // by a gameplay event, so it is written here rather than added to that catalogue.
+        rows.push({
+          title: "Un mot avant de jouer",
+          detail:
+            "Cette histoire parle aussi de ce qu'on en vient à considérer comme acquis, et de ce que cela coûte à d'autres. Plus tard, certains passages peuvent devenir inconfortables ; tu pourras toujours interrompre une scène sans perdre ce qu'elle raconte.",
+        });
       } else if (m.panel === "teaching") {
         // Epic C2.5v-b (design §5's own "quatre moments" screen, deferred from C2.5 — see
         // garden-state-cmd-k.js's header comment): the three literal rendering clauses C2.5v's

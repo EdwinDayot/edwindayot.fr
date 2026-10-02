@@ -95,6 +95,39 @@ test("Stage 1: corrupted save, unavailable storage, invalid import and backup re
   assert.doesNotThrow(() => bad.load(1000));
   assert.equal(bad.available, false);
 });
+test("Stage 1: load() reports isNew only for a game that never had any save", () => {
+  // Epic C7.37 (design §14: announce content themes at presentation, once). isNew must reflect
+  // raw key presence, never whether a present value happened to parse.
+  assert.equal(new SaveStore(memory()).load(1000).isNew, true);
+  const resumed = memory();
+  new SaveStore(resumed).save(new GardenState(null, 1000), 1000);
+  assert.equal(new SaveStore(resumed).load(1000).isNew, false);
+  const restored = memory(),
+    restoreStore = new SaveStore(restored),
+    g2 = new GardenState(null, 1000);
+  restoreStore.save(g2, 1000);
+  g2.s.water = 80;
+  restoreStore.save(g2, 1000);
+  restored.setItem(KEY, "bad");
+  const reloaded = new SaveStore(restored).load(1000);
+  assert.match(reloaded.message, /restaurée/);
+  assert.equal(reloaded.isNew, false);
+  const migrated = memory();
+  migrated.setItem(LEGACY, JSON.stringify({ version: 2, plots: [] }));
+  assert.equal(new SaveStore(migrated).load(1000).isNew, false);
+  // Storage that throws on every read looks identical to "all three keys absent" from read()'s
+  // return value alone — but a returning player whose storage just broke must never be told
+  // this is their first time. Caught by /code-review before this commit.
+  const unreadable = new SaveStore({
+    getItem() {
+      throw Error();
+    },
+    setItem() {
+      throw Error();
+    },
+  });
+  assert.equal(unreadable.load(1000).isNew, false);
+});
 test("Stage 2: collision, locked land, river and access are checked before payment", () => {
   const g = new GardenState(null, 1000);
   g.command({ type: "craft", item: "pot" });

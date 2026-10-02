@@ -10,6 +10,14 @@
     S = GardenSave,
     $ = (id) => document.getElementById(id);
   A.ui = new GardenHUD(A.canvas, A.view, A.dispatch);
+  // Epic C7.37 (design §14: "annoncer dès la présentation du jeu la présence de thèmes
+  // d'exploitation et de culpabilité, sans détailler les retournements"). A.loaded.isNew
+  // (save.js) is computed once, at the one `A.store.load()` call in garden.js, from raw key
+  // presence before this page's own first save — true only for a game that never existed
+  // before. Opened here, not in garden.js itself, because A.openPanel (garden-cmd.js) and
+  // A.ui (just constructed above) don't exist yet at garden.js's own module-execution time
+  // (scripts run in document order: garden.js, then garden-cmd.js, ..., then this file last).
+  if (A.loaded.isNew) A.openPanel("content-notice");
   $("import-file").onchange = async (e) => {
     try {
       const file = e.target.files[0];
