@@ -99,9 +99,10 @@
   A.sound = function sound(kind) {
     // Epic C7.35: settings.sound (single on/off) was replaced by soundEffects/soundAmbient
     // (two independent [0, 1] levels, garden-state-cmd-c.js). Gating on either being above
-    // zero reproduces the previous on/off behavior exactly (both move together today, see
-    // garden-dispatch.js); scaling the ambient/effect gains below by their own distinct
-    // level, rather than just gating playback on/off, is C7.36's own job.
+    // zero reproduces the previous on/off behavior exactly for total silence. Epic C7.36
+    // scales the ambient/effect gains below by their own distinct level (0 reproduces the
+    // previous "sound: false" silence, 1 reproduces "sound: true" exactly, see the two
+    // `* A.game.s.settings.sound…` factors below) rather than just gating playback on/off.
     if (!(A.game.s.settings.soundEffects > 0 || A.game.s.settings.soundAmbient > 0))
       return;
     try {
@@ -122,35 +123,44 @@
         A.ambient = A.audio.createBufferSource();
         A.ambient.buffer = buffer;
         A.ambient.loop = true;
-        const g = A.audio.createGain();
-        g.gain.value = 0.035;
-        A.ambient.connect(g).connect(A.audio.destination);
+        // Epic C7.36: kept on A so a later level change (garden-dispatch.js's
+        // "setting-sound-level") can retune this already-running loop's gain directly,
+        // rather than only taking effect on this buffer's next (never, since loop: true)
+        // creation.
+        A.ambientGain = A.audio.createGain();
+        A.ambientGain.gain.value = 0.035 * A.game.s.settings.soundAmbient;
+        A.ambient.connect(A.ambientGain).connect(A.audio.destination);
         A.ambient.start();
+      } else A.ambientGain.gain.value = 0.035 * A.game.s.settings.soundAmbient;
+      // exponentialRampToValueAtTime throws on a zero target, so a muted effects level
+      // (soundEffects === 0) skips the oscillator entirely rather than ramping to 0 — the
+      // ambient update above still runs either way, since the two levels are independent.
+      if (A.game.s.settings.soundEffects > 0) {
+        const o = A.audio.createOscillator(),
+          g = A.audio.createGain(),
+          now = A.audio.currentTime;
+        o.type = kind === "mine" || kind === "step" ? "triangle" : "sine";
+        o.frequency.setValueAtTime(
+          kind === "mine"
+            ? A.held() === "pickaxe"
+              ? 460
+              : 140
+            : kind === "step"
+              ? 80
+              : 650,
+          now,
+        );
+        o.frequency.exponentialRampToValueAtTime(60, now + 0.2);
+        g.gain.setValueAtTime(0.0001, now);
+        g.gain.exponentialRampToValueAtTime(
+          (kind === "step" ? 0.008 : 0.045) * A.game.s.settings.soundEffects,
+          now + 0.012,
+        );
+        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+        o.connect(g).connect(A.audio.destination);
+        o.start();
+        o.stop(now + 0.24);
       }
-      const o = A.audio.createOscillator(),
-        g = A.audio.createGain(),
-        now = A.audio.currentTime;
-      o.type = kind === "mine" || kind === "step" ? "triangle" : "sine";
-      o.frequency.setValueAtTime(
-        kind === "mine"
-          ? A.held() === "pickaxe"
-            ? 460
-            : 140
-          : kind === "step"
-            ? 80
-            : 650,
-        now,
-      );
-      o.frequency.exponentialRampToValueAtTime(60, now + 0.2);
-      g.gain.setValueAtTime(0.0001, now);
-      g.gain.exponentialRampToValueAtTime(
-        kind === "step" ? 0.008 : 0.045,
-        now + 0.012,
-      );
-      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
-      o.connect(g).connect(A.audio.destination);
-      o.start();
-      o.stop(now + 0.24);
     } catch {}
   };
 })();

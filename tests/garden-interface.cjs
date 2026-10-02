@@ -4,10 +4,10 @@ const url = process.env.GARDEN_URL || "http://127.0.0.1:4174/";
 (async () => {
   const b = await chromium.launch({
     headless: true,
-    // Epic C7.35: same documented fallback as tests/garden-material-audit.cjs/
+    // Epic C7.35/C7.36: same documented fallback as tests/garden-material-audit.cjs/
     // campaign-house-visual.cjs, needed in this container to actually run this file (the
-    // one test that exercises the settings panel's sound toggle this epic's compatibility
-    // glue depends on) rather than leaving the regression unverified.
+    // one test that exercises the settings panel's two sound-level rows,
+    // soundAmbient/soundEffects) rather than leaving the regression unverified.
     executablePath: require("node:fs").existsSync("/opt/pw-browsers/chromium")
       ? "/opt/pw-browsers/chromium"
       : undefined,
@@ -56,26 +56,36 @@ const url = process.env.GARDEN_URL || "http://127.0.0.1:4174/";
       await p.waitForTimeout(100);
     };
     await click("open-settings");
-    await click("row-0");
-    assert.deepEqual(
-      await p.evaluate(() => [
-        __view.game.s.settings.soundEffects,
-        __view.game.s.settings.soundAmbient,
-      ]),
-      [1, 1],
+    // Epic C7.36: soundAmbient (row-0) and soundEffects (row-1) each cycle independently
+    // through five levels (0, 0.25, 0.5, 0.75, 1) on every click, replacing the single
+    // combined on/off row C7.35 left in place — four clicks each reaches 1 (the previous
+    // "sound: true" behavior) without the other level moving at all.
+    for (let i = 0; i < 4; i++) await click("row-0");
+    assert.equal(
+      await p.evaluate(() => __view.game.s.settings.soundAmbient),
+      1,
     );
-    await click("row-0");
+    assert.equal(await p.evaluate(() => __view.game.s.settings.soundEffects), 0);
+    for (let i = 0; i < 4; i++) await click("row-1");
+    assert.equal(
+      await p.evaluate(() => __view.game.s.settings.soundEffects),
+      1,
+    );
+    assert.equal(await p.evaluate(() => __view.game.s.settings.soundAmbient), 1);
+    // Export/import/backup/rescue each shifted one row later by the new soundEffects row
+    // (hints/reduced/pause now row-2/row-3/row-4) and now land entirely on the settings
+    // panel's second page (confirmed against the real paginated row ids, not guessed).
+    await click("next");
     const download = p.waitForEvent("download");
-    await click("row-4");
+    await click("row-0");
     const file = await download,
       stream = await file.createReadStream(),
       chunks = [];
     for await (const c of stream) chunks.push(c);
     const raw = Buffer.concat(chunks);
     assert.equal(JSON.parse(raw).version, 3);
-    await click("next");
     let chooser = p.waitForEvent("filechooser");
-    await click("row-0");
+    await click("row-1");
     await (
       await chooser
     ).setFiles({
@@ -86,7 +96,7 @@ const url = process.env.GARDEN_URL || "http://127.0.0.1:4174/";
     await p.waitForFunction(() => __hud.model.toast.includes("Import refusé"));
     assert.equal(await p.evaluate(() => __hud.model.importReady), false);
     chooser = p.waitForEvent("filechooser");
-    await click("row-0");
+    await click("row-1");
     await (
       await chooser
     ).setFiles({
@@ -95,7 +105,7 @@ const url = process.env.GARDEN_URL || "http://127.0.0.1:4174/";
       buffer: raw,
     });
     await p.waitForFunction(() => __hud.model.importReady);
-    await click("row-0");
+    await click("row-1");
     await p.waitForFunction(() => !__hud.model.panel);
     assert.deepEqual(
       await p.evaluate(() => __view.game.s.inventory),

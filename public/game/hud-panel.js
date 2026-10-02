@@ -574,22 +574,27 @@
             data: { id: e.id },
           });
       } else if (m.panel === "settings") {
+        // Epic C7.36: soundAmbient/soundEffects (C7.35) each get their own row and their
+        // own level display (percentage, five crans) instead of the single "Sons et
+        // ambiance" on/off row this replaces — see garden-dispatch.js's
+        // "setting-sound-level" for the matching cycle-on-tap logic.
         for (const [key, label] of [
-          ["sound", "Sons et ambiance"],
+          ["soundAmbient", "Volume d'ambiance"],
+          ["soundEffects", "Volume des effets"],
+        ])
+          rows.push({
+            title: label,
+            detail: `${Math.round(m.s.settings[key] * 100)} %`,
+            action: "setting-sound-level",
+            data: { key },
+          });
+        for (const [key, label] of [
           ["hints", "Indications"],
           ["reduced", "Réduire les mouvements"],
         ])
           rows.push({
             title: label,
-            // Epic C7.35: "sound" is a combined display of the two real settings
-            // (soundEffects/soundAmbient) until C7.36 gives each its own row — see
-            // garden-dispatch.js's "setting" case for the matching toggle logic.
-            detail:
-              (key === "sound"
-                ? m.s.settings.soundEffects > 0 || m.s.settings.soundAmbient > 0
-                : m.s.settings[key])
-                ? "Activé"
-                : "Désactivé",
+            detail: m.s.settings[key] ? "Activé" : "Désactivé",
             action: "setting",
             data: { key },
           });
